@@ -106,5 +106,10 @@ The mod actually requires the only game-code files from the build project: `jamp
 - RoboPhred
 - OJP Team group
 
+**Extra assets authors:**
+- Lord Marka Ragnos: G.Grievous, Strofitus, b3-k5 StroffxDesign, Bacon, Xioth
+- Throwable Stuff: Jose Carlos
+- HD HUD Elements: Grab
+
 # License
 **OpenJK** is licensed under GPLv2 as free software. You are free to use, modify and redistribute OpenJK following the terms in LICENSE.txt.
