@@ -2,6 +2,14 @@
 
 
 
+## [Unreleased]
+
+### Added
+- Text in quotes inside the RP chat modifiers (`/me`, `/do`, `/my`, `/force`, `/npc` and the rest) is coloured green, then the line goes back to its own colour.
+
+### Changed
+- `/admholo` and `/admghost` are renamed to `/holo` and `/ghost`. Any logged-in player can use them on themselves; using them on another player still needs the "Player effects" admin flag. `/admwalkthrough` and `/admhidden` are unchanged.
+
 ## [3.8.5]
 
 All changes below are relative to the last stable GalaxyRP release (3.7.2) this fork started from.
