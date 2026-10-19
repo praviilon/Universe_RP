@@ -6,6 +6,7 @@
 
 ### Added
 - Text in quotes inside the RP chat modifiers (`/me`, `/do`, `/my`, `/force`, `/npc` and the rest) is coloured green, then the line goes back to its own colour.
+- `/list glm <folder> <page>`: lists the `.glm` model files the server has, starting in `models/players`, the same way `/list models` lists `.md3` files.
 
 ### Changed
 - `/admholo` and `/admghost` are renamed to `/holo` and `/ghost`. Any logged-in player can use them on themselves; using them on another player still needs the "Player effects" admin flag. `/admwalkthrough` and `/admhidden` are unchanged.
