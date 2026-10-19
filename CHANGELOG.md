@@ -2,12 +2,13 @@
 
 
 
-## [Unreleased]
+## [3.8.6]
 
 ### Added
 - Text in quotes inside the RP chat modifiers (`/me`, `/do`, `/my`, `/force`, `/npc` and the rest) is coloured green, then the line goes back to its own colour.
 - `/list glm <folder> <page>`: lists the `.glm` model files the server has, starting in `models/players`, the same way `/list md3` lists `.md3` files. Its names can be used as the `model` key of a `misc_model_ghoul`.
 - `/upgradereset <player name or ID>` admin command ("Upgrade Skills" admin flag, like `/skillup` and `/skilldown`): removes the three permanent shop upgrades from a player's character so they can be bought again. Credits are not refunded.
+- Hats and Capes for players, persisted per character. Use `/cosmetics` command to set them. `rp_allow_cosmetics` server cvar: `0` switches hats and capes off for everyone. Each character's choice is still saved and comes back when it is switched on again.
 
 ### Changed
 - `/admholo` and `/admghost` are renamed to `/holo` and `/ghost`. Any logged-in player can use them on themselves; using them on another player still needs the "Player effects" admin flag. `/admwalkthrough` and `/admhidden` are unchanged.
