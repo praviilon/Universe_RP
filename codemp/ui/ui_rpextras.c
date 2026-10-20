@@ -17,7 +17,8 @@ ingame_rpx_spawners (GLX_U: and ingame_rpx_glmprops). cgame's half is cg_rpextra
   model at no cost.
 - GLX_U: the GLM Props preview (UI_RPX_GPREVIEW): the same, for a .glm, through a Ghoul2 instance of
   its own. The instance is freed when the menu closes and made again from the model's path when it
-  opens on the same map (the model keeps its slot); RPX_GlmBounds() (rp_extras.h) gives its size.
+  opens on the same map (the model keeps its slot); RPX_GlmShape() (rp_extras.h) gives its size as drawn.
+  Its skin: one of the model_*.skin files of the model's folder (RPX_ReadSkins()).
   Its Animation tab: the frames of the model's own animation file (.gla) it plays, typed or taken from
   the named animations of the animation.cfg next to that file (FEEDER_RPX_ANIMS); the preview plays
   them as the spawned prop will (RPX_GlmAnimate()).
@@ -83,9 +84,15 @@ static struct {
 	vec3_t		mins, maxs;
 	char		gla[MAX_QPATH];		// its animation file, without .gla: "" or "*default" for none
 	int			numFrames;			// that file's frames; 0 when there is none or it was not read
+	int			sizedAt[3];			// the Animation tab (Animated, Start, End) mins/maxs were measured at
+	int			changedAt;			// when it last changed from that; 0 when it has not
+	char		skins[32][32];		// its folder's skins (model_<name>.skin), "default" first
+	int			numSkins;
 	char		previewed[RPX_PREVIEW_GLMS][MAX_QPATH];
 	int			numPreviewed;
 } rpxGlm;
+
+#define RPX_GLM_RESIZE_SETTLE	300		// the Animation tab's frames typed: measured again once they rest this long
 
 // GLX_U: [Extras] what the GLM preview's instance plays now (RPX_GlmAnimate())
 static struct {
@@ -453,6 +460,7 @@ static void RPX_Navigate( int row ) {
 	RPX_Msg( "" );
 	if ( rpxKind == RPX_GLMS ) {
 		RPX_GlmClear();
+		trap->Cvar_Set( "ui_rpx_g_skin", "" );
 	} else {
 		rpxProp.model = 0;
 	}
@@ -567,6 +575,7 @@ qboolean UI_RpxFeederSelection( int index ) {
 			rpxProp.model = 0;
 		} else if ( rpxKind == RPX_GLMS ) {
 			RPX_GlmClear();
+			trap->Cvar_Set( "ui_rpx_g_skin", "" );	// another model's skins
 		} else if ( rpxKind == RPX_EFFECTS ) {
 			RPX_StopFxPreview();
 		}
@@ -700,38 +709,11 @@ static void RPX_PreviewProp( void ) {
 }
 
 static qboolean RPX_GlmMake( const char *path );
+static void RPX_GlmMeasure( void );
 
 // GLX_U: [Extras] an animation file (without .gla) that is one: not "" nor the game's own "*default"
 static qboolean RPX_GlaNamed( const char *gla ) {
 	return ( gla[0] && gla[0] != '*' ) ? qtrue : qfalse;
-}
-
-// GLX_U: [Extras] the frames of an animation file (mdxaHeader_t: ident, version, name, fScale, numFrames),
-// 0 when there is none or it does not read as one
-static int RPX_GlaFrames( const char *gla ) {
-	static const int ident = ( 'A' << 24 ) + ( 'G' << 16 ) + ( 'L' << 8 ) + '2';	// MDXA_IDENT
-	char path[MAX_QPATH];
-	byte head[80];
-	fileHandle_t f = 0;
-	int len, frames = 0;
-
-	if ( !RPX_GlaNamed( gla ) || strlen( gla ) + 4 >= sizeof( path ) ) {
-		return 0;
-	}
-	Com_sprintf( path, sizeof( path ), "%s.gla", gla );
-	len = trap->FS_Open( path, &f, FS_READ );
-	if ( !f ) {
-		return 0;
-	}
-	if ( len >= (int)sizeof( head ) && trap->FS_Read( head, sizeof( head ), f ) == (int)sizeof( head ) &&
-		RPX_GlmInt( head ) == ident && RPX_GlmInt( head + 4 ) == 6 ) {
-		frames = RPX_GlmInt( head + 76 );
-		if ( frames < 0 ) {
-			frames = 0;
-		}
-	}
-	trap->FS_Close( f );
-	return frames;
 }
 
 static int QDECL RPX_AnimCompare( const void *a, const void *b ) {
@@ -920,6 +902,7 @@ static void RPX_AnimSet( int which ) {
 		trap->Cvar_Set( "ui_rpx_g_end", va( "%d", a->first + a->num - 1 ) );
 	}
 	trap->Cvar_Set( "ui_rpx_g_anim", "1" );
+	RPX_GlmMeasure();	// at once: a button, not typing
 	RPX_Msg( "" );
 }
 
@@ -955,6 +938,16 @@ static const char *RPX_GlmSpawnFramesProblem( void ) {
 
 // GLX_U: [Extras] the GLM preview's instance of path, with the skin the game shows a misc_model_ghoul
 // without one: model_default.skin from its folder, when there is one (CG_General in cg_ents.c)
+static qboolean RPX_GlmSetSkin( const char *file ) {
+	qhandle_t h;
+
+	if ( !RPX_LocalFileExists( file ) || !( h = trap->R_RegisterSkin( file ) ) ) {
+		return qfalse;
+	}
+	trap->G2API_SetSkin( rpxGlm.ghoul2, 0, h, h );
+	return qtrue;
+}
+
 static qboolean RPX_GlmMake( const char *path ) {
 	char skin[MAX_QPATH];
 	char *slash;
@@ -971,26 +964,143 @@ static qboolean RPX_GlmMake( const char *path ) {
 	}
 	UI_InsertG2Pointer( rpxGlm.ghoul2 );
 
+	// GLX_U: [Extras] or the one Skin chooses (the server's misc_model_ghoul "skin": model_<skin>.skin)
 	Q_strncpyz( skin, path, sizeof( skin ) );
 	slash = strrchr( skin, '/' );
-	if ( slash && (int)( slash + 1 - skin ) + 18 < (int)sizeof( skin ) ) {
-		strcpy( slash + 1, "model_default.skin" );
-		if ( RPX_LocalFileExists( skin ) ) {
-			qhandle_t h = trap->R_RegisterSkin( skin );
+	if ( slash ) {
+		const char *chosen = RPX_CvarStr( "ui_rpx_g_skin" );
+		qboolean set = qfalse;
 
-			if ( h ) {
-				trap->G2API_SetSkin( rpxGlm.ghoul2, 0, h, h );
-			}
+		if ( chosen[0] && Q_stricmp( chosen, "default" ) && !RPX_LabelProblem( chosen ) &&
+			(int)( slash + 1 - skin ) + 11 + (int)strlen( chosen ) < (int)sizeof( skin ) ) {
+			Com_sprintf( slash + 1, sizeof( skin ) - (int)( slash + 1 - skin ), "model_%s.skin", chosen );
+			set = RPX_GlmSetSkin( skin );
+		}
+		if ( !set && (int)( slash + 1 - skin ) + 18 < (int)sizeof( skin ) ) {
+			strcpy( slash + 1, "model_default.skin" );
+			RPX_GlmSetSkin( skin );
 		}
 	}
 	return qtrue;
+}
+
+// GLX_U: [Extras] the GLM preview's model measured as drawn at the Animation tab's frames (RPX_GlmShape());
+// its animation file and that file's frame count with it
+static void RPX_GlmMeasure( void ) {
+	int frames[RPX_GLM_MAX_FRAMES], n;
+	float reach;
+
+	rpxGlm.sizedAt[0] = atoi( RPX_CvarStr( "ui_rpx_g_anim" ) );
+	rpxGlm.sizedAt[1] = (int)atof( RPX_CvarStr( "ui_rpx_g_start" ) );
+	rpxGlm.sizedAt[2] = (int)atof( RPX_CvarStr( "ui_rpx_g_end" ) );
+	rpxGlm.changedAt = 0;
+	n = RPX_GlmFrameList( rpxGlm.sizedAt[0] ? qtrue : qfalse, rpxGlm.sizedAt[1], rpxGlm.sizedAt[2], frames );
+	rpxGlm.sized = RPX_GlmShape( rpxGlm.path, frames, n, rpxGlm.mins, rpxGlm.maxs, &reach, rpxGlm.gla, sizeof( rpxGlm.gla ), &rpxGlm.numFrames );
+	if ( !rpxGlm.sized ) {
+		// the box the ui frames a menu's Ghoul2 model in when it has none (Item_Model_Paint)
+		VectorSet( rpxGlm.mins, -16, -16, -24 );
+		VectorSet( rpxGlm.maxs, 16, 16, 32 );
+	}
+}
+
+// GLX_U: [Extras] measured again when the Animation tab's frames have changed and rest (typed ones change at
+// each key; measuring reads most of a big animation file)
+static void RPX_GlmResizeCheck( void ) {
+	int now = uiInfo.uiDC.realTime;
+	int at[3];
+
+	at[0] = atoi( RPX_CvarStr( "ui_rpx_g_anim" ) );
+	at[1] = (int)atof( RPX_CvarStr( "ui_rpx_g_start" ) );
+	at[2] = (int)atof( RPX_CvarStr( "ui_rpx_g_end" ) );
+	if ( !memcmp( at, rpxGlm.sizedAt, sizeof( at ) ) ) {
+		rpxGlm.changedAt = 0;
+		return;
+	}
+	if ( !rpxGlm.changedAt ) {
+		rpxGlm.changedAt = now ? now : 1;
+	} else if ( now - rpxGlm.changedAt >= RPX_GLM_RESIZE_SETTLE ) {
+		RPX_GlmMeasure();
+	}
+}
+
+// GLX_U: [Extras] the skins of the previewed model's folder on this client: its model_<name>.skin files, with
+// a name the server takes (letters, digits, _ and -); "default" first
+static void RPX_ReadSkins( void ) {
+	static char list[8192];
+	char folder[MAX_QPATH];
+	const char *slash = strrchr( rpxGlm.path, '/' ), *name;
+	int count, i, k;
+
+	rpxGlm.numSkins = 0;
+	if ( !slash ) {
+		return;
+	}
+	Q_strncpyz( folder, rpxGlm.path, (int)( slash - rpxGlm.path ) + 1 );
+	count = trap->FS_GetFileList( folder, ".skin", list, sizeof( list ) );
+	for ( i = 0, name = list; i < count && name < list + sizeof( list ) && *name; i++, name += strlen( name ) + 1 ) {
+		char skin[32];
+		int len = strlen( name );
+
+		if ( len <= 11 || len - 11 >= (int)sizeof( skin ) || Q_stricmpn( name, "model_", 6 ) || Q_stricmp( name + len - 5, ".skin" ) ) {
+			continue;
+		}
+		Q_strncpyz( skin, name + 6, len - 10 );
+		if ( RPX_LabelProblem( skin ) || rpxGlm.numSkins >= (int)ARRAY_LEN( rpxGlm.skins ) ) {
+			continue;
+		}
+		for ( k = 0; k < rpxGlm.numSkins && Q_stricmp( rpxGlm.skins[k], skin ); k++ ) {
+		}
+		if ( k < rpxGlm.numSkins ) {
+			continue;	// in two places
+		}
+		if ( !Q_stricmp( skin, "default" ) && rpxGlm.numSkins ) {
+			memmove( rpxGlm.skins[1], rpxGlm.skins[0], sizeof( rpxGlm.skins[0] ) * rpxGlm.numSkins );
+			Q_strncpyz( rpxGlm.skins[0], skin, sizeof( rpxGlm.skins[0] ) );
+		} else {
+			Q_strncpyz( rpxGlm.skins[rpxGlm.numSkins], skin, sizeof( rpxGlm.skins[0] ) );
+		}
+		rpxGlm.numSkins++;
+	}
+}
+
+// GLX_U: [Extras] where the chosen skin is in the previewed model's list, or -1
+static int RPX_GlmSkinIndex( void ) {
+	const char *chosen = RPX_CvarStr( "ui_rpx_g_skin" );
+	int i;
+
+	for ( i = 0; i < rpxGlm.numSkins; i++ ) {
+		if ( !Q_stricmp( rpxGlm.skins[i], chosen[0] ? chosen : "default" ) ) {
+			return i;
+		}
+	}
+	return -1;
+}
+
+// GLX_U: [Extras] Skin's < and >: the previewed model's skins in turn
+static void RPX_GlmSkinStep( int step ) {
+	int i;
+
+	if ( !rpxGlm.shown ) {
+		RPX_Msg( "^3Press Preview first: the skins are the previewed model's." );
+		return;
+	}
+	if ( !rpxGlm.numSkins ) {
+		RPX_Msg( "^3This model has no skin files of its own." );
+		return;
+	}
+	i = RPX_GlmSkinIndex();
+	i = ( i < 0 ) ? ( step > 0 ? 0 : rpxGlm.numSkins - 1 ) : ( i + step + rpxGlm.numSkins ) % rpxGlm.numSkins;
+	trap->Cvar_Set( "ui_rpx_g_skin", Q_stricmp( rpxGlm.skins[i], "default" ) ? rpxGlm.skins[i] : "" );
+	if ( !RPX_GlmMake( rpxGlm.path ) ) {	// shown with it
+		rpxGlm.shown = qfalse;
+	}
+	RPX_Msg( "" );
 }
 
 // GLX_U: [Extras] Preview in GLM Props: as RPX_PreviewProp(), for the selected .glm
 static void RPX_PreviewGlm( void ) {
 	char folder[RPX_NAME_LEN], path[MAX_QPATH * 2];
 	int row = RPX_SelectedRow(), i;
-	float reach;
 
 	if ( rpxKind != RPX_GLMS || !RPX_HaveSelection() ) {
 		return;
@@ -1020,20 +1130,18 @@ static void RPX_PreviewGlm( void ) {
 		Q_strncpyz( rpxGlm.previewed[rpxGlm.numPreviewed++], path, sizeof( rpxGlm.previewed[0] ) );
 	}
 
+	Q_strncpyz( rpxGlm.path, path, sizeof( rpxGlm.path ) );
+	RPX_ReadSkins();
+	if ( RPX_GlmSkinIndex() < 0 ) {
+		trap->Cvar_Set( "ui_rpx_g_skin", "" );	// not one of this model's
+	}
 	if ( !RPX_GlmMake( path ) ) {
 		RPX_GlmClear();
 		RPX_Msg( "^3That model could not be loaded." );
 		return;
 	}
-	Q_strncpyz( rpxGlm.path, path, sizeof( rpxGlm.path ) );
 	rpxGlm.shown = qtrue;
-	rpxGlm.sized = RPX_GlmBounds( path, rpxGlm.mins, rpxGlm.maxs, &reach, rpxGlm.gla, sizeof( rpxGlm.gla ) );
-	if ( !rpxGlm.sized ) {
-		// the box the ui frames a menu's Ghoul2 model in when it has none (Item_Model_Paint)
-		VectorSet( rpxGlm.mins, -16, -16, -24 );
-		VectorSet( rpxGlm.maxs, 16, 16, 32 );
-	}
-	rpxGlm.numFrames = RPX_GlaFrames( rpxGlm.gla );
+	RPX_GlmMeasure();
 	RPX_ReadAnims( rpxGlm.numFrames > 0 ? rpxGlm.gla : "" );
 	RPX_Msg( "" );
 }
@@ -1082,6 +1190,7 @@ The Extras menus' uiScripts; qfalse when name is not one of them.
 	rpxEnter											the list's double click: open a folder
 	rpxPreview											Props, GLM Props and Effects
 	rpxAnimSet <start|end|both>, rpxAnimEnter, rpxAnimReplay	GLM Props' Animation tab
+	rpxSkin <prev|next>									GLM Props' Skin
 	rpxDo <action>										a button: see CG_Rpx_f() in cg_rpextras.c
 	rpxReset <prop|angles|cam>							the preview's sliders back, or the prop's angles
 	rpxLightSame										Lights: the colour when off is the colour when on
@@ -1231,6 +1340,11 @@ qboolean UI_RpxScript( const char *name, char **args ) {
 
 		if ( item && item->typeData.listbox && item->typeData.listbox->cursorPos == item->cursorPos ) {
 			RPX_AnimSet( 3 );
+		}
+	} else if ( !Q_stricmp( name, "rpxSkin" ) ) {
+		// GLX_U: [Extras] GLM Props' Skin < and >
+		if ( String_Parse( args, &arg ) ) {
+			RPX_GlmSkinStep( !Q_stricmp( arg, "prev" ) ? -1 : 1 );
 		}
 	} else if ( !Q_stricmp( name, "rpxAnimReplay" ) ) {
 		rpxGlmAnim.replay = qtrue;	// GLX_U: [Extras] RPX_GlmAnimate() plays them again
@@ -1415,6 +1529,7 @@ static void RPX_DrawGlmPreview( rectDef_t *rect, float scale, vec4_t color, int 
 	}
 	if ( rpxGlm.shown ) {
 		RPX_GlmAnimate();	// GLX_U: the Animation tab's frames (may make the instance again)
+		RPX_GlmResizeCheck();
 	}
 	if ( !rpxGlm.shown || !rpxGlm.ghoul2 ) {
 		rpxGlm.shown = qfalse;
@@ -1540,6 +1655,20 @@ static void RPX_DrawAnimRange( rectDef_t *rect, float scale, vec4_t color, int i
 	Text_Paint( rect->x, rect->y + rect->h / 2, scale, color, text, 0, 0, ITEM_TEXTSTYLE_NORMAL, iMenuFont );
 }
 
+// GLX_U: [Extras] GLM Props' Skin line: the chosen one, and which of the previewed model's it is
+static void RPX_DrawSkin( rectDef_t *rect, float scale, vec4_t color, int iMenuFont ) {
+	const char *chosen = RPX_CvarStr( "ui_rpx_g_skin" );
+	char text[96];
+	int i = rpxGlm.shown ? RPX_GlmSkinIndex() : -1;
+
+	if ( i >= 0 ) {
+		Com_sprintf( text, sizeof( text ), "Skin: %s (%d of %d)", rpxGlm.skins[i], i + 1, rpxGlm.numSkins );
+	} else {
+		Com_sprintf( text, sizeof( text ), "Skin: %s", chosen[0] ? chosen : "default" );
+	}
+	Text_Paint( rect->x, rect->y, scale, color, text, 0, 0, ITEM_TEXTSTYLE_NORMAL, iMenuFont );
+}
+
 qboolean UI_RpxOwnerDraw( int ownerDraw, rectDef_t *rect, float scale, vec4_t color, int iMenuFont ) {
 	switch ( ownerDraw ) {
 	case UI_RPX_PREVIEW:
@@ -1568,6 +1697,9 @@ qboolean UI_RpxOwnerDraw( int ownerDraw, rectDef_t *rect, float scale, vec4_t co
 		return qtrue;
 	case UI_RPX_GANIMRANGE:
 		RPX_DrawAnimRange( rect, scale, color, iMenuFont );
+		return qtrue;
+	case UI_RPX_GSKIN:
+		RPX_DrawSkin( rect, scale, color, iMenuFont );
 		return qtrue;
 	default:
 		return qfalse;

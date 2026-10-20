@@ -129,6 +129,9 @@ static const char * const rpxSoundChannels[] = {
 	X( "ui_rpx_g_end",			"0" ) \
 	X( "ui_rpx_g_loop",			"0" )		/* spawnflags 2, LOOP */ \
 	X( "ui_rpx_filter_anims",	"" )		/* the Animation tab's list of named animations */ \
+	X( "ui_rpx_g_box",			"1" )		/* GLX_U: 1 its box fits the model as drawn, 0 the default 32 */ \
+	X( "ui_rpx_g_sit",			"1" )		/* raised so its bottom sits on the surface aimed at */ \
+	X( "ui_rpx_g_skin",			"" )		/* model_<skin>.skin of its folder; "" its default */ \
 	X( "ui_rpx_e_dir",			"0" )		/* 0 up, 1 facing me, 2 facing me, tilted by ui_rpx_e_pitch */ \
 	X( "ui_rpx_e_pitch",		"0" ) \
 	X( "ui_rpx_e_delay",		"200" ) \
@@ -205,17 +208,16 @@ static const char * const rpxSoundChannels[] = {
 #define RPX_PREVIEW_EFFECTS	32
 #define RPX_PREVIEW_GLMS	50		// GLX_U: each takes a model slot, and its .gla one too
 
-// GLX_U: [Extras] a .glm model's size, for the GLM Props preview and the spawned prop's radius: the box
-// round the vertices of its most detailed LOD, as the file stores them (the model's base pose), and the
-// farthest of them from the origin (*reach: the same however the model is turned). With gla, also the
-// animation file the model names (without its .gla; '\' read as '/', no leading '/'; "*default" is the
-// game's own one-bone skeleton: no animation). The ui has no FS_Seek,
-// so the file is read forward only, a piece at a time, and only as far as that LOD's last vertex. qfalse
-// for anything that does not read as a .glm should (mdx_format.h).
+// GLX_U: [Extras] a .glm model's shape as the game draws it, for the GLM Props preview and the spawned
+// prop's radius, box and lift (RPX_GlmShape() below). Both files are read forward only, a piece at a time
+// (the ui has no FS_Seek).
 #define RPX_GLM_PIECE		16384
 #define RPX_GLM_MAX_SURFS	1024
-#define RPX_GLM_MAX_VERTS	65536		// in one surface
+#define RPX_GLM_SURF_VERTS	4096		// in one surface (the renderer draws at most 1000 at a time)
 #define RPX_GLM_MAX_COORD	65536.0f
+#define RPX_GLM_MAX_BONES	256
+#define RPX_GLM_MAX_REFS	32			// bone references of one surface: a vertex names them in 5 bits
+#define RPX_GLM_MAX_FRAMES	16			// frames of an animation measured: its start, its end, 14 between
 
 typedef struct {
 	fileHandle_t	f;
@@ -266,122 +268,461 @@ static QINLINE int RPX_GlmInt( const byte *p ) {
 	return LittleLong( v );
 }
 
-static QINLINE qboolean RPX_GlmBoundsRead( rpxGlmReader_t *r, vec3_t mins, vec3_t maxs, float *reach, char *gla, int glaSize ) {
-	static const int ident = ( 'M' << 24 ) + ( 'G' << 16 ) + ( 'L' << 8 ) + '2';	// MDXM_IDENT
-	int surfOfs[RPX_GLM_MAX_SURFS];
-	int numSurfs, lod, table, i, j, k, verts = 0;
-	const byte *p;
+static QINLINE float RPX_GlmFloat( const byte *p ) {
+	float v;
 
-	// mdxmHeader_t: ident, version, name, animName, animIndex, numBones, numLODs, ofsLODs, numSurfaces, ...
-	p = RPX_GlmAt( r, 0, 164 );
+	memcpy( &v, p, 4 );
+	return LittleFloat( v );
+}
+
+static QINLINE unsigned short RPX_GlmShort( const byte *p ) {
+	return (unsigned short)( p[0] | ( p[1] << 8 ) );
+}
+
+static rpxGlmReader_t rpxGlmReader;	// one file at a time; not on the stack: 16 KB
+
+static QINLINE qboolean RPX_GlmOpen( const char *path ) {
+	rpxGlmReader.f = 0;
+	rpxGlmReader.pos = rpxGlmReader.have = 0;
+	rpxGlmReader.len = trap->FS_Open( path, &rpxGlmReader.f, FS_READ );
+	if ( !rpxGlmReader.f ) {
+		return qfalse;
+	}
+	if ( rpxGlmReader.len <= 0 ) {
+		trap->FS_Close( rpxGlmReader.f );
+		return qfalse;
+	}
+	return qtrue;
+}
+
+// a .glm's header: the animation file it names (without .gla; '\' read as '/', no leading '/'; "*default"
+// is the game's own one-bone skeleton), where its first LOD is and how many surfaces it has
+static QINLINE qboolean RPX_GlmHeader( char *gla, int glaSize, int *lod, int *numSurfs ) {
+	static const int ident = ( 'M' << 24 ) + ( 'G' << 16 ) + ( 'L' << 8 ) + '2';	// MDXM_IDENT
+	const byte *p = RPX_GlmAt( &rpxGlmReader, 0, 164 );	// mdxmHeader_t
+	int n = 0, at = 72;
+
 	if ( !p || RPX_GlmInt( p ) != ident || RPX_GlmInt( p + 4 ) != 6 || RPX_GlmInt( p + 144 ) < 1 ) {
 		return qfalse;
 	}
-	if ( gla && glaSize > 0 ) {
-		// animName, 64 characters
-		int n = 0, at = 72;
-
-		while ( at < 136 && ( p[at] == '/' || p[at] == '\\' ) ) {
-			at++;
-		}
-		for ( ; at < 136 && p[at] && n < glaSize - 1; at++ ) {
-			gla[n++] = ( p[at] == '\\' ) ? '/' : (char)p[at];
-		}
-		gla[n] = '\0';
+	while ( at < 136 && ( p[at] == '/' || p[at] == '\\' ) ) {	// animName, 64 characters
+		at++;
 	}
-	lod = RPX_GlmInt( p + 148 );
-	numSurfs = RPX_GlmInt( p + 152 );
-	if ( lod < 164 || numSurfs < 1 || numSurfs > RPX_GLM_MAX_SURFS ) {
+	for ( ; at < 136 && p[at] && n < glaSize - 1; at++ ) {
+		gla[n++] = ( p[at] == '\\' ) ? '/' : (char)p[at];
+	}
+	gla[n] = '\0';
+	*lod = RPX_GlmInt( p + 148 );
+	*numSurfs = RPX_GlmInt( p + 152 );
+	return ( *lod >= 164 && *numSurfs >= 1 && *numSurfs <= RPX_GLM_MAX_SURFS ) ? qtrue : qfalse;
+}
+
+// the drawn bones of some frames of an animation file: each bone's matrix in the frame times its parent's,
+// which is what the renderer skins a vertex with (tr_ghoul2.cpp, G2_TransformBone(); the root matrix is
+// none for these models). Returns the file's frame count, 0 when it does not read as one.
+static float rpxGlmBones[RPX_GLM_MAX_FRAMES][RPX_GLM_MAX_BONES][3][4];
+static int rpxGlmNumBones;
+
+typedef struct {
+	int		index;			// into the compressed bone pool
+	short	frame, bone;	// whose
+} rpxGlmPoolUse_t;
+
+static int QDECL RPX_GlmPoolCompare( const void *a, const void *b ) {
+	return ( (const rpxGlmPoolUse_t *)a )->index - ( (const rpxGlmPoolUse_t *)b )->index;
+}
+
+static int QDECL RPX_GlmIntCompare( const void *a, const void *b ) {
+	return *(const int *)a - *(const int *)b;
+}
+
+// a compressed bone: quaternion and position (MC_UnCompressQuat(), matcomp.cpp)
+static QINLINE void RPX_GlmUnCompress( const byte *comp, float m[3][4] ) {
+	float w = RPX_GlmShort( comp ) / 16383.0f - 2.0f, x = RPX_GlmShort( comp + 2 ) / 16383.0f - 2.0f;
+	float y = RPX_GlmShort( comp + 4 ) / 16383.0f - 2.0f, z = RPX_GlmShort( comp + 6 ) / 16383.0f - 2.0f;
+	float tx = 2.0f * x, ty = 2.0f * y, tz = 2.0f * z;
+	float twx = tx * w, twy = ty * w, twz = tz * w, txx = tx * x, txy = ty * x, txz = tz * x;
+	float tyy = ty * y, tyz = tz * y, tzz = tz * z;
+
+	m[0][0] = 1.0f - ( tyy + tzz );	m[0][1] = txy - twz;			m[0][2] = txz + twy;
+	m[1][0] = txy + twz;			m[1][1] = 1.0f - ( txx + tzz );	m[1][2] = tyz - twx;
+	m[2][0] = txz - twy;			m[2][1] = tyz + twx;			m[2][2] = 1.0f - ( txx + tyy );
+	m[0][3] = RPX_GlmShort( comp + 8 ) / 64.0f - 512.0f;
+	m[1][3] = RPX_GlmShort( comp + 10 ) / 64.0f - 512.0f;
+	m[2][3] = RPX_GlmShort( comp + 12 ) / 64.0f - 512.0f;
+}
+
+static QINLINE void RPX_GlmMultiply( float out[3][4], float a[3][4], float b[3][4] ) {
+	int i, j;
+
+	for ( i = 0; i < 3; i++ ) {
+		for ( j = 0; j < 4; j++ ) {
+			out[i][j] = a[i][0] * b[0][j] + a[i][1] * b[1][j] + a[i][2] * b[2][j] + ( j == 3 ? a[i][3] : 0.0f );
+		}
+	}
+}
+
+// frames: the ones wanted, put in order, past the file's last moved to it; *numFrames: how many are left
+static QINLINE int RPX_GlaBones( const char *gla, int *frames, int *numFrames ) {
+	static const int ident = ( 'A' << 24 ) + ( 'G' << 16 ) + ( 'L' << 8 ) + '2';	// MDXA_IDENT
+	static float local[RPX_GLM_MAX_FRAMES][RPX_GLM_MAX_BONES][3][4];
+	static rpxGlmPoolUse_t uses[RPX_GLM_MAX_FRAMES * RPX_GLM_MAX_BONES];
+	static int parents[RPX_GLM_MAX_BONES], order[RPX_GLM_MAX_BONES], skelOfs[RPX_GLM_MAX_BONES];
+	char path[MAX_QPATH];
+	int fileFrames, ofsFrames, numBones, ofsPool, i, j, k, n, numUses;
+	const byte *p;
+	qboolean done[RPX_GLM_MAX_BONES];
+
+	if ( strlen( gla ) + 4 >= sizeof( path ) ) {
+		return 0;
+	}
+	Com_sprintf( path, sizeof( path ), "%s.gla", gla );
+	if ( !RPX_GlmOpen( path ) ) {
+		return 0;
+	}
+	// mdxaHeader_t: ident, version, name, fScale, numFrames, ofsFrames, numBones, ofsCompBonePool, ofsSkel
+	p = RPX_GlmAt( &rpxGlmReader, 0, 100 );
+	if ( !p || RPX_GlmInt( p ) != ident || RPX_GlmInt( p + 4 ) != 6 ) {
+		trap->FS_Close( rpxGlmReader.f );
+		return 0;
+	}
+	fileFrames = RPX_GlmInt( p + 76 );
+	ofsFrames = RPX_GlmInt( p + 80 );
+	numBones = RPX_GlmInt( p + 84 );
+	ofsPool = RPX_GlmInt( p + 88 );
+	if ( fileFrames < 1 || numBones < 1 || numBones > RPX_GLM_MAX_BONES || ofsFrames < 100 || ofsPool < ofsFrames ) {
+		trap->FS_Close( rpxGlmReader.f );
+		return 0;
+	}
+
+	// the frames: in order, each once, within the file
+	for ( i = 0; i < *numFrames; i++ ) {
+		frames[i] = (int)Com_Clamp( 0, fileFrames - 1, frames[i] );
+	}
+	qsort( frames, *numFrames, sizeof( frames[0] ), RPX_GlmIntCompare );
+	for ( i = 1, n = 1; i < *numFrames; i++ ) {
+		if ( frames[i] != frames[n - 1] ) {
+			frames[n++] = frames[i];
+		}
+	}
+	*numFrames = ( *numFrames > 0 ) ? n : 0;
+
+	// the skeleton: each bone's parent (mdxaSkel_t: name, flags, parent, ...), in the file's order
+	for ( i = 0; i < numBones; i++ ) {
+		p = RPX_GlmAt( &rpxGlmReader, 100 + i * 4, 4 );
+		if ( !p ) {
+			trap->FS_Close( rpxGlmReader.f );
+			return 0;
+		}
+		skelOfs[i] = 100 + RPX_GlmInt( p );
+		order[i] = i;
+	}
+	for ( i = 1; i < numBones; i++ ) {
+		int b = order[i];
+
+		for ( j = i; j > 0 && skelOfs[order[j - 1]] > skelOfs[b]; j-- ) {
+			order[j] = order[j - 1];
+		}
+		order[j] = b;
+	}
+	for ( i = 0; i < numBones; i++ ) {
+		p = RPX_GlmAt( &rpxGlmReader, skelOfs[order[i]] + 68, 4 );
+		if ( !p ) {
+			trap->FS_Close( rpxGlmReader.f );
+			return 0;
+		}
+		parents[order[i]] = RPX_GlmInt( p );
+		if ( parents[order[i]] >= numBones ) {
+			trap->FS_Close( rpxGlmReader.f );
+			return 0;
+		}
+	}
+
+	// the frames' bones: a 3-byte index into the pool each
+	numUses = 0;
+	for ( i = 0; i < *numFrames; i++ ) {
+		p = RPX_GlmAt( &rpxGlmReader, ofsFrames + frames[i] * numBones * 3, numBones * 3 );
+		if ( !p ) {
+			trap->FS_Close( rpxGlmReader.f );
+			return 0;
+		}
+		for ( j = 0; j < numBones; j++ ) {
+			uses[numUses].index = p[j * 3] | ( p[j * 3 + 1] << 8 ) | ( p[j * 3 + 2] << 16 );
+			uses[numUses].frame = (short)i;
+			uses[numUses].bone = (short)j;
+			numUses++;
+		}
+	}
+	// and the pool, in order: 14 bytes a bone
+	qsort( uses, numUses, sizeof( uses[0] ), RPX_GlmPoolCompare );
+	for ( i = 0; i < numUses; i++ ) {
+		p = RPX_GlmAt( &rpxGlmReader, ofsPool + uses[i].index * 14, 14 );
+		if ( !p ) {
+			trap->FS_Close( rpxGlmReader.f );
+			return 0;
+		}
+		RPX_GlmUnCompress( p, local[uses[i].frame][uses[i].bone] );
+	}
+	trap->FS_Close( rpxGlmReader.f );
+
+	// each bone times its parent's, the parent first
+	for ( i = 0; i < *numFrames; i++ ) {
+		for ( j = 0; j < numBones; j++ ) {
+			done[j] = qfalse;
+		}
+		for ( k = 0; k < numBones; k++ ) {		// a pass a level of the tree at most
+			qboolean progress = qfalse, left = qfalse;
+
+			for ( j = 0; j < numBones; j++ ) {
+				if ( done[j] ) {
+					continue;
+				}
+				if ( parents[j] < 0 ) {
+					memcpy( rpxGlmBones[i][j], local[i][j], sizeof( local[i][j] ) );
+				} else if ( done[parents[j]] ) {
+					RPX_GlmMultiply( rpxGlmBones[i][j], rpxGlmBones[i][parents[j]], local[i][j] );
+				} else {
+					left = qtrue;
+					continue;
+				}
+				done[j] = qtrue;
+				progress = qtrue;
+			}
+			if ( !left ) {
+				break;
+			}
+			if ( !progress ) {
+				return 0;	// a loop in the tree
+			}
+		}
+	}
+	rpxGlmNumBones = numBones;
+	return fileFrames;
+}
+
+/*
+==================
+RPX_GlmShape
+
+GLX_U: [Extras] the box round a .glm as the game draws it at some frames of its animation file, and the
+farthest it reaches from its origin (the same however it is turned): every vertex of its most detailed
+LOD, skinned with its bone weights (mdx_format.h) by the frames' bones (RPX_GlaBones()). A model whose
+animation file is "*default", or that has none the client can read, is measured as the file stores it
+(the drawn pose of a "*default" one). With gla, the animation file it names (without .gla); with
+glaFrames, that file's frame count (0: none read). qfalse when the .glm does not read as one.
+==================
+*/
+static QINLINE qboolean RPX_GlmShape( const char *path, const int *wanted, int numWanted, vec3_t mins, vec3_t maxs,
+	float *reach, char *gla, int glaSize, int *glaFrames ) {
+	static int surfOfs[RPX_GLM_MAX_SURFS];
+	static float pos[RPX_GLM_SURF_VERTS][3];
+	static unsigned int packed[RPX_GLM_SURF_VERTS];
+	static byte weights[RPX_GLM_SURF_VERTS][4];
+	char name[MAX_QPATH];
+	int frames[RPX_GLM_MAX_FRAMES], numFrames = 0, fileFrames = 0;
+	int lod, numSurfs, table, i, j, f, w, verts = 0;
+	const byte *p;
+
+	if ( !gla || glaSize <= 0 ) {
+		gla = name;
+		glaSize = sizeof( name );
+	}
+	gla[0] = '\0';
+	if ( glaFrames ) {
+		*glaFrames = 0;
+	}
+	if ( !RPX_GlmOpen( path ) ) {
+		return qfalse;
+	}
+	if ( !RPX_GlmHeader( gla, glaSize, &lod, &numSurfs ) ) {
+		trap->FS_Close( rpxGlmReader.f );
+		return qfalse;
+	}
+	trap->FS_Close( rpxGlmReader.f );
+
+	// the bones of the frames wanted (the animation file is read before the .glm's vertices)
+	for ( i = 0; i < numWanted && i < RPX_GLM_MAX_FRAMES; i++ ) {
+		frames[numFrames++] = wanted[i];
+	}
+	if ( gla[0] && gla[0] != '*' && numFrames ) {
+		fileFrames = RPX_GlaBones( gla, frames, &numFrames );
+	}
+	if ( !fileFrames ) {
+		numFrames = 0;		// as the file stores it
+	}
+	if ( glaFrames ) {
+		*glaFrames = fileFrames;
+	}
+
+	if ( !RPX_GlmOpen( path ) || !RPX_GlmHeader( name, sizeof( name ), &lod, &numSurfs ) ) {
+		if ( rpxGlmReader.f ) {
+			trap->FS_Close( rpxGlmReader.f );
+		}
 		return qfalse;
 	}
 
-	// the first LOD: its mdxmLOD_t, then an offset a surface, from where that table starts
+	// the first LOD: its mdxmLOD_t, then an offset a surface, from where that table starts; in file order
 	table = lod + 4;
 	for ( i = 0; i < numSurfs; i++ ) {
-		p = RPX_GlmAt( r, table + i * 4, 4 );
+		p = RPX_GlmAt( &rpxGlmReader, table + i * 4, 4 );
 		if ( !p ) {
+			trap->FS_Close( rpxGlmReader.f );
 			return qfalse;
 		}
 		surfOfs[i] = table + RPX_GlmInt( p );
-		if ( surfOfs[i] < table + numSurfs * 4 || surfOfs[i] >= r->len ) {
+		if ( surfOfs[i] < table + numSurfs * 4 || surfOfs[i] >= rpxGlmReader.len ) {
+			trap->FS_Close( rpxGlmReader.f );
 			return qfalse;
 		}
 	}
-	// in file order, as the file can only be read forward
-	for ( i = 1; i < numSurfs; i++ ) {
-		int v = surfOfs[i];
+	qsort( surfOfs, numSurfs, sizeof( surfOfs[0] ), RPX_GlmIntCompare );
 
-		for ( j = i; j > 0 && surfOfs[j - 1] > v; j-- ) {
-			surfOfs[j] = surfOfs[j - 1];
-		}
-		surfOfs[j] = v;
-	}
-
-	VectorSet( mins, 0, 0, 0 );
-	VectorSet( maxs, 0, 0, 0 );
+	VectorClear( mins );
+	VectorClear( maxs );
 	*reach = 0.0f;
 	for ( i = 0; i < numSurfs; i++ ) {
-		int numVerts, ofsVerts;
+		int refs[RPX_GLM_MAX_REFS], numVerts, ofsVerts, numRefs, ofsRefs, part;
 
-		// mdxmSurface_t: ident, thisSurfaceIndex, ofsHeader, numVerts, ofsVerts, ...
-		p = RPX_GlmAt( r, surfOfs[i], 40 );
+		// mdxmSurface_t: ident, thisSurfaceIndex, ofsHeader, numVerts, ofsVerts, numTriangles, ofsTriangles,
+		// numBoneReferences, ofsBoneReferences, ofsEnd
+		p = RPX_GlmAt( &rpxGlmReader, surfOfs[i], 40 );
 		if ( !p ) {
+			trap->FS_Close( rpxGlmReader.f );
 			return qfalse;
 		}
 		numVerts = RPX_GlmInt( p + 12 );
 		ofsVerts = RPX_GlmInt( p + 16 );
-		if ( numVerts < 0 || numVerts > RPX_GLM_MAX_VERTS || ofsVerts < 40 ) {
+		numRefs = RPX_GlmInt( p + 28 );
+		ofsRefs = RPX_GlmInt( p + 32 );
+		if ( numVerts < 0 || numVerts > RPX_GLM_SURF_VERTS || ofsVerts < 40 || numRefs < 0 || numRefs > RPX_GLM_MAX_REFS ||
+			( numRefs && ofsRefs < 40 ) ) {
+			trap->FS_Close( rpxGlmReader.f );
 			return qfalse;
 		}
-		// mdxmVertex_t, 32 bytes: normal, then the position
-		for ( j = 0; j < numVerts; j++ ) {
-			float lenSq = 0.0f;
 
-			p = RPX_GlmAt( r, surfOfs[i] + ofsVerts + j * 32 + 12, 12 );
-			if ( !p ) {
-				return qfalse;
-			}
-			for ( k = 0; k < 3; k++ ) {
-				float c;
+		// the vertices (mdxmVertex_t, 32 bytes: normal, position, weight count and bone numbers, weights) and
+		// the bone references, whichever comes first in the file
+		for ( part = 0; part < 2; part++ ) {
+			qboolean vertsNow = ( ( ofsVerts <= ofsRefs ) == ( part == 0 ) ) ? qtrue : qfalse;
 
-				memcpy( &c, p + k * 4, 4 );
-				c = LittleFloat( c );
-				if ( !( c > -RPX_GLM_MAX_COORD && c < RPX_GLM_MAX_COORD ) ) {
-					return qfalse;		// not a number, or no model's
+			if ( vertsNow ) {
+				for ( j = 0; j < numVerts; j++ ) {
+					p = RPX_GlmAt( &rpxGlmReader, surfOfs[i] + ofsVerts + j * 32 + 12, 20 );
+					if ( !p ) {
+						trap->FS_Close( rpxGlmReader.f );
+						return qfalse;
+					}
+					for ( w = 0; w < 3; w++ ) {
+						pos[j][w] = RPX_GlmFloat( p + w * 4 );
+						if ( !( pos[j][w] > -RPX_GLM_MAX_COORD && pos[j][w] < RPX_GLM_MAX_COORD ) ) {
+							trap->FS_Close( rpxGlmReader.f );
+							return qfalse;	// not a number, or no model's
+						}
+					}
+					packed[j] = (unsigned int)RPX_GlmInt( p + 12 );
+					memcpy( weights[j], p + 16, 4 );
 				}
-				if ( !verts || c < mins[k] ) mins[k] = c;
-				if ( !verts || c > maxs[k] ) maxs[k] = c;
-				lenSq += c * c;
+			} else {
+				for ( j = 0; j < numRefs; j++ ) {
+					p = RPX_GlmAt( &rpxGlmReader, surfOfs[i] + ofsRefs + j * 4, 4 );
+					if ( !p ) {
+						trap->FS_Close( rpxGlmReader.f );
+						return qfalse;
+					}
+					refs[j] = RPX_GlmInt( p );
+				}
 			}
-			if ( lenSq > *reach ) {
-				*reach = lenSq;
+		}
+
+		for ( j = 0; j < numVerts; j++ ) {
+			for ( f = 0; f < ( numFrames ? numFrames : 1 ); f++ ) {
+				vec3_t out;
+				float lenSq;
+
+				if ( !numFrames ) {
+					VectorCopy( pos[j], out );
+				} else {
+					int count = ( packed[j] >> 30 ) + 1;
+					float total = 0.0f;
+
+					VectorClear( out );
+					for ( w = 0; w < count; w++ ) {
+						int ref = ( packed[j] >> ( 5 * w ) ) & 31;
+						float weight, ( *m )[4];
+
+						if ( w == count - 1 ) {
+							weight = 1.0f - total;
+						} else {
+							weight = ( weights[j][w] | ( ( packed[j] >> ( 12 + w * 2 ) ) & 0x300 ) ) / 1023.0f;
+							total += weight;
+						}
+						if ( ref >= numRefs || refs[ref] < 0 || refs[ref] >= rpxGlmNumBones ) {
+							trap->FS_Close( rpxGlmReader.f );
+							return qfalse;
+						}
+						m = rpxGlmBones[f][refs[ref]];
+						out[0] += weight * ( m[0][0] * pos[j][0] + m[0][1] * pos[j][1] + m[0][2] * pos[j][2] + m[0][3] );
+						out[1] += weight * ( m[1][0] * pos[j][0] + m[1][1] * pos[j][1] + m[1][2] * pos[j][2] + m[1][3] );
+						out[2] += weight * ( m[2][0] * pos[j][0] + m[2][1] * pos[j][1] + m[2][2] * pos[j][2] + m[2][3] );
+					}
+				}
+				for ( w = 0; w < 3; w++ ) {
+					if ( !verts || out[w] < mins[w] ) mins[w] = out[w];
+					if ( !verts || out[w] > maxs[w] ) maxs[w] = out[w];
+				}
+				lenSq = DotProduct( out, out );
+				if ( lenSq > *reach ) {
+					*reach = lenSq;
+				}
+				verts++;
 			}
-			verts++;
 		}
 	}
+	trap->FS_Close( rpxGlmReader.f );
 	*reach = sqrt( *reach );
 	return verts ? qtrue : qfalse;
 }
 
-static QINLINE qboolean RPX_GlmBounds( const char *path, vec3_t mins, vec3_t maxs, float *reach, char *gla, int glaSize ) {
-	static rpxGlmReader_t reader;	// not on the stack: 16 KB
-	rpxGlmReader_t *r = &reader;
-	qboolean ok = qfalse;
+// GLX_U: [Extras] the frames GLM Props measures a model at: frame 0 when it is not animated (what the renderer
+// draws a bone with no animation at), else its start, its end and up to 14 frames between
+static QINLINE int RPX_GlmFrameList( qboolean animated, int start, int end, int *frames ) {
+	int k, n = 0;
 
-	r->f = 0;
-	r->pos = r->have = 0;
-	if ( gla && glaSize > 0 ) {
-		gla[0] = '\0';
+	if ( !animated || end < start ) {
+		frames[0] = animated ? start : 0;
+		return 1;
 	}
-	r->len = trap->FS_Open( path, &r->f, FS_READ );
-	if ( !r->f ) {
-		return qfalse;
+	for ( k = 0; k < RPX_GLM_MAX_FRAMES; k++ ) {
+		int f = start + (int)( (float)( end - start ) * k / ( RPX_GLM_MAX_FRAMES - 1 ) + 0.5f );
+
+		if ( !n || f != frames[n - 1] ) {
+			frames[n++] = f;
+		}
 	}
-	if ( r->len > 0 ) {
-		ok = RPX_GlmBoundsRead( r, mins, maxs, reach, gla, glaSize );
+	return n;
+}
+
+// GLX_U: [Extras] a box turned by angles: the world-axis box round its eight turned corners (an entity's box
+// does not turn with it)
+static QINLINE void RPX_TurnedBox( const vec3_t mins, const vec3_t maxs, const vec3_t angles, vec3_t outMins, vec3_t outMaxs ) {
+	vec3_t axis[3];
+	int c, k;
+
+	AnglesToAxis( angles, axis );
+	for ( c = 0; c < 8; c++ ) {
+		vec3_t corner, world;
+
+		corner[0] = ( c & 1 ) ? maxs[0] : mins[0];
+		corner[1] = ( c & 2 ) ? maxs[1] : mins[1];
+		corner[2] = ( c & 4 ) ? maxs[2] : mins[2];
+		for ( k = 0; k < 3; k++ ) {
+			world[k] = corner[0] * axis[0][k] + corner[1] * axis[1][k] + corner[2] * axis[2][k];
+		}
+		for ( k = 0; k < 3; k++ ) {
+			if ( !c || world[k] < outMins[k] ) outMins[k] = world[k];
+			if ( !c || world[k] > outMaxs[k] ) outMaxs[k] = world[k];
+		}
 	}
-	trap->FS_Close( r->f );
-	return ok;
 }
 
 // GLX_U: [Extras] what is wrong with GLM Props' frames, or NULL: the server's limits (SP_misc_model_ghoul's

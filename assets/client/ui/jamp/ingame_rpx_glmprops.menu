@@ -2,9 +2,9 @@
 // ingame_rpx_glmprops: the GLM Props menu of the Extras.
 // GLX_U: [Extras] MD3 Props (ingame_rpx_props.menu) for .glm models, spawned as a misc_model_ghoul:
 // the same layout, with its own ui_rpx_g_* cvars. No Animated, Breakable or Health (a misc_model_ghoul
-// takes no damage). Its right-hand column has two tabs (ui_rpx_g_tab): Prop, and Animation -- the frames
-// of the model's animation file it plays, typed or taken from its named animations. The GLM Props button
-// of ingame_galaxyrp.menu opens it. The list, the preview and the rpx scripts are ui_rpextras.c; the
+// takes no damage); Box, Skin and On surface instead. Its right-hand column has two tabs (ui_rpx_g_tab):
+// Prop, and Animation -- the frames of the model's animation file it plays, typed or taken from its named
+// animations. The GLM Props button of ingame_galaxyrp.menu opens it. The list, the preview and the rpx scripts are ui_rpextras.c; the
 // commands the buttons send are built in cg_rpextras.c.
 //----------------------------------------------------------------------------------------------
 {
@@ -674,7 +674,153 @@
 			{
 				"0"
 			}
-			descText            "Spawned prop: players and NPCs cannot walk through its box"
+			descText            "Spawned prop: players and NPCs cannot walk through it"
+			action
+			{
+				play "sound/interface/button1.wav"
+			}
+		}
+		itemDef
+		{
+			name                rpx_box
+			type                ITEM_TYPE_MULTI
+			text                "Box:"
+			cvar                "ui_rpx_g_box"
+			rect                432 120 180 18
+			textalign           ITEM_ALIGN_LEFT
+			textalignx          0
+			textaligny          -2
+			font                2
+			textscale           0.7
+			forecolor           1 1 1 1
+			visible             1
+			descText            "Spawned prop: its box (what Solid blocks, what you aim at) fits the model, or is 32 units"
+			cvarTest            "ui_rpx_g_tab"
+			showCvar
+			{
+				"0"
+			}
+			cvarFloatList
+			{
+				"Fit model" 1
+				"Default" 0
+			}
+			action
+			{
+				play "sound/interface/button1.wav"
+			}
+		}
+		itemDef
+		{
+			name                rpx_skin
+			type                ITEM_TYPE_OWNERDRAW
+			ownerdraw           UI_RPX_GSKIN
+			rect                432 142 136 16
+			font                2
+			textscale           0.6
+			forecolor           1 1 1 1
+			visible             1
+			decoration
+			cvarTest            "ui_rpx_g_tab"
+			showCvar
+			{
+				"0"
+			}
+		}
+		itemDef
+		{
+			name                rpx_skin_prev
+			type                ITEM_TYPE_BUTTON
+			style               WINDOW_STYLE_FILLED
+			rect                572 140 18 18
+			text                "<"
+			textalign           ITEM_ALIGN_CENTER
+			textalignx          9
+			textaligny          0
+			font                2
+			textscale           0.6
+			forecolor           1 .682 0 1
+			backcolor           0 0 0 .6
+			border              1
+			bordercolor         1 .682 0 .6
+			visible             1
+			descText            "Spawned prop: the previewed model's previous skin; the preview shows it"
+			cvarTest            "ui_rpx_g_tab"
+			showCvar
+			{
+				"0"
+			}
+			mouseEnter
+			{
+				setitemcolor rpx_skin_prev bordercolor 1 1 1 1
+			}
+			mouseExit
+			{
+				setitemcolor rpx_skin_prev bordercolor 1 .682 0 .6
+			}
+			action
+			{
+				play "sound/interface/button1.wav" ;
+				uiScript rpxSkin prev
+			}
+		}
+		itemDef
+		{
+			name                rpx_skin_next
+			type                ITEM_TYPE_BUTTON
+			style               WINDOW_STYLE_FILLED
+			rect                594 140 18 18
+			text                ">"
+			textalign           ITEM_ALIGN_CENTER
+			textalignx          9
+			textaligny          0
+			font                2
+			textscale           0.6
+			forecolor           1 .682 0 1
+			backcolor           0 0 0 .6
+			border              1
+			bordercolor         1 .682 0 .6
+			visible             1
+			descText            "Spawned prop: the previewed model's next skin; the preview shows it"
+			cvarTest            "ui_rpx_g_tab"
+			showCvar
+			{
+				"0"
+			}
+			mouseEnter
+			{
+				setitemcolor rpx_skin_next bordercolor 1 1 1 1
+			}
+			mouseExit
+			{
+				setitemcolor rpx_skin_next bordercolor 1 .682 0 .6
+			}
+			action
+			{
+				play "sound/interface/button1.wav" ;
+				uiScript rpxSkin next
+			}
+		}
+		itemDef
+		{
+			name                rpx_sit
+			type                ITEM_TYPE_YESNO
+			text                "On surface:"
+			cvar                "ui_rpx_g_sit"
+			rect                432 160 180 18
+			textalign           ITEM_ALIGN_LEFT
+			textalignx          0
+			textaligny          -2
+			font                2
+			textscale           0.7
+			forecolor           1 1 1 1
+			visible             1
+			descText            "Spawned prop: raised so its bottom sits on the surface you aim at, not sunk into it"
+			cvarTest            "ui_rpx_g_tab"
+			showCvar
+			{
+				"0"
+			}
 			action
 			{
 				play "sound/interface/button1.wav"

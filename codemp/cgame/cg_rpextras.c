@@ -635,22 +635,27 @@ RPX_SpawnGlm
 
 GLX_U: [Extras] GLM Props' Spawn (grab: its Grab): a misc_model_ghoul of the selected .glm, with the
 menu's angles, scale, Solid and light, as RPX_SpawnProp() sends a misc_model_breakable, and the frames of
-its Animation tab (startframe/endframe, LOOP), refused here as the ui refuses them. Its radius, how
-far from its origin the client still draws it, from the model's own size (RPX_GlmBounds(), on this
-client's copy): the server's default, 50, is less than many models reach, and they would vanish as soon
-as their origin left the screen. Not sent when this client cannot measure the model.
+its Animation tab (startframe/endframe, LOOP), refused here as the ui refuses them, and its Skin. From
+the model's shape as drawn at those frames (RPX_GlmShape(), on this client's copy):
+- its radius, how far from its origin the client still draws it: the server's default, 50, is less than
+  many models reach, and they would vanish as soon as their origin left the screen;
+- with Box Fit, its box (mins/maxs) round that shape turned by its angles, unscaled (the server scales it);
+- with On surface, aimoffset raised so its bottom sits on the surface aimed at: models made as player or
+  NPC models reach 24 units below their origin, which /entaddaim puts on the surface. A SOLID one the server
+  raises itself by what the scale took off its box's bottom (SP_misc_model_ghoul), so that part is left out.
+None of the three when this client cannot measure the model.
 ==================
 */
 #define RPX_GLM_MIN_RADIUS	50		// the server's default for a misc_model_ghoul
 #define RPX_GLM_MAX_RADIUS	255		// the most the network carries (entityState_t::g2radius)
 
 static void RPX_SpawnGlm( qboolean grab ) {
-	char folder[RPX_NAME_LEN], name[RPX_NAME_LEN], path[MAX_QPATH * 2], cmd[MAX_STRING_CHARS];
-	vec3_t mins, maxs;
-	float scale, reach;
-	int pitch, yaw, roll, flags, start, end;
-	qboolean animated;
-	const char *problem;
+	char folder[RPX_NAME_LEN], name[RPX_NAME_LEN], path[MAX_QPATH * 2], cmd[MAX_STRING_CHARS], skinName[64];
+	vec3_t mins, maxs, angles;
+	float scale, reach, lift = 0.0f;
+	int pitch, yaw, roll, flags, start, end, frames[RPX_GLM_MAX_FRAMES], numFrames, offset;
+	qboolean animated, solid, scaled;
+	const char *problem, *skin;
 
 	if ( !RPX_Selected( RPX_GLMS, folder, sizeof( folder ), name, sizeof( name ) ) ) {
 		return;
@@ -680,11 +685,13 @@ static void RPX_SpawnGlm( qboolean grab ) {
 	scale = RPX_CvarFloat( "ui_rpx_g_scale" ) / 100.0f;	// a percent
 	if ( scale < 0.01f ) scale = 0.01f;
 	if ( scale > 10.23f ) scale = 10.23f;
-	if ( fabs( scale - 1.0f ) > 0.001f ) {
+	scaled = ( fabs( scale - 1.0f ) > 0.001f ) ? qtrue : qfalse;
+	if ( scaled ) {
 		Q_strcat( cmd, sizeof( cmd ), va( " modelscale \"%.2f\"", scale ) );
 	}
 
-	flags = RPX_CvarInt( "ui_rpx_g_solid" ) ? 1 : 0;
+	solid = RPX_CvarInt( "ui_rpx_g_solid" ) ? qtrue : qfalse;
+	flags = solid ? 1 : 0;
 	if ( animated ) {
 		Q_strcat( cmd, sizeof( cmd ), va( " startframe \"%d\" endframe \"%d\"", start, end ) );
 		if ( RPX_CvarInt( "ui_rpx_g_loop" ) && end > start ) {
@@ -708,15 +715,54 @@ static void RPX_SpawnGlm( qboolean grab ) {
 		Q_strcat( cmd, sizeof( cmd ), va( " light \"%d\" color \"%.2f %.2f %.2f\"", radius, r, g, b ) );
 	}
 
-	if ( RPX_GlmBounds( path, mins, maxs, &reach, NULL, 0 ) ) {
+	RPX_CvarString( "ui_rpx_g_skin", skinName, sizeof( skinName ) );
+	skin = skinName;
+	if ( skin[0] && Q_stricmp( skin, "default" ) && !RPX_LabelProblem( skin ) ) {
+		Q_strcat( cmd, sizeof( cmd ), va( " skin \"%s\"", skin ) );
+	}
+
+	numFrames = RPX_GlmFrameList( animated, start, end, frames );
+	if ( RPX_GlmShape( path, frames, numFrames, mins, maxs, &reach, NULL, 0, NULL ) ) {
 		int radius = (int)ceil( reach );
+		vec3_t boxMins, boxMaxs;
+		float boxBottom = -16.0f;	// the server's default box
 
 		if ( radius < RPX_GLM_MIN_RADIUS ) radius = RPX_GLM_MIN_RADIUS;
 		if ( radius > RPX_GLM_MAX_RADIUS ) radius = RPX_GLM_MAX_RADIUS;
 		Q_strcat( cmd, sizeof( cmd ), va( " radius \"%d\"", radius ) );
+
+		VectorSet( angles, pitch, yaw, roll );
+		RPX_TurnedBox( mins, maxs, angles, boxMins, boxMaxs );
+		if ( RPX_CvarInt( "ui_rpx_g_box" ) ) {
+			int k, lo[3], hi[3];
+
+			for ( k = 0; k < 3; k++ ) {
+				lo[k] = (int)floor( boxMins[k] );
+				hi[k] = (int)ceil( boxMaxs[k] );
+				if ( hi[k] <= lo[k] ) {
+					hi[k] = lo[k] + 1;	// a flat model: a box at least a unit through
+				}
+			}
+			Q_strcat( cmd, sizeof( cmd ), va( " mins \"%d %d %d\" maxs \"%d %d %d\"", lo[0], lo[1], lo[2], hi[0], hi[1], hi[2] ) );
+			boxBottom = (float)lo[2];
+		}
+		if ( RPX_CvarInt( "ui_rpx_g_sit" ) ) {
+			lift = -boxMins[2] * scale;
+			if ( solid && scaled ) {
+				lift -= boxBottom * ( 1.0f - scale );	// what the server raises it by
+			}
+		}
 	}
 
-	RPX_AddOffset( cmd, sizeof( cmd ), "ui_rpx_g_lift" );
+	offset = RPX_CvarInt( "ui_rpx_g_lift" );
+	if ( offset < 0 ) offset = 0;
+	if ( lift > 0.0f ) {
+		offset += (int)ceil( lift );
+	}
+	if ( offset > 512 ) offset = 512;
+	if ( offset > 0 ) {
+		Q_strcat( cmd, sizeof( cmd ), va( " aimoffset \"%d\"", offset ) );
+	}
 	RPX_Queue( cmd );
 }
 

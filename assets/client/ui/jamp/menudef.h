@@ -385,6 +385,7 @@ along with this program; if not, see <http://www.gnu.org/licenses/>.
 #define UI_RPX_GSWATCH		306		// GLX_U: the GLM Props menu's light colour
 #define UI_RPX_GANIMFILE	307		// GLX_U: the GLM Props menu's animation file line
 #define UI_RPX_GANIMRANGE	308		// GLX_U: the GLM Props menu's frames line
+#define UI_RPX_GSKIN		309		// GLX_U: the GLM Props menu's skin line
 
 #define VOICECHAT_GETFLAG			"getflag"				// command someone to get the flag
 #define VOICECHAT_OFFENSE			"offense"				// command someone to go on offense
