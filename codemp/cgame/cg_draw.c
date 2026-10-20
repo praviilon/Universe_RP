@@ -3286,7 +3286,7 @@ CG_DrawRadar
 float	cg_radarRange = 2500.0f;
 
 #define RADAR_RADIUS			60
-#define RADAR_X					(580 - RADAR_RADIUS)
+#define RADAR_X					RATIO_RX( 580 - RADAR_RADIUS )	// GLX_U: [Widescreen] pinned to the right edge
 #define RADAR_CHAT_DURATION		6000
 static int radarLockSoundDebounceTime = 0;
 static int impactSoundDebounceTime = 0;
@@ -3355,7 +3355,7 @@ float CG_DrawRadar ( float y )
 	color[0] = color[1] = color[2] = 1.0f;
 	color[3] = 0.6f;
 	trap->R_SetColor ( color );
-	CG_DrawPic( RADAR_X + xOffset, y, RADAR_RADIUS*2, RADAR_RADIUS*2, cgs.media.radarShader );
+	CG_DrawPic( RADAR_X + xOffset, y, RATIO_W( RADAR_RADIUS*2 ), RADAR_RADIUS*2, cgs.media.radarShader );
 
 	//Always green for your own team.
 	VectorCopy ( g_color_table[ColorIndex(COLOR_GREEN)], teamColor );
@@ -3414,7 +3414,7 @@ float CG_DrawRadar ( float y )
 					qhandle_t shader;
 					vec4_t    color;
 
-					x = (float)RADAR_X + (float)RADAR_RADIUS + (float)sin (angle) * distance;
+					x = (float)RADAR_X + RATIO_W( (float)RADAR_RADIUS + (float)sin (angle) * distance );
 					ly = y + (float)RADAR_RADIUS + (float)cos (angle) * distance;
 
 					arrowBaseScale = 9.0f;
@@ -3520,7 +3520,7 @@ float CG_DrawRadar ( float y )
 						}
 
 						trap->R_SetColor ( color );
-						CG_DrawPic ( x - 4 + xOffset, ly - 4, arrowBaseScale, arrowBaseScale, shader );
+						CG_DrawPic ( x - RATIO_W( 4 ) + xOffset, ly - 4, RATIO_W( arrowBaseScale ), arrowBaseScale, shader );
 					}
 				}
 				break;
@@ -3533,7 +3533,7 @@ float CG_DrawRadar ( float y )
 						float  x;
 						float  ly;
 
-						x = (float)RADAR_X + (float)RADAR_RADIUS + (float)sin (angle) * distance;
+						x = (float)RADAR_X + RATIO_W( (float)RADAR_RADIUS + (float)sin (angle) * distance );
 						ly = y + (float)RADAR_RADIUS + (float)cos (angle) * distance;
 
 						arrowBaseScale = 9.0f;
@@ -3583,7 +3583,7 @@ float CG_DrawRadar ( float y )
 						{
 							trap->R_SetColor ( NULL );
 						}
-						CG_DrawPic ( x - 4 + xOffset, ly - 4, arrowBaseScale, arrowBaseScale, cent->m_pVehicle->m_pVehicleInfo->radarIconHandle );
+						CG_DrawPic ( x - RATIO_W( 4 ) + xOffset, ly - 4, RATIO_W( arrowBaseScale ), arrowBaseScale, cent->m_pVehicle->m_pVehicleInfo->radarIconHandle );
 					}
 				}
 				else
@@ -3636,7 +3636,7 @@ float CG_DrawRadar ( float y )
 					arrow_w = arrowBaseScale * RADAR_RADIUS / 128;
 					arrow_h = arrowBaseScale * RADAR_RADIUS / 128;
 
-					CG_DrawRotatePic2( RADAR_X + RADAR_RADIUS + sin (angle) * distance + xOffset,
+					CG_DrawRotatePic2( RADAR_X + RATIO_W( RADAR_RADIUS + sin (angle) * distance ) + xOffset,
 									   y + RADAR_RADIUS + cos (angle) * distance,
 									   arrow_w, arrow_h,
 									   (360 - cent->lerpAngles[YAW]) + cg.predictedPlayerState.viewangles[YAW], cgs.media.mAutomapPlayerIcon );
@@ -3690,7 +3690,7 @@ float CG_DrawRadar ( float y )
 						}
 						distance = (actualDist/RADAR_ASTEROID_RANGE)*RADAR_RADIUS;
 
-						x = (float)RADAR_X + (float)RADAR_RADIUS + (float)sin (angle) * distance;
+						x = (float)RADAR_X + RATIO_W( (float)RADAR_RADIUS + (float)sin (angle) * distance );
 						ly = y + (float)RADAR_RADIUS + (float)cos (angle) * distance;
 
 						if ( asteroidScale > 3.0f )
@@ -3740,7 +3740,7 @@ float CG_DrawRadar ( float y )
 						}
 
 						trap->R_SetColor ( asteroidColor );
-						CG_DrawPic ( x - 4 + xOffset, ly - 4, arrowBaseScale, arrowBaseScale, trap->R_RegisterShaderNoMip( "gfx/menus/radar/asteroid" ) );
+						CG_DrawPic ( x - RATIO_W( 4 ) + xOffset, ly - 4, RATIO_W( arrowBaseScale ), arrowBaseScale, trap->R_RegisterShaderNoMip( "gfx/menus/radar/asteroid" ) );
 					}
 				}
 				break;
@@ -3753,7 +3753,7 @@ float CG_DrawRadar ( float y )
 					float  x;
 					float  ly;
 
-					x = (float)RADAR_X + (float)RADAR_RADIUS + (float)sin (angle) * distance;
+					x = (float)RADAR_X + RATIO_W( (float)RADAR_RADIUS + (float)sin (angle) * distance );
 					ly = y + (float)RADAR_RADIUS + (float)cos (angle) * distance;
 
 					arrowBaseScale = 3.0f;
@@ -3842,7 +3842,7 @@ float CG_DrawRadar ( float y )
 					{
 						trap->R_SetColor ( NULL );
 					}
-					CG_DrawPic ( x - 4 + xOffset, ly - 4, arrowBaseScale, arrowBaseScale, cgs.media.mAutomapRocketIcon );
+					CG_DrawPic ( x - RATIO_W( 4 ) + xOffset, ly - 4, RATIO_W( arrowBaseScale ), arrowBaseScale, cgs.media.mAutomapRocketIcon );
 				}
 				break;
 
@@ -3943,7 +3943,7 @@ float CG_DrawRadar ( float y )
 				arrow_w = arrowBaseScale * RADAR_RADIUS / 128;
 				arrow_h = arrowBaseScale * RADAR_RADIUS / 128;
 
-				CG_DrawRotatePic2( RADAR_X + RADAR_RADIUS + sin (angle) * distance + xOffset,
+				CG_DrawRotatePic2( RADAR_X + RATIO_W( RADAR_RADIUS + sin (angle) * distance ) + xOffset,
 								   y + RADAR_RADIUS + cos (angle) * distance,
 								   arrow_w, arrow_h,
 								   (360 - cent->lerpAngles[YAW]) + cg.predictedPlayerState.viewangles[YAW], cgs.media.mAutomapPlayerIcon );
@@ -3958,7 +3958,7 @@ float CG_DrawRadar ( float y )
 	arrow_h = arrowBaseScale * RADAR_RADIUS / 128;
 
 	trap->R_SetColor ( colorWhite );
-	CG_DrawRotatePic2( RADAR_X + RADAR_RADIUS + xOffset, y + RADAR_RADIUS, arrow_w, arrow_h,
+	CG_DrawRotatePic2( RADAR_X + RATIO_W( RADAR_RADIUS ) + xOffset, y + RADAR_RADIUS, arrow_w, arrow_h,
 					   0, cgs.media.mAutomapPlayerIcon );
 
 	return y+(RADAR_RADIUS*2);
@@ -4887,9 +4887,9 @@ void CG_DrawHealthBar(centity_t *cent, float chX, float chY, float chW, float ch
 {
 	vec4_t aColor;
 	vec4_t cColor;
-	float x = chX+((chW/2)-(HEALTH_WIDTH/2));
+	float x = chX + chW/2 - RATIO_W( HEALTH_WIDTH )/2;	// GLX_U: [Widescreen] chW is already corrected
 	float y = (chY+chH) + 8.0f;
-	float percent = ((float)cent->currentState.health/(float)cent->currentState.maxhealth)*HEALTH_WIDTH;
+	float percent = ((float)cent->currentState.health/(float)cent->currentState.maxhealth)*RATIO_W( HEALTH_WIDTH );
 	if (percent <= 0)
 	{
 		return;
@@ -4925,13 +4925,13 @@ void CG_DrawHealthBar(centity_t *cent, float chX, float chY, float chW, float ch
 	cColor[3] = 0.4f;
 
 	//draw the background (black)
-	CG_DrawRect(x, y, HEALTH_WIDTH, HEALTH_HEIGHT, 1.0f, colorTable[CT_BLACK]);
+	CG_DrawRect(x, y, RATIO_W( HEALTH_WIDTH ), HEALTH_HEIGHT, 1.0f, colorTable[CT_BLACK]);
 
 	//now draw the part to show how much health there is in the color specified
-	CG_FillRect(x+1.0f, y+1.0f, percent-1.0f, HEALTH_HEIGHT-1.0f, aColor);
+	CG_FillRect(x+RATIO_W( 1.0f ), y+1.0f, percent-RATIO_W( 1.0f ), HEALTH_HEIGHT-1.0f, aColor);
 
 	//then draw the other part greyed out
-	CG_FillRect(x+percent, y+1.0f, HEALTH_WIDTH-percent-1.0f, HEALTH_HEIGHT-1.0f, cColor);
+	CG_FillRect(x+percent, y+1.0f, RATIO_W( HEALTH_WIDTH-1.0f )-percent, HEALTH_HEIGHT-1.0f, cColor);
 }
 
 //same routine (at least for now), draw progress of a "hack" or whatever
@@ -4939,12 +4939,12 @@ void CG_DrawHaqrBar(float chX, float chY, float chW, float chH)
 {
 	vec4_t aColor;
 	vec4_t cColor;
-	float x = chX+((chW/2)-(HEALTH_WIDTH/2));
+	float x = chX + chW/2 - RATIO_W( HEALTH_WIDTH )/2;	// GLX_U: [Widescreen] chW is already corrected
 	float y = (chY+chH) + 8.0f;
-	float percent = (((float)cg.predictedPlayerState.hackingTime-(float)cg.time)/(float)cg.predictedPlayerState.hackingBaseTime)*HEALTH_WIDTH;
+	float percent = (((float)cg.predictedPlayerState.hackingTime-(float)cg.time)/(float)cg.predictedPlayerState.hackingBaseTime)*RATIO_W( HEALTH_WIDTH );
 
-	if (percent > HEALTH_WIDTH ||
-		percent < 1.0f)
+	if (percent > RATIO_W( HEALTH_WIDTH ) ||	// GLX_U: [Widescreen] percent is in corrected units
+		percent < RATIO_W( 1.0f ))
 	{
 		return;
 	}
@@ -4962,16 +4962,16 @@ void CG_DrawHaqrBar(float chX, float chY, float chW, float chH)
 	cColor[3] = 0.1f;
 
 	//draw the background (black)
-	CG_DrawRect(x, y, HEALTH_WIDTH, HEALTH_HEIGHT, 1.0f, colorTable[CT_BLACK]);
+	CG_DrawRect(x, y, RATIO_W( HEALTH_WIDTH ), HEALTH_HEIGHT, 1.0f, colorTable[CT_BLACK]);
 
 	//now draw the part to show how much health there is in the color specified
-	CG_FillRect(x+1.0f, y+1.0f, percent-1.0f, HEALTH_HEIGHT-1.0f, aColor);
+	CG_FillRect(x+RATIO_W( 1.0f ), y+1.0f, percent-RATIO_W( 1.0f ), HEALTH_HEIGHT-1.0f, aColor);
 
 	//then draw the other part greyed out
-	CG_FillRect(x+percent, y+1.0f, HEALTH_WIDTH-percent-1.0f, HEALTH_HEIGHT-1.0f, cColor);
+	CG_FillRect(x+percent, y+1.0f, RATIO_W( HEALTH_WIDTH-1.0f )-percent, HEALTH_HEIGHT-1.0f, cColor);
 
 	//draw the hacker icon
-	CG_DrawPic(x, y-HEALTH_WIDTH, HEALTH_WIDTH, HEALTH_WIDTH, cgs.media.hackerIconShader);
+	CG_DrawPic(x, y-HEALTH_WIDTH, RATIO_W( HEALTH_WIDTH ), HEALTH_WIDTH, cgs.media.hackerIconShader);
 }
 
 //generic timing bar
@@ -4986,7 +4986,7 @@ void CG_DrawGenericTimerBar(void)
 {
 	vec4_t aColor;
 	vec4_t cColor;
-	float x = CGTIMERBAR_X;
+	float x = RATIO_RX( CGTIMERBAR_X );	// GLX_U: [Widescreen] pinned to the right edge
 	float y = CGTIMERBAR_Y;
 	float percent = ((float)(cg_genericTimerBar-cg.time)/(float)cg_genericTimerDur)*CGTIMERBAR_H;
 
@@ -5013,13 +5013,13 @@ void CG_DrawGenericTimerBar(void)
 	cColor[3] = 0.1f;
 
 	//draw the background (black)
-	CG_DrawRect(x, y, CGTIMERBAR_W, CGTIMERBAR_H, 1.0f, colorTable[CT_BLACK]);
+	CG_DrawRect(x, y, RATIO_W( CGTIMERBAR_W ), CGTIMERBAR_H, 1.0f, colorTable[CT_BLACK]);
 
 	//now draw the part to show how much health there is in the color specified
-	CG_FillRect(x+1.0f, y+1.0f+(CGTIMERBAR_H-percent), CGTIMERBAR_W-2.0f, CGTIMERBAR_H-1.0f-(CGTIMERBAR_H-percent), aColor);
+	CG_FillRect(x+RATIO_W( 1.0f ), y+1.0f+(CGTIMERBAR_H-percent), RATIO_W( CGTIMERBAR_W-2.0f ), CGTIMERBAR_H-1.0f-(CGTIMERBAR_H-percent), aColor);
 
 	//then draw the other part greyed out
-	CG_FillRect(x+1.0f, y+1.0f, CGTIMERBAR_W-2.0f, CGTIMERBAR_H-percent, cColor);
+	CG_FillRect(x+RATIO_W( 1.0f ), y+1.0f, RATIO_W( CGTIMERBAR_W-2.0f ), CGTIMERBAR_H-percent, cColor);
 }
 
 // GalaxyRP fix: [Skills] CG_DrawUniqueSkillTimer() and CG_DrawUniqueSkillDurationTimer() used to be
@@ -5462,6 +5462,7 @@ static void CG_DrawCrosshair( vec3_t worldPoint, int chEntValid ) {
 		hShader = cgs.media.crosshairShader[Com_Clampi( 1, NUM_CROSSHAIRS, cg_drawCrosshair.integer ) - 1];
 	}
 
+	w = RATIO_W( w );	// GLX_U: [Widescreen] corrected once: the corona, the bars below and the Sense Health anchor all use it
 	chX = x + cg.refdef.x + 0.5 * (640 - w);
 	chY = y + cg.refdef.y + 0.5 * (480 - h);
 	trap->R_DrawStretchPic( chX, chY, w, h, 0, 0, 1, 1, hShader );
