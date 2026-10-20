@@ -15,6 +15,9 @@
 - `/admholo` and `/admghost` are renamed to `/holo` and `/ghost`. Any logged-in player can use them on themselves; using them on another player still needs the "Player effects" admin flag. `/admwalkthrough` and `/admhidden` are unchanged.
 - `/list models` is renamed to `/list md3`, to tell it apart from `/list glm`.
 
+### Fixed
+- The top-right HUD no longer keeps an empty gap where the removed leader/duel info used to be, so the team score line and powerup icons sit at the top again. Jedi Master still shows its "Get Saber!" hint.
+
 ## [3.8.5]
 
 All changes below are relative to the last stable GalaxyRP release (3.7.2) this fork started from.
