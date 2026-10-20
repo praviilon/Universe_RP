@@ -2,9 +2,9 @@ name: build
 
 # GalaxyRP addition: [TaystJK multi-arch] DAJ_RP previously had no CI at all. This workflow is
 # modeled on TaystJK's own .github/workflows/build.yml matrix (Windows x86/x86_64 via MSVC,
-# Linux x86/x86_64 via GCC, macOS x86_64/arm64 native), so every push/PR is actually built for
-# all of the platform/architecture combinations this port is meant to support -- something that
-# can't be fully verified from a single Linux sandbox. It additionally builds Linux arm64
+# Linux x86/x86_64 via GCC, macOS x86_64/arm64 native), so a build covers all of the
+# platform/architecture combinations this port is meant to support -- something that can't be
+# fully verified from a single Linux sandbox. It additionally builds Linux arm64
 # (cross-compiled via cmake/Toolchains/linux-aarch64.cmake), which TaystJK's own CI does not do
 # (TaystJK's only "ARM" coverage is a native macOS Apple Silicon runner).
 #
@@ -31,25 +31,18 @@ name: build
 # On a pushed v* tag, the release job at the bottom collects all 14 and attaches them to a DRAFT
 # GitHub release for review. Nothing publishes itself.
 
+# GLX_U: [CI] it runs by hand (Actions -> build -> Run workflow, on a branch or a tag), on a pushed v*
+# tag, and on pull requests into develop or main. A push to a branch builds nothing.
 on:
   workflow_dispatch:
   push:
-    branches:
-      - develop
-      - main
     # GalaxyRP addition: [releases] a pushed v* tag builds everything and then runs the release
     # job at the bottom. Releases are cut from main; the tag is what triggers them, and nothing is
     # published automatically -- the release job produces a DRAFT for you to review and publish.
-    #
-    # Caveat worth knowing: GitHub does not document whether paths-ignore is evaluated for tag
-    # pushes. If it is, tagging a commit whose only changes are markdown could skip this workflow
-    # entirely. A release tag essentially always sits on a commit with real changes, and
-    # workflow_dispatch above is the escape hatch if it ever bites.
+    # GLX_U: no paths-ignore here: GitHub does not evaluate path filters for tag pushes, so a tag
+    # always builds.
     tags:
       - "v*"
-    paths-ignore:
-      - "**.md"
-      - ".gitignore"
   pull_request:
     branches:
       - develop
@@ -488,10 +481,10 @@ jobs:
           path: dist/${{ env.RP_MOD_FOLDER }}-macos-${{ matrix.arch }}-${{ matrix.build_type }}-Client.tar.gz
           if-no-files-found: error
 
-  # GalaxyRP addition: [releases] tag-only, and never automatic. Ordinary pushes to develop or main
-  # build and upload artifacts exactly as before and skip this job entirely; only a pushed v* tag
-  # reaches it, and what it produces is a DRAFT -- the 14 assets are attached and left for you to
-  # review in the UI and publish by hand.
+  # GalaxyRP addition: [releases] tag-only, and never automatic. A run on a branch (by hand) or on a
+  # pull request builds and uploads artifacts and skips this job entirely; only a v* tag (pushed, or
+  # picked in Run workflow) reaches it, and what it produces is a DRAFT -- the 14 assets are
+  # attached and left for you to review in the UI and publish by hand.
   #
   # The point of routing releases through here rather than uploading by hand: a release asset is
   # byte-exact (GitHub never re-archives one), so what a player downloads is precisely the archive
