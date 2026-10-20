@@ -10,10 +10,12 @@
 - `/upgradereset <player name or ID>` admin command ("Upgrade Skills" admin flag, like `/skillup` and `/skilldown`): removes the three permanent shop upgrades from a player's character so they can be bought again. Credits are not refunded.
 - Hats and Capes for players, persisted per character. Use `/cosmetics` command to set them. `rp_allow_cosmetics` server cvar: `0` switches hats and capes off for everyone. Each character's choice is still saved and comes back when it is switched on again.
 - AFK: after `rp_afk_time` seconds without input (default 120, `0` switches it off), a player gets the protection bubble (no damage from players or NPCs) and a comlink animation, until they move, look around or press a key. `/afk` does the same after 20 seconds without input, so it can't be used to dodge a hit. `/players` marks AFK players.
+- Extras: **GLM Props** menu, under existing MD3 Props: browse the server's `.glm` models (starting in `models/players`), preview one, set its animation, scale and other properties and spawn as a `misc_model_ghoul`.
 
 ### Changed
 - `/admholo` and `/admghost` are renamed to `/holo` and `/ghost`. Any logged-in player can use them on themselves; using them on another player still needs the "Player effects" admin flag. `/admwalkthrough` and `/admhidden` are unchanged.
 - `/list models` is renamed to `/list md3`, to tell it apart from `/list glm`.
+- The Extras menu's Props is renamed to MD3 Props, next to the new GLM Props.
 - Widescreen: the main HUD (both styles), the radar, the crosshair and the bars under it keep their shape on a wide screen instead of stretching. Uses the TaystJK engine's `cl_ratioFix` (on by default); `cl_ratioFix 0` brings back the stretched look.
 
 ### Fixed
