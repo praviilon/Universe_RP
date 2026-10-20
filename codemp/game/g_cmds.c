@@ -8666,6 +8666,7 @@ G_Say
 check_if_player_ignores_other
 
 GalaxyRP fix: [Chat] true when 'other' has /ignore'd 'ent'.
+GLX_U: slots 0..30 are bits of word 0, 31 and up of word 1 at bit (slot - 31), as /ignore stores them.
 ==================
 */
 static qboolean check_if_player_ignores_other( gentity_t *ent, gentity_t *other )
@@ -8673,7 +8674,7 @@ static qboolean check_if_player_ignores_other( gentity_t *ent, gentity_t *other 
 	if ( !ent || !other || !other->client )
 		return qfalse;
 
-	if ( ent->s.number < MAX_CLIENTS - 1)
+	if ( ent->s.number < 31 )
 		return (level.ignored_players[other->s.number][0] & (1 << ent->s.number)) ? qtrue : qfalse;
 
 	return (level.ignored_players[other->s.number][1] & (1 << (ent->s.number - 31))) ? qtrue : qfalse;
