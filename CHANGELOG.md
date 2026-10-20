@@ -14,6 +14,7 @@
 ### Changed
 - `/admholo` and `/admghost` are renamed to `/holo` and `/ghost`. Any logged-in player can use them on themselves; using them on another player still needs the "Player effects" admin flag. `/admwalkthrough` and `/admhidden` are unchanged.
 - `/list models` is renamed to `/list md3`, to tell it apart from `/list glm`.
+- Widescreen: the main HUD (both styles), the radar, the crosshair and the bars under it keep their shape on a wide screen instead of stretching. Uses the TaystJK engine's `cl_ratioFix` (on by default); `cl_ratioFix 0` brings back the stretched look.
 
 ### Fixed
 - The top-right HUD no longer keeps an empty gap where the removed leader/duel info used to be, so the team score line and powerup icons sit at the top again. Jedi Master still shows its "Get Saber!" hint.
