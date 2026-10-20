@@ -171,6 +171,44 @@ void CG_DrawRotatePic2( float x, float y, float width, float height,float angle,
 }
 
 /*
+================
+CG_DrawRotatePic2Ratio
+
+GLX_U: [Widescreen] CG_DrawRotatePic2 that keeps the picture in shape on a wider (or narrower)
+screen. x, y: the centre on the 640x480 screen; width, height: the 4:3 size. The 2D screen is
+stretched sideways and the renderer turns the quad inside it, so a single quad comes out sheared.
+The picture is drawn as strips instead, each a rotated rectangle placed and sized exactly; the only
+error left is the slant inside one strip, kept under half a pixel. One plain call at 4:3, 0 or 90.
+================
+*/
+void CG_DrawRotatePic2Ratio( float x, float y, float width, float height, float angle, qhandle_t hShader ) {
+	const float k = cgs.widthRatioCoef;
+	float a, s, c, stretch, shear, strip, ly;
+	int n, i;
+
+	if ( k == 1.0f || k <= 0.0f ) {
+		CG_DrawRotatePic2( x, y, width, height, angle, hShader );
+		return;
+	}
+
+	a = DEG2RAD( angle );
+	s = sinf( a );
+	c = cosf( a );
+	stretch = sqrtf( k*k*c*c + s*s );	// on-screen length of the picture's x axis, per unit; > 0
+	shear = fabsf( s*c*( 1.0f - k*k ) ) / stretch;
+	// error in pixels <= shear * strip/2 * vidHeight/(480*min(k,1)): n strips keep it under half a pixel
+	n = Com_Clampi( 1, 512, (int)ceilf( shear * fabsf( height ) * cgs.glconfig.vidHeight / ( 480.0f * ( k < 1.0f ? k : 1.0f ) ) ) );
+	strip = height / n;
+	a = RAD2DEG( atan2f( s, k*c ) );
+
+	for ( i = 0; i < n; i++ ) {
+		ly = ( i + 0.5f ) * strip - 0.5f * height;
+		trap->R_DrawRotatePic2( x - k*s*ly, y + c*ly, width*stretch, k*strip/stretch,
+			0, (float)i/n, 1, (float)( i + 1 )/n, a, hShader );
+	}
+}
+
+/*
 ===============
 CG_DrawChar
 

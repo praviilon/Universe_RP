@@ -310,9 +310,16 @@ static void CG_DrawZoomMask( void )
 		// Using a magic number to convert the zoom level to a rotation amount that correlates more or less with the zoom artwork.
 		level *= 103.0f;
 
+		// GLX_U: [Widescreen] the mask keeps its shape; its black goes on out to the screen edges
+		if ( cgs.widthRatioCoef < 1.0f )
+		{
+			CG_FillRect( 0, 0, 320 - RATIO_W( 320 ) + 1, 480, colorTable[CT_BLACK] );
+			CG_FillRect( 320 + RATIO_W( 320 ) - 1, 0, 320 - RATIO_W( 320 ) + 1, 480, colorTable[CT_BLACK] );
+		}
+
 		// Draw target mask
 		trap->R_SetColor( colorTable[CT_WHITE] );
-		CG_DrawPic( 0, 0, 640, 480, cgs.media.disruptorMask );
+		CG_DrawPic( 320 - RATIO_W( 320 ), 0, RATIO_W( 640 ), 480, cgs.media.disruptorMask );
 
 		// apparently 99.0f is the full zoom level
 		if ( level >= 99 )
@@ -327,7 +334,7 @@ static void CG_DrawZoomMask( void )
 		}
 
 		// Draw rotating insert
-		CG_DrawRotatePic2( 320, 240, 640, 480, -level, cgs.media.disruptorInsert );
+		CG_DrawRotatePic2Ratio( 320, 240, 640, 480, -level, cgs.media.disruptorInsert );	// GLX_U: [Widescreen]
 
 		// Increase the light levels under the center of the target
 //		CG_DrawPic( 198, 118, 246, 246, cgs.media.disruptorLight );
@@ -396,10 +403,10 @@ static void CG_DrawZoomMask( void )
 
 		for (fi = 18.5f; fi <= 18.5f + max; fi+= 3 ) // going from 15 to 45 degrees, with 5 degree increments
 		{
-			cx = 320 + sin( (fi+90.0f)/57.296f ) * 190;
+			cx = 320 + RATIO_W( sin( (fi+90.0f)/57.296f ) * 190 );	// GLX_U: [Widescreen] on the mask's ring
 			cy = 240 + cos( (fi+90.0f)/57.296f ) * 190;
 
-			CG_DrawRotatePic2( cx, cy, 12, 24, 90 - fi, cgs.media.disruptorInsertTick );
+			CG_DrawRotatePic2Ratio( cx, cy, 12, 24, 90 - fi, cgs.media.disruptorInsertTick );
 		}
 
 		if ( cg.predictedPlayerState.weaponstate == WEAPON_CHARGING_ALT )
@@ -414,7 +421,7 @@ static void CG_DrawZoomMask( void )
 				max = 1.0f;
 			}
 
-			trap->R_DrawStretchPic(257, 435, 134*max, 34, 0, 0, max, 1, cgs.media.disruptorChargeShader);
+			trap->R_DrawStretchPic(320 + RATIO_W( 257 - 320 ), 435, RATIO_W( 134*max ), 34, 0, 0, max, 1, cgs.media.disruptorChargeShader);	// GLX_U: [Widescreen]
 		}
 //		trap->R_SetColor( colorTable[CT_WHITE] );
 //		CG_DrawPic( 0, 0, 640, 480, cgs.media.disruptorMask );
