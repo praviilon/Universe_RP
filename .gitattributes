@@ -31,5 +31,5 @@
 
 # Batch files need CRLF. cmd.exe seeks by byte offset when it jumps to a label, and on an
 # LF-only file that seek can land mid-line, so a script built on goto/call :label silently
-# stops looping. galaxyrp_host_autorestart.bat is exactly that kind of script.
+# stops looping. universe_rp_host_autorestart.bat is exactly that kind of script.
 *.bat text eol=crlf

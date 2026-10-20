@@ -17,7 +17,7 @@ name: build
 # Each job publishes TWO packages from that one build:
 #
 #   GalaxyRP-<os>-<arch>-Release-Full    the whole assembled GalaxyRP/ folder, as before
-#   GalaxyRP-<os>-<arch>-Release-Client  cgame + ui + pk3 + description.txt + galaxyrp_play
+#   GalaxyRP-<os>-<arch>-Release-Client  cgame + ui + pk3 + description.txt + universe_rp_play
 #
 # so 14 per run rather than 7. The Client package is for players joining someone else's server: it
 # leaves out jampgame (the server-side module) and everything an operator needs, so it is not a
@@ -26,7 +26,7 @@ name: build
 #
 # Each package is a real archive built by the job itself (.zip on Windows, .tar.gz on Linux and
 # macOS) rather than a directory handed to upload-artifact, which would strip the execute bit off
-# galaxyrp_play. See the "Package" step for why that matters and what it would break.
+# universe_rp_play. See the "Package" step for why that matters and what it would break.
 #
 # On a pushed v* tag, the release job at the bottom collects all 14 and attaches them to a DRAFT
 # GitHub release for review. Nothing publishes itself.
@@ -122,9 +122,9 @@ jobs:
       #
       # Contents: cgame + ui (the two modules a joining player actually loads -- jampgame is the
       # server-side module and is deliberately left out), the pk3, description.txt for the in-game
-      # mod menu, and this platform's galaxyrp_play launcher. Everything server-side stays in the
-      # Full package only: database/, duelarena/, textfiles/, galaxyrp_server.cfg, the two host
-      # launchers and galaxyrp_calculator.html.
+      # mod menu, and this platform's universe_rp_play launcher. Everything server-side stays in the
+      # Full package only: database/, duelarena/, textfiles/, universe_rp_server.cfg, the two host
+      # launchers and universe_rp_calculator.html.
       #
       # Globbed rather than spelled out, because every one of these names varies by job: the modules
       # are <name>${Architecture} plus a platform extension (cgamex86.dll, cgamei386.so on Linux x86
@@ -145,7 +145,7 @@ jobs:
           mkdir -p "$DST"
           cp "$SRC"/cgame*.so "$SRC"/cgame*.dll "$SRC"/cgame*.dylib \
              "$SRC"/ui*.so    "$SRC"/ui*.dll    "$SRC"/ui*.dylib    \
-             "$SRC"/*.pk3 "$SRC"/description.txt "$SRC"/galaxyrp_play.* "$DST"/
+             "$SRC"/*.pk3 "$SRC"/description.txt "$SRC"/universe_rp_play.* "$DST"/
           echo "Client package contents:"
           find "$DST" -type f | sort
           # Fail the job rather than publish a half-empty package. Every line above is a glob, so a
@@ -161,7 +161,7 @@ jobs:
       # GalaxyRP addition: [releases] see the matching comment in the ubuntu job for why the archive
       # is built here rather than left to upload-artifact. Windows is the one platform where the
       # permission argument does not apply -- cmd.exe decides what is runnable from the extension,
-      # so galaxyrp_play.bat needs no execute bit -- but the packages are built here anyway so that
+      # so universe_rp_play.bat needs no execute bit -- but the packages are built here anyway so that
       # every release asset is a real archive produced by the build, and .zip because that is what a
       # Windows player can open without installing anything.
       #
@@ -264,9 +264,9 @@ jobs:
       #
       # Contents: cgame + ui (the two modules a joining player actually loads -- jampgame is the
       # server-side module and is deliberately left out), the pk3, description.txt for the in-game
-      # mod menu, and this platform's galaxyrp_play launcher. Everything server-side stays in the
-      # Full package only: database/, duelarena/, textfiles/, galaxyrp_server.cfg, the two host
-      # launchers and galaxyrp_calculator.html.
+      # mod menu, and this platform's universe_rp_play launcher. Everything server-side stays in the
+      # Full package only: database/, duelarena/, textfiles/, universe_rp_server.cfg, the two host
+      # launchers and universe_rp_calculator.html.
       #
       # Globbed rather than spelled out, because every one of these names varies by job: the modules
       # are <name>${Architecture} plus a platform extension (cgamex86.dll, cgamei386.so on Linux x86
@@ -287,7 +287,7 @@ jobs:
           mkdir -p "$DST"
           cp "$SRC"/cgame*.so "$SRC"/cgame*.dll "$SRC"/cgame*.dylib \
              "$SRC"/ui*.so    "$SRC"/ui*.dll    "$SRC"/ui*.dylib    \
-             "$SRC"/*.pk3 "$SRC"/description.txt "$SRC"/galaxyrp_play.* "$DST"/
+             "$SRC"/*.pk3 "$SRC"/description.txt "$SRC"/universe_rp_play.* "$DST"/
           echo "Client package contents:"
           find "$DST" -type f | sort
           # Fail the job rather than publish a half-empty package. Every line above is a glob, so a
@@ -303,7 +303,7 @@ jobs:
       # GalaxyRP addition: [releases] build the archive HERE rather than letting upload-artifact zip
       # loose files. upload-artifact documents that "File permissions are not maintained during
       # zipped artifact upload. All directories will have 755 and all files will have 644", which
-      # silently strips the 0755 that assets/CMakeLists.txt forces onto galaxyrp_play -- and a
+      # silently strips the 0755 that assets/CMakeLists.txt forces onto universe_rp_play -- and a
       # .command that is not executable cannot be double-clicked at all, which is its only purpose.
       #
       # Its re-zipping cannot reach inside an archive we made, though, so a tarball built here
@@ -331,9 +331,9 @@ jobs:
           # reports that. This exact guard reported a false failure until it was written this way.
           for a in dist/*.tar.gz; do
             listing="$(tar tvzf "$a")"
-            if ! printf '%s\n' "$listing" | grep -E '^-rwx.*galaxyrp_play' > /dev/null; then
-              echo "::error::$a has no executable galaxyrp_play -- the launcher would not run"
-              printf '%s\n' "$listing" | grep galaxyrp_play || true
+            if ! printf '%s\n' "$listing" | grep -E '^-rwx.*universe_rp_play' > /dev/null; then
+              echo "::error::$a has no executable universe_rp_play -- the launcher would not run"
+              printf '%s\n' "$listing" | grep universe_rp_play || true
               exit 1
             fi
           done
@@ -406,9 +406,9 @@ jobs:
       #
       # Contents: cgame + ui (the two modules a joining player actually loads -- jampgame is the
       # server-side module and is deliberately left out), the pk3, description.txt for the in-game
-      # mod menu, and this platform's galaxyrp_play launcher. Everything server-side stays in the
-      # Full package only: database/, duelarena/, textfiles/, galaxyrp_server.cfg, the two host
-      # launchers and galaxyrp_calculator.html.
+      # mod menu, and this platform's universe_rp_play launcher. Everything server-side stays in the
+      # Full package only: database/, duelarena/, textfiles/, universe_rp_server.cfg, the two host
+      # launchers and universe_rp_calculator.html.
       #
       # Globbed rather than spelled out, because every one of these names varies by job: the modules
       # are <name>${Architecture} plus a platform extension (cgamex86.dll, cgamei386.so on Linux x86
@@ -429,7 +429,7 @@ jobs:
           mkdir -p "$DST"
           cp "$SRC"/cgame*.so "$SRC"/cgame*.dll "$SRC"/cgame*.dylib \
              "$SRC"/ui*.so    "$SRC"/ui*.dll    "$SRC"/ui*.dylib    \
-             "$SRC"/*.pk3 "$SRC"/description.txt "$SRC"/galaxyrp_play.* "$DST"/
+             "$SRC"/*.pk3 "$SRC"/description.txt "$SRC"/universe_rp_play.* "$DST"/
           echo "Client package contents:"
           find "$DST" -type f | sort
           # Fail the job rather than publish a half-empty package. Every line above is a glob, so a
@@ -445,7 +445,7 @@ jobs:
       # GalaxyRP addition: [releases] build the archive HERE rather than letting upload-artifact zip
       # loose files. upload-artifact documents that "File permissions are not maintained during
       # zipped artifact upload. All directories will have 755 and all files will have 644", which
-      # silently strips the 0755 that assets/CMakeLists.txt forces onto galaxyrp_play -- and a
+      # silently strips the 0755 that assets/CMakeLists.txt forces onto universe_rp_play -- and a
       # .command that is not executable cannot be double-clicked at all, which is its only purpose.
       #
       # Its re-zipping cannot reach inside an archive we made, though, so a tarball built here
@@ -467,9 +467,9 @@ jobs:
           # Assert the bit actually survived. This is the entire reason these are archives rather
           # than loose files, so it should fail the build rather than be assumed.
           for a in dist/*.tar.gz; do
-            if ! tar tvzf "$a" | grep -Eq '^-rwx.*galaxyrp_play'; then
-              echo "::error::$a has no executable galaxyrp_play -- the launcher would not run"
-              tar tvzf "$a" | grep galaxyrp_play || true
+            if ! tar tvzf "$a" | grep -Eq '^-rwx.*universe_rp_play'; then
+              echo "::error::$a has no executable universe_rp_play -- the launcher would not run"
+              tar tvzf "$a" | grep universe_rp_play || true
               exit 1
             fi
           done

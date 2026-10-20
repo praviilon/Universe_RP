@@ -1,6 +1,6 @@
 #!/bin/sh
 
-# galaxyrp_play.command -- macOS client launcher
+# universe_rp_play.command -- macOS client launcher
 
 # Main settings
 jk_executable_x64="taystjk.x86_64.app"

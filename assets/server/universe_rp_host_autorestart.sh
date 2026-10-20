@@ -1,19 +1,19 @@
 #!/bin/sh
 
-# galaxyrp_host_autorestart.command -- macOS dedicated server launcher with auto-restart
+# universe_rp_host_autorestart.sh -- Linux dedicated server launcher with auto-restart
 #
-# Same as galaxyrp_host.command, but if the server dies it is brought straight back up. A clean
+# Same as universe_rp_host.sh, but if the server dies it is brought straight back up. A clean
 # shutdown (/quit, or any exit with status 0) ends the loop instead, so the server stays
-# stoppable without reaching for kill. Every restart is appended to galaxyrp_restart.log
+# stoppable without reaching for kill. Every restart is appended to universe_rp_restart.log
 # next to this script.
 
 # Main settings
 jk_dedicated=2
 jk_net_port=29070
-jk_config=galaxyrp_server.cfg
-jk_executable_x64="taystjkded.x86_64"
+jk_config=universe_rp_server.cfg
+jk_executable_64="taystjkded.x86_64"
+jk_executable_32="taystjkded.i386"
 jk_executable_arm64="taystjkded.arm64"
-jk_executable_universal="taystjkded"
 
 # Optional: one of this machine's own IP addresses, to bind the server to it alone. Leave it empty
 # (the default) and the server listens on all of this machine's addresses, which is what nearly every
@@ -26,7 +26,7 @@ jk_net_ip=""
 jk_restart_delay=5			# seconds to wait before bringing the server back up
 jk_restart_min_uptime=10	# a run shorter than this counts as a failed start, not a crash
 jk_restart_max_failures=5	# consecutive failed starts before giving up
-jk_restart_log=galaxyrp_restart.log
+jk_restart_log=universe_rp_restart.log
 jk_restart_log_max=1048576	# rotate the log once it passes 1 MB
 
 # GalaxyRP: [TaystJK] the restart log belongs next to THIS script, in the GalaxyRP folder --
@@ -40,51 +40,62 @@ jk_mod_folder="$(basename "$jk_script_dir")"
 
 # GalaxyRP: [TaystJK] this script lives inside the GalaxyRP folder, one level below the engine
 # executables -- switch to that parent folder FIRST, using the script's own location (not whatever
-# directory Finder/Terminal happened to start it from). This makes both the executable check below
+# directory the script happened to be launched from). This makes both the executable check below
 # and the absolute homepath computed further down resolve against the engine's own folder, not
 # wherever the script's working directory started out.
 cd "$(dirname "$0")/.." || exit 1
 ENGINE_DIR="$(pwd)"
 
-# GalaxyRP: [TaystJK] prefer whichever arch-specific build matches this Mac's actual CPU (fastest,
-# runs native, no Rosetta) before falling back to the universal build. Deliberately NOT falling
-# back to the *other* arch-specific build: on an arm64 Mac that would mean running the x86_64
-# build under Rosetta instead of the native slice already inside the universal build, and on an
-# x86_64 Mac the arm64 build wouldn't run at all -- so universal is always the better second choice.
-# GalaxyRP: [TaystJK] the CPU is asked through sysctl hw.optional.arm64 first: it is 1 on an Apple
-# Silicon Mac even when this script runs in a Terminal under Rosetta, where uname -m answers x86_64 --
-# which picked the Intel build there and ran the whole game translated. Intel Macs answer 0, or nothing
-# on older macOS, and uname -m decides as before.
-jk_mac_arch="$(uname -m 2>/dev/null)"
-if [ "$(sysctl -in hw.optional.arm64 2>/dev/null)" = "1" ]; then
-	jk_mac_arch=arm64
-fi
-case "$jk_mac_arch" in
-	arm64)
-		jk_executable_native="$jk_executable_arm64"
+# Executable check -- by this machine's architecture first (uname -m), so a build it cannot run is
+# never picked. A 64-bit x86 system prefers the 64-bit build and falls back to the 32-bit one (it runs
+# 32-bit programs too, given the 32-bit libraries); a 32-bit system looks for the 32-bit build only, as
+# a 64-bit one fails there with "Exec format error"; an ARM system looks for an arm64 build, which
+# TaystJK does not publish but makes when built from source there (GalaxyRP's own Linux arm64 game
+# modules run with it); any other machine is tried as before, 64-bit then 32-bit. Bail out with an
+# error naming what was looked for instead of trying to launch something that isn't there.
+jk_arch="$(uname -m 2>/dev/null)"
+case "$jk_arch" in
+	x86_64|amd64)
+		jk_candidates="$jk_executable_64 $jk_executable_32"
+		;;
+	i386|i486|i586|i686)
+		jk_candidates="$jk_executable_32"
+		;;
+	aarch64|arm64)
+		jk_candidates="$jk_executable_arm64"
 		;;
 	*)
-		jk_executable_native="$jk_executable_x64"
+		jk_candidates="$jk_executable_64 $jk_executable_32"
 		;;
 esac
 
-# Executable check -- prefer the native-arch build, fall back to the universal build, and bail out
-# with an error instead of silently trying to launch something that isn't there.
-if [ -f "$jk_executable_native" ]; then
-	jk_executable="$jk_executable_native"
-elif [ -f "$jk_executable_universal" ]; then
-	jk_executable="$jk_executable_universal"
-else
-	echo "ERROR: Could not find $jk_executable_native or $jk_executable_universal next to the $jk_mod_folder folder."
-	echo "Make sure a TaystJK dedicated server build is installed alongside $jk_mod_folder."
+jk_executable=""
+jk_looked_for=""
+for jk_candidate in $jk_candidates; do
+	if [ -z "$jk_executable" ] && [ -f "$jk_candidate" ]; then
+		jk_executable="$jk_candidate"
+	fi
+	jk_looked_for="${jk_looked_for:+$jk_looked_for or }$jk_candidate"
+done
+
+if [ -z "$jk_executable" ]; then
+	echo "ERROR: Could not find $jk_looked_for next to the $jk_mod_folder folder (this machine: ${jk_arch:-unknown})."
+	case "$jk_arch" in
+		i386|i486|i586|i686)
+			if [ -f "$jk_executable_64" ]; then
+				echo "$jk_executable_64 is there, but a 64-bit build cannot run on this 32-bit system: install the i386 build."
+			fi
+			;;
+		aarch64|arm64)
+			echo "TaystJK publishes no Linux ARM builds: build TaystJK from source on this machine, which makes $jk_executable_arm64."
+			;;
+	esac
+	echo "Make sure a TaystJK dedicated server build for this machine is installed alongside $jk_mod_folder."
 	printf "Press Enter to exit..."
 	read -r _
 	exit 1
 fi
 
-# Clear the quarantine flag TaystJK's own installer script strips too, so macOS doesn't block a
-# freshly-downloaded (not App-Store, ad-hoc signed) build from running.
-xattr -d com.apple.quarantine "$jk_executable" 2>/dev/null
 chmod +x "$jk_executable" 2>/dev/null
 
 # Append one line to the restart log, rotating it first if it has grown past the cap. A server
@@ -140,8 +151,8 @@ while : ; do
 	[ -n "$jk_started" ] || jk_started=0
 
 	# Launch. fs_portable 1 + an absolute fs_homepath keep every file the server writes (config
-	# changes, the accounts database, logs) inside this server folder instead of
-	# ~/Library/Application Support.
+	# changes, the accounts database, logs) inside this server folder instead of the user's home
+	# directory.
 	"./$jk_executable" +set dedicated "$jk_dedicated" +set net_port "$jk_net_port" "$@" +set fs_portable 1 +set fs_homepath "$ENGINE_DIR" +set fs_game "$jk_mod_folder" +exec "$jk_config"
 	jk_status=$?
 

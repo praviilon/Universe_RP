@@ -1,6 +1,6 @@
 #!/bin/sh
 
-# galaxyrp_play.sh -- Linux client launcher
+# universe_rp_play.sh -- Linux client launcher
 
 # Main settings
 jk_executable_64="taystjk.x86_64"

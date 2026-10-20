@@ -1,17 +1,17 @@
 @echo off
 setlocal enabledelayedexpansion
 
-:: galaxyrp_host_autorestart.bat -- Windows dedicated server launcher with auto-restart
+:: universe_rp_host_autorestart.bat -- Windows dedicated server launcher with auto-restart
 ::
-:: Same as galaxyrp_host.bat, but if the server dies it is brought straight back up. A clean
+:: Same as universe_rp_host.bat, but if the server dies it is brought straight back up. A clean
 :: shutdown -- /quit, or any exit with code 0 -- ends the loop instead, so the server stays
 :: stoppable without reaching for Task Manager. Every restart is appended to
-:: galaxyrp_restart.log next to this script.
+:: universe_rp_restart.log next to this script.
 
 :: Main settings
 set jk_dedicated=2
 set jk_net_port=29070
-set jk_config=galaxyrp_server.cfg
+set jk_config=universe_rp_server.cfg
 set jk_executable_64=taystjkded.x86_64.exe
 set jk_executable_32=taystjkded.x86.exe
 
@@ -26,7 +26,7 @@ set jk_net_ip=
 set jk_restart_delay=5
 set jk_restart_min_uptime=10
 set jk_restart_max_failures=5
-set jk_restart_log=galaxyrp_restart.log
+set jk_restart_log=universe_rp_restart.log
 set jk_restart_log_max=1048576
 
 :: GalaxyRP fix: [TaystJK] the restart log belongs next to THIS script, in the GalaxyRP folder --

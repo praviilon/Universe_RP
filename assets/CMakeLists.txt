@@ -28,7 +28,7 @@ set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS
 	"${CMAKE_SOURCE_DIR}/galaxyrp/game/rp_version.h")
 
 # GalaxyRP fix: [packaging] assets/server carries a play/host launcher set for every OS this mod
-# supports (galaxyrp_play/host/host_autorestart.bat for Windows, .sh for Linux, .command for
+# supports (universe_rp_play/host/host_autorestart.bat for Windows, .sh for Linux, .command for
 # macOS), committed side-by-side so they're easy to find and maintain together -- but a given
 # build should only ever ship the 3 scripts for its OWN target platform, not all 9.
 # CMAKE_SYSTEM_NAME already reflects the right platform for every build that matters here (native
@@ -37,16 +37,16 @@ set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS
 # dev-build copy and the install() for packaging/CI) drop the other platforms' scripts using this
 # same list.
 set(GalaxyRPAllLauncherFiles
-	galaxyrp_play.bat galaxyrp_host.bat galaxyrp_host_autorestart.bat
-	galaxyrp_play.sh galaxyrp_host.sh galaxyrp_host_autorestart.sh
-	galaxyrp_play.command galaxyrp_host.command galaxyrp_host_autorestart.command)
+	universe_rp_play.bat universe_rp_host.bat universe_rp_host_autorestart.bat
+	universe_rp_play.sh universe_rp_host.sh universe_rp_host_autorestart.sh
+	universe_rp_play.command universe_rp_host.command universe_rp_host_autorestart.command)
 
 # GalaxyRP fix: [packaging] the platform detection below is the DEFAULT, not an override: it only
 # runs when GalaxyRPLauncherFiles has not already been set. Without this guard the message in the
 # else() branch was giving advice that could not work -- a -D on the command line creates a CACHE
 # variable, and the plain set() calls here create a NORMAL variable, which shadows the cache entry
 # for the rest of this directory. The branch always won and the -D was silently discarded
-# (confirmed: -DGalaxyRPLauncherFiles=galaxyrp_play.bat on Linux still installed the .sh set and
+# (confirmed: -DGalaxyRPLauncherFiles=universe_rp_play.bat on Linux still installed the .sh set and
 # still excluded every .bat). The else() branch also overwrote it on the line right after telling
 # the user to set it. Now the advice is honoured, and on any platform rather than only the
 # unrecognized one -- which also makes it possible to package for a different target than the host,
@@ -54,15 +54,15 @@ set(GalaxyRPAllLauncherFiles
 # "use the default" rather than shipping nothing.
 if(NOT GalaxyRPLauncherFiles)
 	if(CMAKE_SYSTEM_NAME STREQUAL "Windows")
-		set(GalaxyRPLauncherFiles galaxyrp_play.bat galaxyrp_host.bat galaxyrp_host_autorestart.bat)
+		set(GalaxyRPLauncherFiles universe_rp_play.bat universe_rp_host.bat universe_rp_host_autorestart.bat)
 	elseif(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
-		set(GalaxyRPLauncherFiles galaxyrp_play.command galaxyrp_host.command galaxyrp_host_autorestart.command)
+		set(GalaxyRPLauncherFiles universe_rp_play.command universe_rp_host.command universe_rp_host_autorestart.command)
 	elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
-		set(GalaxyRPLauncherFiles galaxyrp_play.sh galaxyrp_host.sh galaxyrp_host_autorestart.sh)
+		set(GalaxyRPLauncherFiles universe_rp_play.sh universe_rp_host.sh universe_rp_host_autorestart.sh)
 	else()
 		message(WARNING "GalaxyRP: unrecognized CMAKE_SYSTEM_NAME '${CMAKE_SYSTEM_NAME}' -- shipping "
 			"every platform's launcher script since it's unclear which one applies. Set "
-			"GalaxyRPLauncherFiles explicitly (e.g. -DGalaxyRPLauncherFiles=galaxyrp_play.sh;galaxyrp_host.sh;galaxyrp_host_autorestart.sh) "
+			"GalaxyRPLauncherFiles explicitly (e.g. -DGalaxyRPLauncherFiles=universe_rp_play.sh;universe_rp_host.sh;universe_rp_host_autorestart.sh) "
 			"to fix this.")
 		set(GalaxyRPLauncherFiles ${GalaxyRPAllLauncherFiles})
 	endif()
@@ -163,10 +163,10 @@ endforeach()
 
 # GalaxyRP fix: [packaging] install(DIRECTORY) does not preserve source file permissions -- it
 # would otherwise install these scripts world-readable but NOT executable (confirmed: verified
-# locally, installed galaxyrp_play.sh/host.sh came out 644, not the 755 they have in the repo).
+# locally, installed universe_rp_play.sh/host.sh came out 644, not the 755 they have in the repo).
 # That was harmless for the old .bat-only setup (Windows has no Unix execute bit; a .bat's
 # "executability" is determined by its extension), but it would silently break the whole point of
-# the new .sh/.command scripts -- Linux's `./galaxyrp_play.sh` and macOS Finder's double-click both
+# the new .sh/.command scripts -- Linux's `./universe_rp_play.sh` and macOS Finder's double-click both
 # require the execute bit to actually be set. Force it back on explicitly for just the launcher
 # files being installed (everything else under assets/server -- the .cfg/.html/.txt content,
 # database/ -- has no reason to be executable).

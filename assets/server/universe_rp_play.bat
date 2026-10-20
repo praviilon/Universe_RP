@@ -1,6 +1,6 @@
 @echo off
 
-:: galaxyrp_play.bat -- Windows client launcher
+:: universe_rp_play.bat -- Windows client launcher
 
 :: Main settings
 set jk_executable_64=taystjk.x86_64.exe
@@ -68,7 +68,7 @@ set /p option=[2] Type or paste an IP to connect:
 :: saved profiles, screenshots) inside this folder instead of the Windows user profile.
 :: GalaxyRP fix: [TaystJK] dropped "+set net_port 29070 +set dedicated 0 +exec server.cfg" from
 :: the "play locally" branch -- those are dedicated-server-only settings (server.cfg isn't even
-:: this mod's config filename, that's galaxyrp_server.cfg) that don't belong on a client launch
+:: this mod's config filename, that's universe_rp_server.cfg) that don't belong on a client launch
 :: and appear to have been copy-pasted here by mistake.
 :: GalaxyRP fix: [TaystJK] the TaystJK client (unlike the dedicated server) defaults fs_forcegame
 :: to "taystjk", which unconditionally overwrites fs_gamedir back to "taystjk" at the end of

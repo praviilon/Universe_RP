@@ -1,11 +1,11 @@
 #!/bin/sh
 
-# galaxyrp_host.command -- macOS dedicated server launcher
+# universe_rp_host.command -- macOS dedicated server launcher
 
 # Main settings
 jk_dedicated=2
 jk_net_port=29070
-jk_config=galaxyrp_server.cfg
+jk_config=universe_rp_server.cfg
 jk_executable_x64="taystjkded.x86_64"
 jk_executable_arm64="taystjkded.arm64"
 jk_executable_universal="taystjkded"

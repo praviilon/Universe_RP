@@ -1,11 +1,11 @@
 @echo off
 
-:: galaxyrp_host.bat -- Windows dedicated server launcher
+:: universe_rp_host.bat -- Windows dedicated server launcher
 
 :: Main settings
 set jk_dedicated=2
 set jk_net_port=29070
-set jk_config=galaxyrp_server.cfg
+set jk_config=universe_rp_server.cfg
 set jk_executable_64=taystjkded.x86_64.exe
 set jk_executable_32=taystjkded.x86.exe
 
