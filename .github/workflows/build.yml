@@ -62,8 +62,8 @@ on:
 # RP_MOD_FOLDER must equal RP_MOD_FOLDER in galaxyrp/game/rp_version.h (CMake installs into that
 # folder); the release job checks it. RP_MOD_NAME is RP_MOD_NAME there.
 env:
-  RP_MOD_FOLDER: GalaxyRP
-  RP_MOD_NAME: Galaxy RP
+  RP_MOD_FOLDER: UniverseRP
+  RP_MOD_NAME: Universe RP
 
 jobs:
   msvc:

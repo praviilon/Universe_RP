@@ -51,7 +51,7 @@
 			name                rpx_title
 			style               WINDOW_STYLE_SHADER
 			background          "gfx/menus/menu_blendbox"
-			text                "^6Galaxy ^4RP^3 Extras: ^7NPCs & Vehicles"
+			text                "^9Universe ^7RP^3 Extras: ^7NPCs & Vehicles"
 			rect                20 5 580 28
 			textalign           ITEM_ALIGN_CENTER
 			textalignx          290
@@ -79,7 +79,7 @@
 			border              1
 			bordercolor         1 .682 0 .6
 			visible             1
-			descText            "Back to the Galaxy RP menu"
+			descText            "Back to the Universe RP menu"
 			mouseEnter
 			{
 				setitemcolor rpx_back bordercolor 1 1 1 1
