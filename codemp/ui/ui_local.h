@@ -408,6 +408,9 @@ void		UI_FillRect( float x, float y, float width, float height, const float *col
 int			UI_RpxFeederCount( void );
 const char	*UI_RpxFeederItemText( int index );
 qboolean	UI_RpxFeederSelection( int index );
+int			UI_RpxAnimFeederCount( void );			// GLX_U: [Extras] GLM Props' animations
+const char	*UI_RpxAnimFeederItemText( int index );
+qboolean	UI_RpxAnimFeederSelection( int index );
 qboolean	UI_RpxScript( const char *name, char **args );
 qboolean	UI_RpxOwnerDraw( int ownerDraw, rectDef_t *rect, float scale, vec4_t color, int iMenuFont );
 void		UI_RpxRegisterCvars( void );

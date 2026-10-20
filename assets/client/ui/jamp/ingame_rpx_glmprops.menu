@@ -2,8 +2,10 @@
 // ingame_rpx_glmprops: the GLM Props menu of the Extras.
 // GLX_U: [Extras] MD3 Props (ingame_rpx_props.menu) for .glm models, spawned as a misc_model_ghoul:
 // the same layout, with its own ui_rpx_g_* cvars. No Animated, Breakable or Health (a misc_model_ghoul
-// takes no damage). The GLM Props button of ingame_galaxyrp.menu opens it. The list, the preview and
-// the rpx scripts are ui_rpextras.c; the commands the buttons send are built in cg_rpextras.c.
+// takes no damage). Its right-hand column has two tabs (ui_rpx_g_tab): Prop, and Animation -- the frames
+// of the model's animation file it plays, typed or taken from its named animations. The GLM Props button
+// of ingame_galaxyrp.menu opens it. The list, the preview and the rpx scripts are ui_rpextras.c; the
+// commands the buttons send are built in cg_rpextras.c.
 //----------------------------------------------------------------------------------------------
 {
 	menuDef
@@ -577,22 +579,6 @@
 		}
 		itemDef
 		{
-			name                rpx_head_spawn
-			type                ITEM_TYPE_TEXT
-			style               WINDOW_STYLE_EMPTY
-			rect                432 40 180 14
-			text                "Spawned prop"
-			textalign           ITEM_ALIGN_LEFT
-			textalignx          0
-			textaligny          0
-			font                2
-			textscale           0.55
-			forecolor           1 .682 0 1
-			visible             1
-			decoration
-		}
-		itemDef
-		{
 			name                rpx_scale
 			type                ITEM_TYPE_INTSLIDER
 			text                "Scale %"
@@ -605,6 +591,11 @@
 			textscale           0.7
 			forecolor           1 1 1 1
 			visible             1
+			cvarTest            "ui_rpx_g_tab"
+			showCvar
+			{
+				"0"
+			}
 			descText            "Spawned prop: size in percent (up to 1023); the preview shows the size line"
 			action
 			{
@@ -632,6 +623,11 @@
 			border              1
 			bordercolor         .5 .5 .5 .6
 			visible             1
+			cvarTest            "ui_rpx_g_tab"
+			showCvar
+			{
+				"0"
+			}
 			descText            "Spawned prop: size in percent (up to 1023); the preview shows the size line"
 		}
 		itemDef
@@ -648,6 +644,11 @@
 			textscale           0.7
 			forecolor           1 1 1 1
 			visible             1
+			cvarTest            "ui_rpx_g_tab"
+			showCvar
+			{
+				"0"
+			}
 			descText            "Spawned prop: faces you, then Yaw turns it; No: Yaw is the map direction"
 			action
 			{
@@ -668,6 +669,11 @@
 			textscale           0.7
 			forecolor           1 1 1 1
 			visible             1
+			cvarTest            "ui_rpx_g_tab"
+			showCvar
+			{
+				"0"
+			}
 			descText            "Spawned prop: players and NPCs cannot walk through its box"
 			action
 			{
@@ -688,6 +694,11 @@
 			textscale           0.7
 			forecolor           1 1 1 1
 			visible             1
+			cvarTest            "ui_rpx_g_tab"
+			showCvar
+			{
+				"0"
+			}
 			descText            "Spawned prop: it gives off light (the preview shows it)"
 			action
 			{
@@ -708,6 +719,11 @@
 			textscale           0.7
 			forecolor           1 1 1 1
 			visible             1
+			cvarTest            "ui_rpx_g_tab"
+			showCvar
+			{
+				"0"
+			}
 			descText            "Spawned prop: how far the light reaches (the preview shows it)"
 			action
 			{
@@ -735,6 +751,11 @@
 			border              1
 			bordercolor         .5 .5 .5 .6
 			visible             1
+			cvarTest            "ui_rpx_g_tab"
+			showCvar
+			{
+				"0"
+			}
 			descText            "Spawned prop: how far the light reaches (the preview shows it)"
 		}
 		itemDef
@@ -751,6 +772,11 @@
 			textscale           0.7
 			forecolor           1 1 1 1
 			visible             1
+			cvarTest            "ui_rpx_g_tab"
+			showCvar
+			{
+				"0"
+			}
 			descText            "Spawned prop: the light's colour, red (the preview shows it)"
 			action
 			{
@@ -778,6 +804,11 @@
 			border              1
 			bordercolor         .5 .5 .5 .6
 			visible             1
+			cvarTest            "ui_rpx_g_tab"
+			showCvar
+			{
+				"0"
+			}
 			descText            "Spawned prop: the light's colour, red (the preview shows it)"
 		}
 		itemDef
@@ -794,6 +825,11 @@
 			textscale           0.7
 			forecolor           1 1 1 1
 			visible             1
+			cvarTest            "ui_rpx_g_tab"
+			showCvar
+			{
+				"0"
+			}
 			descText            "Spawned prop: the light's colour, green (the preview shows it)"
 			action
 			{
@@ -821,6 +857,11 @@
 			border              1
 			bordercolor         .5 .5 .5 .6
 			visible             1
+			cvarTest            "ui_rpx_g_tab"
+			showCvar
+			{
+				"0"
+			}
 			descText            "Spawned prop: the light's colour, green (the preview shows it)"
 		}
 		itemDef
@@ -837,6 +878,11 @@
 			textscale           0.7
 			forecolor           1 1 1 1
 			visible             1
+			cvarTest            "ui_rpx_g_tab"
+			showCvar
+			{
+				"0"
+			}
 			descText            "Spawned prop: the light's colour, blue (the preview shows it)"
 			action
 			{
@@ -864,6 +910,11 @@
 			border              1
 			bordercolor         .5 .5 .5 .6
 			visible             1
+			cvarTest            "ui_rpx_g_tab"
+			showCvar
+			{
+				"0"
+			}
 			descText            "Spawned prop: the light's colour, blue (the preview shows it)"
 		}
 		itemDef
@@ -878,6 +929,11 @@
 			border              1
 			bordercolor         1 .682 0 .6
 			visible             1
+			cvarTest            "ui_rpx_g_tab"
+			showCvar
+			{
+				"0"
+			}
 			decoration
 		}
 		itemDef
@@ -897,6 +953,11 @@
 			border              1
 			bordercolor         1 .682 0 .6
 			visible             1
+			cvarTest            "ui_rpx_g_tab"
+			showCvar
+			{
+				"0"
+			}
 			descText            "Spawned prop: a light colour to start from"
 			mouseEnter
 			{
@@ -931,6 +992,11 @@
 			border              1
 			bordercolor         1 .682 0 .6
 			visible             1
+			cvarTest            "ui_rpx_g_tab"
+			showCvar
+			{
+				"0"
+			}
 			descText            "Spawned prop: a light colour to start from"
 			mouseEnter
 			{
@@ -965,6 +1031,11 @@
 			border              1
 			bordercolor         1 .682 0 .6
 			visible             1
+			cvarTest            "ui_rpx_g_tab"
+			showCvar
+			{
+				"0"
+			}
 			descText            "Spawned prop: a light colour to start from"
 			mouseEnter
 			{
@@ -999,6 +1070,11 @@
 			border              1
 			bordercolor         1 .682 0 .6
 			visible             1
+			cvarTest            "ui_rpx_g_tab"
+			showCvar
+			{
+				"0"
+			}
 			descText            "Spawned prop: a light colour to start from"
 			mouseEnter
 			{
@@ -1033,6 +1109,11 @@
 			border              1
 			bordercolor         1 .682 0 .6
 			visible             1
+			cvarTest            "ui_rpx_g_tab"
+			showCvar
+			{
+				"0"
+			}
 			descText            "Spawned prop: a light colour to start from"
 			mouseEnter
 			{
@@ -1064,6 +1145,11 @@
 			textscale           0.7
 			forecolor           1 1 1 1
 			visible             1
+			cvarTest            "ui_rpx_g_tab"
+			showCvar
+			{
+				"0"
+			}
 			descText            "Spawned prop: how far out from the surface you aim at it goes"
 			action
 			{
@@ -1091,6 +1177,11 @@
 			border              1
 			bordercolor         .5 .5 .5 .6
 			visible             1
+			cvarTest            "ui_rpx_g_tab"
+			showCvar
+			{
+				"0"
+			}
 			descText            "Spawned prop: how far out from the surface you aim at it goes"
 		}
 		itemDef
@@ -1155,6 +1246,455 @@
 			{
 				play "sound/interface/button1.wav" ;
 				uiScript rpxDo grabglm
+			}
+		}
+		itemDef
+		{
+			name                rpx_tab_prop
+			type                ITEM_TYPE_BUTTON
+			style               WINDOW_STYLE_FILLED
+			rect                432 36 88 18
+			text                "Prop"
+			textalign           ITEM_ALIGN_CENTER
+			textalignx          44
+			textaligny          1
+			font                2
+			textscale           0.7
+			forecolor           1 .682 0 1
+			backcolor           0 0 0 .6
+			border              1
+			bordercolor         1 .682 0 .6
+			visible             1
+			descText            "The spawned prop: size, solid, light, offset"
+			mouseEnter
+			{
+				setitemcolor rpx_tab_prop bordercolor 1 1 1 1
+			}
+			mouseExit
+			{
+				setitemcolor rpx_tab_prop bordercolor 1 .682 0 .6
+			}
+			action
+			{
+				play "sound/interface/button1.wav" ;
+				setcvar ui_rpx_g_tab 0
+			}
+		}
+		itemDef
+		{
+			name                rpx_tab_anim
+			type                ITEM_TYPE_BUTTON
+			style               WINDOW_STYLE_FILLED
+			rect                524 36 88 18
+			text                "Animation"
+			textalign           ITEM_ALIGN_CENTER
+			textalignx          44
+			textaligny          1
+			font                2
+			textscale           0.7
+			forecolor           1 .682 0 1
+			backcolor           0 0 0 .6
+			border              1
+			bordercolor         1 .682 0 .6
+			visible             1
+			descText            "The frames of its animation file it plays"
+			mouseEnter
+			{
+				setitemcolor rpx_tab_anim bordercolor 1 1 1 1
+			}
+			mouseExit
+			{
+				setitemcolor rpx_tab_anim bordercolor 1 .682 0 .6
+			}
+			action
+			{
+				play "sound/interface/button1.wav" ;
+				setcvar ui_rpx_g_tab 1
+			}
+		}
+		itemDef
+		{
+			name                rpx_tab_prop_on
+			style               WINDOW_STYLE_FILLED
+			rect                434 52 84 2
+			backcolor           1 1 1 1
+			visible             1
+			decoration
+			cvarTest            "ui_rpx_g_tab"
+			showCvar
+			{
+				"0"
+			}
+		}
+		itemDef
+		{
+			name                rpx_tab_anim_on
+			style               WINDOW_STYLE_FILLED
+			rect                526 52 84 2
+			backcolor           1 1 1 1
+			visible             1
+			decoration
+			cvarTest            "ui_rpx_g_tab"
+			showCvar
+			{
+				"1"
+			}
+		}
+		itemDef
+		{
+			name                rpx_anim
+			type                ITEM_TYPE_YESNO
+			text                "Animated:"
+			cvar                "ui_rpx_g_anim"
+			rect                432 60 180 18
+			textalign           ITEM_ALIGN_LEFT
+			textalignx          0
+			textaligny          -2
+			font                2
+			textscale           0.7
+			forecolor           1 1 1 1
+			visible             1
+			descText            "Spawned prop: plays the frames below; No: stands in its base pose"
+			cvarTest            "ui_rpx_g_tab"
+			showCvar
+			{
+				"1"
+			}
+			action
+			{
+				play "sound/interface/button1.wav"
+			}
+		}
+		itemDef
+		{
+			name                rpx_start
+			type                ITEM_TYPE_NUMERICFIELD
+			style               0
+			text                "Start frame: "
+			cvar                "ui_rpx_g_start"
+			maxchars            5
+			maxPaintChars       5
+			rect                432 80 180 18
+			textalign           ITEM_ALIGN_LEFT
+			textalignx          0
+			textaligny          -2
+			font                2
+			textscale           0.7
+			forecolor           1 1 1 1
+			outlinecolor        1 .5 .5 .5
+			backcolor           0 0 0 .6
+			border              1
+			bordercolor         .5 .5 .5 .6
+			visible             1
+			descText            "Spawned prop: the first frame it plays (Set start takes an animation's)"
+			cvarTest            "ui_rpx_g_tab"
+			showCvar
+			{
+				"1"
+			}
+		}
+		itemDef
+		{
+			name                rpx_end
+			type                ITEM_TYPE_NUMERICFIELD
+			style               0
+			text                "End frame: "
+			cvar                "ui_rpx_g_end"
+			maxchars            5
+			maxPaintChars       5
+			rect                432 100 180 18
+			textalign           ITEM_ALIGN_LEFT
+			textalignx          0
+			textaligny          -2
+			font                2
+			textscale           0.7
+			forecolor           1 1 1 1
+			outlinecolor        1 .5 .5 .5
+			backcolor           0 0 0 .6
+			border              1
+			bordercolor         .5 .5 .5 .6
+			visible             1
+			descText            "Spawned prop: the last frame it plays, then holds (Set end takes an animation's)"
+			cvarTest            "ui_rpx_g_tab"
+			showCvar
+			{
+				"1"
+			}
+		}
+		itemDef
+		{
+			name                rpx_loop
+			type                ITEM_TYPE_YESNO
+			text                "Loop:"
+			cvar                "ui_rpx_g_loop"
+			rect                432 120 180 18
+			textalign           ITEM_ALIGN_LEFT
+			textalignx          0
+			textaligny          -2
+			font                2
+			textscale           0.7
+			forecolor           1 1 1 1
+			visible             1
+			descText            "Spawned prop: plays the frames over and over"
+			cvarTest            "ui_rpx_g_tab"
+			showCvar
+			{
+				"1"
+			}
+			action
+			{
+				play "sound/interface/button1.wav"
+			}
+		}
+		itemDef
+		{
+			name                rpx_animfile
+			type                ITEM_TYPE_OWNERDRAW
+			ownerdraw           UI_RPX_GANIMFILE
+			rect                432 140 180 16
+			font                2
+			textscale           0.55
+			forecolor           .8 .8 .8 1
+			visible             1
+			decoration
+			cvarTest            "ui_rpx_g_tab"
+			showCvar
+			{
+				"1"
+			}
+		}
+		itemDef
+		{
+			name                rpx_animfilter
+			type                ITEM_TYPE_EDITFIELD
+			style               0
+			text                "Filter: "
+			cvar                "ui_rpx_filter_anims"
+			maxchars            30
+			maxPaintChars       30
+			rect                432 158 180 18
+			textalign           ITEM_ALIGN_LEFT
+			textalignx          0
+			textaligny          -2
+			font                2
+			textscale           0.7
+			forecolor           1 1 1 1
+			outlinecolor        1 .5 .5 .5
+			backcolor           0 0 0 .6
+			border              1
+			bordercolor         .5 .5 .5 .6
+			visible             1
+			descText            "Show only the animations with this in their names"
+			cvarTest            "ui_rpx_g_tab"
+			showCvar
+			{
+				"1"
+			}
+		}
+		itemDef
+		{
+			name                rpx_animlist
+			type                ITEM_TYPE_LISTBOX
+			style               WINDOW_STYLE_FILLED
+			rect                432 178 180 98
+			elementwidth        160
+			elementheight       14
+			elementtype         LISTBOX_TEXT
+			feeder              FEEDER_RPX_ANIMS
+			font                2
+			textscale           0.55
+			textstyle           0
+			textalign           0
+			textaligny          0
+			columns             1 4 154 154
+			border              1
+			bordercolor         1 .682 0 .6
+			forecolor           1 1 1 1
+			backcolor           0 0 0 .6
+			outlinecolor        1 .682 0 .35
+			visible             1
+			descText            "The named animations of its animation file; double-click one to use it"
+			cvarTest            "ui_rpx_g_tab"
+			showCvar
+			{
+				"1"
+			}
+			doubleclick
+			{
+				uiScript rpxAnimEnter
+			}
+			mouseEnter
+			{
+				setitemcolor rpx_animlist bordercolor 1 1 1 1
+			}
+			mouseExit
+			{
+				setitemcolor rpx_animlist bordercolor 1 .682 0 .6
+			}
+		}
+		itemDef
+		{
+			name                rpx_animstart
+			type                ITEM_TYPE_BUTTON
+			style               WINDOW_STYLE_FILLED
+			rect                432 280 58 16
+			text                "Set start"
+			textalign           ITEM_ALIGN_CENTER
+			textalignx          29
+			textaligny          1
+			font                2
+			textscale           0.55
+			forecolor           1 .682 0 1
+			backcolor           0 0 0 .6
+			border              1
+			bordercolor         1 .682 0 .6
+			visible             1
+			descText            "Start frame: the selected animation's first"
+			cvarTest            "ui_rpx_g_tab"
+			showCvar
+			{
+				"1"
+			}
+			mouseEnter
+			{
+				setitemcolor rpx_animstart bordercolor 1 1 1 1
+			}
+			mouseExit
+			{
+				setitemcolor rpx_animstart bordercolor 1 .682 0 .6
+			}
+			action
+			{
+				play "sound/interface/button1.wav" ;
+				uiScript rpxAnimSet start
+			}
+		}
+		itemDef
+		{
+			name                rpx_animend
+			type                ITEM_TYPE_BUTTON
+			style               WINDOW_STYLE_FILLED
+			rect                493 280 58 16
+			text                "Set end"
+			textalign           ITEM_ALIGN_CENTER
+			textalignx          29
+			textaligny          1
+			font                2
+			textscale           0.55
+			forecolor           1 .682 0 1
+			backcolor           0 0 0 .6
+			border              1
+			bordercolor         1 .682 0 .6
+			visible             1
+			descText            "End frame: the selected animation's last"
+			cvarTest            "ui_rpx_g_tab"
+			showCvar
+			{
+				"1"
+			}
+			mouseEnter
+			{
+				setitemcolor rpx_animend bordercolor 1 1 1 1
+			}
+			mouseExit
+			{
+				setitemcolor rpx_animend bordercolor 1 .682 0 .6
+			}
+			action
+			{
+				play "sound/interface/button1.wav" ;
+				uiScript rpxAnimSet end
+			}
+		}
+		itemDef
+		{
+			name                rpx_animuse
+			type                ITEM_TYPE_BUTTON
+			style               WINDOW_STYLE_FILLED
+			rect                554 280 58 16
+			text                "Use"
+			textalign           ITEM_ALIGN_CENTER
+			textalignx          29
+			textaligny          1
+			font                2
+			textscale           0.55
+			forecolor           1 .682 0 1
+			backcolor           0 0 0 .6
+			border              1
+			bordercolor         1 .682 0 .6
+			visible             1
+			descText            "Start and End frames: the selected animation"
+			cvarTest            "ui_rpx_g_tab"
+			showCvar
+			{
+				"1"
+			}
+			mouseEnter
+			{
+				setitemcolor rpx_animuse bordercolor 1 1 1 1
+			}
+			mouseExit
+			{
+				setitemcolor rpx_animuse bordercolor 1 .682 0 .6
+			}
+			action
+			{
+				play "sound/interface/button1.wav" ;
+				uiScript rpxAnimSet both
+			}
+		}
+		itemDef
+		{
+			name                rpx_animrange
+			type                ITEM_TYPE_OWNERDRAW
+			ownerdraw           UI_RPX_GANIMRANGE
+			rect                432 298 180 26
+			font                2
+			textscale           0.55
+			forecolor           .8 .8 .8 1
+			visible             1
+			decoration
+			cvarTest            "ui_rpx_g_tab"
+			showCvar
+			{
+				"1"
+			}
+		}
+		itemDef
+		{
+			name                rpx_animreplay
+			type                ITEM_TYPE_BUTTON
+			style               WINDOW_STYLE_FILLED
+			rect                432 326 180 18
+			text                "Replay"
+			textalign           ITEM_ALIGN_CENTER
+			textalignx          90
+			textaligny          1
+			font                2
+			textscale           0.7
+			forecolor           1 .682 0 1
+			backcolor           0 0 0 .6
+			border              1
+			bordercolor         1 .682 0 .6
+			visible             1
+			descText            "Preview only: play the frames again from the start"
+			cvarTest            "ui_rpx_g_tab"
+			showCvar
+			{
+				"1"
+			}
+			mouseEnter
+			{
+				setitemcolor rpx_animreplay bordercolor 1 1 1 1
+			}
+			mouseExit
+			{
+				setitemcolor rpx_animreplay bordercolor 1 .682 0 .6
+			}
+			action
+			{
+				play "sound/interface/button1.wav" ;
+				uiScript rpxAnimReplay
 			}
 		}
 	}

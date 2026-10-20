@@ -18,6 +18,9 @@ ingame_rpx_spawners (GLX_U: and ingame_rpx_glmprops). cgame's half is cg_rpextra
 - GLX_U: the GLM Props preview (UI_RPX_GPREVIEW): the same, for a .glm, through a Ghoul2 instance of
   its own. The instance is freed when the menu closes and made again from the model's path when it
   opens on the same map (the model keeps its slot); RPX_GlmBounds() (rp_extras.h) gives its size.
+  Its Animation tab: the frames of the model's own animation file (.gla) it plays, typed or taken from
+  the named animations of the animation.cfg next to that file (FEEDER_RPX_ANIMS); the preview plays
+  them as the spawned prop will (RPX_GlmAnimate()).
 - The effect preview box (UI_RPX_FXBOX): renders the scene cgame left the effect in (without
   clearing it first, see CG_RpxFxPass()), and tells cgame it is on screen (ui_rpx_fxbox).
 - The light colour swatch of the Props menu (UI_RPX_SWATCH), and the Lights menu's two (UI_RPX_LSWATCH,
@@ -29,6 +32,7 @@ ingame_rpx_spawners (GLX_U: and ingame_rpx_glmprops). cgame's half is cg_rpextra
 
 #include "ui_local.h"
 #include "ui/rp_extras.h"
+#include "ghoul2/G2.h"	// GLX_U: [Extras] the bone animation flags, for the GLM preview
 
 extern void Text_Paint( float x, float y, float scale, vec4_t color, const char *text, float adjust, int limit, int style, int iMenuFont );
 extern int Text_Width( const char *text, float scale, int iMenuFont );
@@ -77,9 +81,46 @@ static struct {
 	void		*ghoul2;			// its instance while the menu is open
 	qboolean	sized;				// mins/maxs are the model's own, not the default box
 	vec3_t		mins, maxs;
+	char		gla[MAX_QPATH];		// its animation file, without .gla: "" or "*default" for none
+	int			numFrames;			// that file's frames; 0 when there is none or it was not read
 	char		previewed[RPX_PREVIEW_GLMS][MAX_QPATH];
 	int			numPreviewed;
 } rpxGlm;
+
+// GLX_U: [Extras] what the GLM preview's instance plays now (RPX_GlmAnimate())
+static struct {
+	qboolean	on;
+	int			start, end;
+	qboolean	loop;
+	qboolean	replay;				// Replay pressed: from the start again
+} rpxGlmAnim;
+
+// GLX_U: [Extras] the named animations of the previewed model's animation file (its animation.cfg)
+#define RPX_MAX_ANIMS		2048
+#define RPX_ANIM_NAME		64
+#define RPX_ANIMCFG_SIZE	0x20000		// the largest animation.cfg read (_humanoid's is some 53 KB)
+
+typedef enum {
+	RPX_ANIMS_NONE,			// nothing read: no model previewed, or it has no animation file
+	RPX_ANIMS_OK,
+	RPX_ANIMS_NOCFG,		// no animation.cfg (or none with a named animation in it)
+	RPX_ANIMS_TOOBIG
+} rpxAnimsState_t;
+
+typedef struct {
+	char		name[RPX_ANIM_NAME];
+	int			first, num;
+} uiRpxAnim_t;
+
+static uiRpxAnim_t		rpxAnims[RPX_MAX_ANIMS];
+static int				rpxNumAnims;
+static rpxAnimsState_t	rpxAnimsState;
+static char				rpxAnimsGla[MAX_QPATH];			// the animation file rpxAnims is from
+static int				rpxAnimView[RPX_MAX_ANIMS];		// index into rpxAnims
+static int				rpxAnimViewNum;
+static char				rpxAnimFilterSeen[64];
+static int				rpxAnimSel = -1;				// the selected one, index into rpxAnims
+static char				rpxAnimText[RPX_ANIMCFG_SIZE + 1];
 
 static int			rpxFxWindowEnd;
 static int			rpxFxDir;
@@ -141,7 +182,8 @@ static qboolean RPX_Contains( const char *hay, const char *needle ) {
 }
 
 // the list of the open Extras menu
-static itemDef_t *RPX_ListItem( void ) {
+// GLX_U: [Extras] or the open menu's list of that feeder (FEEDER_RPX_ANIMS: GLM Props' animations)
+static itemDef_t *RPX_FeederItem( int feeder ) {
 	menuDef_t *menu = rpxMenu[0] ? Menus_FindByName( rpxMenu ) : NULL;
 	int i;
 
@@ -149,11 +191,15 @@ static itemDef_t *RPX_ListItem( void ) {
 		return NULL;
 	}
 	for ( i = 0; i < menu->itemCount; i++ ) {
-		if ( menu->items[i]->type == ITEM_TYPE_LISTBOX && menu->items[i]->special == FEEDER_RPX_LIST ) {
+		if ( menu->items[i]->type == ITEM_TYPE_LISTBOX && menu->items[i]->special == feeder ) {
 			return menu->items[i];
 		}
 	}
 	return NULL;
+}
+
+static itemDef_t *RPX_ListItem( void ) {
+	return RPX_FeederItem( FEEDER_RPX_LIST );
 }
 
 // the selected row, as the list shows it
@@ -430,6 +476,12 @@ static void RPX_CheckMap( void ) {
 	rpxProp.numPreviewed = 0;
 	RPX_GlmClear();
 	rpxGlm.numPreviewed = 0;
+	rpxGlm.numFrames = 0;
+	rpxAnimsGla[0] = '\0';		// GLX_U: files can change between maps
+	rpxAnimsState = RPX_ANIMS_NONE;
+	rpxNumAnims = 0;
+	rpxAnimViewNum = 0;
+	rpxAnimSel = -1;
 	rpxFxWindowEnd = 0;
 }
 
@@ -647,6 +699,260 @@ static void RPX_PreviewProp( void ) {
 	RPX_Msg( "" );
 }
 
+static qboolean RPX_GlmMake( const char *path );
+
+// GLX_U: [Extras] an animation file (without .gla) that is one: not "" nor the game's own "*default"
+static qboolean RPX_GlaNamed( const char *gla ) {
+	return ( gla[0] && gla[0] != '*' ) ? qtrue : qfalse;
+}
+
+// GLX_U: [Extras] the frames of an animation file (mdxaHeader_t: ident, version, name, fScale, numFrames),
+// 0 when there is none or it does not read as one
+static int RPX_GlaFrames( const char *gla ) {
+	static const int ident = ( 'A' << 24 ) + ( 'G' << 16 ) + ( 'L' << 8 ) + '2';	// MDXA_IDENT
+	char path[MAX_QPATH];
+	byte head[80];
+	fileHandle_t f = 0;
+	int len, frames = 0;
+
+	if ( !RPX_GlaNamed( gla ) || strlen( gla ) + 4 >= sizeof( path ) ) {
+		return 0;
+	}
+	Com_sprintf( path, sizeof( path ), "%s.gla", gla );
+	len = trap->FS_Open( path, &f, FS_READ );
+	if ( !f ) {
+		return 0;
+	}
+	if ( len >= (int)sizeof( head ) && trap->FS_Read( head, sizeof( head ), f ) == (int)sizeof( head ) &&
+		RPX_GlmInt( head ) == ident && RPX_GlmInt( head + 4 ) == 6 ) {
+		frames = RPX_GlmInt( head + 76 );
+		if ( frames < 0 ) {
+			frames = 0;
+		}
+	}
+	trap->FS_Close( f );
+	return frames;
+}
+
+static int QDECL RPX_AnimCompare( const void *a, const void *b ) {
+	return Q_stricmp( ( (const uiRpxAnim_t *)a )->name, ( (const uiRpxAnim_t *)b )->name );
+}
+
+// GLX_U: [Extras] the animation list as the filter lets it through, the selection kept on its animation
+static void RPX_BuildAnimView( void ) {
+	itemDef_t *item = RPX_FeederItem( FEEDER_RPX_ANIMS );
+	int i, cursor = -1;
+
+	rpxAnimViewNum = 0;
+	for ( i = 0; i < rpxNumAnims; i++ ) {
+		if ( RPX_Contains( rpxAnims[i].name, rpxAnimFilterSeen ) ) {
+			if ( i == rpxAnimSel ) {
+				cursor = rpxAnimViewNum;
+			}
+			rpxAnimView[rpxAnimViewNum++] = i;
+		}
+	}
+	if ( item && item->typeData.listbox ) {
+		listBoxDef_t *listPtr = item->typeData.listbox;
+
+		item->cursorPos = cursor;
+		listPtr->cursorPos = ( cursor >= 0 ) ? cursor : 0;
+		listPtr->startPos = 0;
+		if ( cursor > 3 ) {
+			int max = Item_ListBox_MaxScroll( item );
+
+			listPtr->startPos = cursor - 3;
+			if ( listPtr->startPos > max ) {
+				listPtr->startPos = max;
+			}
+		}
+	}
+}
+
+// GLX_U: [Extras] the named animations of an animation file (gla, without .gla; "" for none): the
+// animation.cfg next to it, "NAME firstFrame numFrames loopFrames fps" a line -- read here and not with
+// UI_ParseAnimationFile(), which drops the game on a file over 60000 bytes and keeps what it reads in a
+// table the player menus share. Read again only for another file.
+static void RPX_ReadAnims( const char *gla ) {
+	char path[MAX_QPATH];
+	const char *slash, *p;
+	fileHandle_t f = 0;
+	int len;
+
+	if ( !Q_stricmp( gla, rpxAnimsGla ) && ( rpxAnimsState != RPX_ANIMS_NONE || !gla[0] ) ) {
+		return;
+	}
+	Q_strncpyz( rpxAnimsGla, gla, sizeof( rpxAnimsGla ) );
+	rpxNumAnims = 0;
+	rpxAnimSel = -1;
+	rpxAnimsState = RPX_ANIMS_NONE;
+
+	if ( RPX_GlaNamed( gla ) ) {
+		slash = strrchr( gla, '/' );
+		rpxAnimsState = RPX_ANIMS_NOCFG;
+		if ( slash && (int)( slash - gla ) + 15 < (int)sizeof( path ) ) {
+			Com_sprintf( path, sizeof( path ), "%.*s/animation.cfg", (int)( slash - gla ), gla );
+			len = trap->FS_Open( path, &f, FS_READ );
+			if ( f ) {
+				if ( len > RPX_ANIMCFG_SIZE ) {
+					rpxAnimsState = RPX_ANIMS_TOOBIG;
+				} else if ( len > 0 ) {
+					trap->FS_Read( rpxAnimText, len, f );
+					rpxAnimText[len] = '\0';
+					p = rpxAnimText;
+					COM_BeginParseSession( "RPX_ReadAnims" );
+					while ( rpxNumAnims < RPX_MAX_ANIMS ) {
+						char name[RPX_ANIM_NAME];
+						int nums[4], k, nameLen;
+						const char *token = COM_Parse( &p );
+
+						if ( !token || !token[0] ) {
+							break;
+						}
+						nameLen = strlen( token );
+						Q_strncpyz( name, token, sizeof( name ) );
+						for ( k = 0; k < 4; k++ ) {
+							token = COM_Parse( &p );
+							if ( !token || !token[0] ) {
+								break;
+							}
+							nums[k] = atoi( token );
+						}
+						if ( k < 4 ) {
+							break;
+						}
+						// a frame to start at and some to play; a name too long for the list is left out
+						if ( nums[0] >= 0 && nums[1] > 0 && nameLen < RPX_ANIM_NAME ) {
+							Q_strncpyz( rpxAnims[rpxNumAnims].name, name, sizeof( rpxAnims[0].name ) );
+							rpxAnims[rpxNumAnims].first = nums[0];
+							rpxAnims[rpxNumAnims].num = nums[1];
+							rpxNumAnims++;
+						}
+					}
+					if ( rpxNumAnims ) {
+						qsort( rpxAnims, rpxNumAnims, sizeof( rpxAnims[0] ), RPX_AnimCompare );
+						rpxAnimsState = RPX_ANIMS_OK;
+					}
+				}
+				trap->FS_Close( f );
+			}
+		}
+	}
+	RPX_BuildAnimView();
+}
+
+// GLX_U: [Extras] the GLM preview playing what the Animation tab says, as the spawned prop will (CG_General's
+// EF_G2ANIMATING routine: the frames on model_root at 20 a second, then held, or looped); its base pose
+// when not animated. Again whenever the frames, Loop or Animated change, or Replay is pressed.
+static void RPX_GlmAnimate( void ) {
+	qboolean on = ( atoi( RPX_CvarStr( "ui_rpx_g_anim" ) ) && rpxGlm.numFrames > 0 ) ? qtrue : qfalse;
+	qboolean loop = atoi( RPX_CvarStr( "ui_rpx_g_loop" ) ) ? qtrue : qfalse;
+	int start = (int)atof( RPX_CvarStr( "ui_rpx_g_start" ) ), end = (int)atof( RPX_CvarStr( "ui_rpx_g_end" ) );
+
+	if ( on ) {
+		start = (int)Com_Clamp( 0, rpxGlm.numFrames - 1, start );
+		end = (int)Com_Clamp( start, rpxGlm.numFrames - 1, end );
+		loop = ( loop && end > start ) ? qtrue : qfalse;
+	}
+	if ( !rpxGlmAnim.replay && on == rpxGlmAnim.on &&
+		( !on || ( start == rpxGlmAnim.start && end == rpxGlmAnim.end && loop == rpxGlmAnim.loop ) ) ) {
+		return;
+	}
+	rpxGlmAnim.replay = qfalse;
+
+	if ( !on ) {
+		if ( !RPX_GlmMake( rpxGlm.path ) ) {	// the base pose: an instance not animated
+			rpxGlm.shown = qfalse;
+		}
+		return;
+	}
+	trap->G2API_SetBoneAnim( rpxGlm.ghoul2, 0, "model_root", start, end + 1,
+		loop ? BONE_ANIM_OVERRIDE_LOOP : BONE_ANIM_OVERRIDE_FREEZE, 1.0f, uiInfo.uiDC.realTime, -1, 0 );
+	rpxGlmAnim.on = qtrue;
+	rpxGlmAnim.start = start;
+	rpxGlmAnim.end = end;
+	rpxGlmAnim.loop = loop;
+}
+
+// GLX_U: [Extras] the animation list's filter changed: shown again
+static void RPX_AnimSync( void ) {
+	char filter[64];
+
+	RPX_Cvar( "ui_rpx_filter_anims", filter, sizeof( filter ) );
+	if ( strcmp( filter, rpxAnimFilterSeen ) ) {
+		Q_strncpyz( rpxAnimFilterSeen, filter, sizeof( rpxAnimFilterSeen ) );
+		RPX_BuildAnimView();
+	}
+}
+
+// the list shows the previewed model's: none while the box waits for Preview
+int UI_RpxAnimFeederCount( void ) {
+	RPX_AnimSync();
+	return rpxGlm.shown ? rpxAnimViewNum : 0;
+}
+
+const char *UI_RpxAnimFeederItemText( int index ) {
+	if ( index < 0 || index >= rpxAnimViewNum ) {
+		return "";
+	}
+	return rpxAnims[rpxAnimView[index]].name;
+}
+
+qboolean UI_RpxAnimFeederSelection( int index ) {
+	rpxAnimSel = ( index >= 0 && index < rpxAnimViewNum ) ? rpxAnimView[index] : -1;
+	return qtrue;
+}
+
+// GLX_U: [Extras] Set start / Set end / Use (which: 1 start, 2 end, 3 both): the selected animation's first
+// frame, last frame or both, and Animated on
+static void RPX_AnimSet( int which ) {
+	const uiRpxAnim_t *a;
+
+	if ( !rpxGlm.shown || rpxAnimSel < 0 || rpxAnimSel >= rpxNumAnims ) {
+		RPX_Msg( "^3Select an animation from the list first." );
+		return;
+	}
+	a = &rpxAnims[rpxAnimSel];
+	if ( which & 1 ) {
+		trap->Cvar_Set( "ui_rpx_g_start", va( "%d", a->first ) );
+	}
+	if ( which & 2 ) {
+		trap->Cvar_Set( "ui_rpx_g_end", va( "%d", a->first + a->num - 1 ) );
+	}
+	trap->Cvar_Set( "ui_rpx_g_anim", "1" );
+	RPX_Msg( "" );
+}
+
+// GLX_U: [Extras] the named animation that starts at frame (start) or ends at it, or NULL
+static const char *RPX_AnimAt( int frame, qboolean start ) {
+	int i;
+
+	if ( !rpxGlm.shown ) {
+		return NULL;	// the animations are the previewed model's
+	}
+	if ( rpxAnimSel >= 0 && rpxAnimSel < rpxNumAnims ) {
+		const uiRpxAnim_t *a = &rpxAnims[rpxAnimSel];
+
+		if ( ( start ? a->first : a->first + a->num - 1 ) == frame ) {
+			return a->name;		// the selected one first: animations can share frames
+		}
+	}
+	for ( i = 0; i < rpxNumAnims; i++ ) {
+		if ( ( start ? rpxAnims[i].first : rpxAnims[i].first + rpxAnims[i].num - 1 ) == frame ) {
+			return rpxAnims[i].name;
+		}
+	}
+	return NULL;
+}
+
+// GLX_U: [Extras] the frames GLM Props will be spawned with, or why it cannot be (RPX_GlmFramesProblem());
+// the model's frame count only when the preview shows the selected model
+static const char *RPX_GlmSpawnFramesProblem( void ) {
+	return RPX_GlmFramesProblem( atoi( RPX_CvarStr( "ui_rpx_g_anim" ) ) ? qtrue : qfalse,
+		(int)atof( RPX_CvarStr( "ui_rpx_g_start" ) ), (int)atof( RPX_CvarStr( "ui_rpx_g_end" ) ),
+		rpxGlm.shown ? rpxGlm.numFrames : 0 );
+}
+
 // GLX_U: [Extras] the GLM preview's instance of path, with the skin the game shows a misc_model_ghoul
 // without one: model_default.skin from its folder, when there is one (CG_General in cg_ents.c)
 static qboolean RPX_GlmMake( const char *path ) {
@@ -654,6 +960,7 @@ static qboolean RPX_GlmMake( const char *path ) {
 	char *slash;
 
 	RPX_GlmFree();
+	rpxGlmAnim.on = qfalse;	// a new instance stands in its base pose
 	if ( trap->G2API_InitGhoul2Model( &rpxGlm.ghoul2, path, 0, 0, 0, 0, 0 ) < 0 || !rpxGlm.ghoul2 ||
 		!trap->G2_HaveWeGhoul2Models( rpxGlm.ghoul2 ) ) {
 		if ( rpxGlm.ghoul2 ) {
@@ -720,12 +1027,14 @@ static void RPX_PreviewGlm( void ) {
 	}
 	Q_strncpyz( rpxGlm.path, path, sizeof( rpxGlm.path ) );
 	rpxGlm.shown = qtrue;
-	rpxGlm.sized = RPX_GlmBounds( path, rpxGlm.mins, rpxGlm.maxs, &reach );
+	rpxGlm.sized = RPX_GlmBounds( path, rpxGlm.mins, rpxGlm.maxs, &reach, rpxGlm.gla, sizeof( rpxGlm.gla ) );
 	if ( !rpxGlm.sized ) {
 		// the box the ui frames a menu's Ghoul2 model in when it has none (Item_Model_Paint)
 		VectorSet( rpxGlm.mins, -16, -16, -24 );
 		VectorSet( rpxGlm.maxs, 16, 16, 32 );
 	}
+	rpxGlm.numFrames = RPX_GlaFrames( rpxGlm.gla );
+	RPX_ReadAnims( rpxGlm.numFrames > 0 ? rpxGlm.gla : "" );
 	RPX_Msg( "" );
 }
 
@@ -772,6 +1081,7 @@ The Extras menus' uiScripts; qfalse when name is not one of them.
 	rpxNpcMode <0|1>									the NPCs and Vehicles tabs (NPCs & Vehicles, Spawners)
 	rpxEnter											the list's double click: open a folder
 	rpxPreview											Props, GLM Props and Effects
+	rpxAnimSet <start|end|both>, rpxAnimEnter, rpxAnimReplay	GLM Props' Animation tab
 	rpxDo <action>										a button: see CG_Rpx_f() in cg_rpextras.c
 	rpxReset <prop|angles|cam>							the preview's sliders back, or the prop's angles
 	rpxLightSame										Lights: the colour when off is the colour when on
@@ -888,6 +1198,16 @@ qboolean UI_RpxScript( const char *name, char **args ) {
 				RPX_CloseMenus();
 				return qtrue;
 			}
+			// GLX_U: [Extras] GLM Props' Spawn and Grab: frames the server would refuse are said in the menu,
+			// which stays open (cgame checks them again)
+			if ( !Q_stricmp( arg, "spawnglm" ) || !Q_stricmp( arg, "grabglm" ) ) {
+				const char *problem = RPX_GlmSpawnFramesProblem();
+
+				if ( problem ) {
+					RPX_Msg( va( "^3%s", problem ) );
+					return qtrue;
+				}
+			}
 			for ( i = 0; i < (int)ARRAY_LEN( closing ); i++ ) {
 				if ( !Q_stricmp( arg, closing[i] ) ) {
 					if ( RPX_HaveSelection() ) {
@@ -899,6 +1219,21 @@ qboolean UI_RpxScript( const char *name, char **args ) {
 				}
 			}
 		}
+	} else if ( !Q_stricmp( name, "rpxAnimSet" ) ) {
+		// GLX_U: [Extras] GLM Props' Set start / Set end / Use
+		if ( String_Parse( args, &arg ) ) {
+			RPX_AnimSet( !Q_stricmp( arg, "start" ) ? 1 : !Q_stricmp( arg, "end" ) ? 2 : 3 );
+		}
+	} else if ( !Q_stricmp( name, "rpxAnimEnter" ) ) {
+		// GLX_U: [Extras] a double click in the animation list: Use -- on the row already selected only, as
+		// rpxEnter (the list runs this before it selects the row clicked)
+		itemDef_t *item = RPX_FeederItem( FEEDER_RPX_ANIMS );
+
+		if ( item && item->typeData.listbox && item->typeData.listbox->cursorPos == item->cursorPos ) {
+			RPX_AnimSet( 3 );
+		}
+	} else if ( !Q_stricmp( name, "rpxAnimReplay" ) ) {
+		rpxGlmAnim.replay = qtrue;	// GLX_U: [Extras] RPX_GlmAnimate() plays them again
 	} else if ( !Q_stricmp( name, "rpxReset" ) ) {
 		if ( String_Parse( args, &arg ) ) {
 			// GalaxyRP: [Extras] "prop" is the Props preview's Reset view: only what the preview alone
@@ -1078,7 +1413,11 @@ static void RPX_DrawGlmPreview( rectDef_t *rect, float scale, vec4_t color, int 
 	if ( rpxGlm.shown && !rpxGlm.ghoul2 && !RPX_GlmMake( rpxGlm.path ) ) {
 		rpxGlm.shown = qfalse;
 	}
-	if ( !rpxGlm.shown ) {
+	if ( rpxGlm.shown ) {
+		RPX_GlmAnimate();	// GLX_U: the Animation tab's frames (may make the instance again)
+	}
+	if ( !rpxGlm.shown || !rpxGlm.ghoul2 ) {
+		rpxGlm.shown = qfalse;
 		RPX_CenterText( rect, scale, color, "Press Preview to see it", iMenuFont );
 		return;
 	}
@@ -1150,6 +1489,57 @@ static void RPX_DrawSwatch( rectDef_t *rect ) {
 	RPX_DrawSwatchOf( rect, "ui_rpx_p_lr", "ui_rpx_p_lg", "ui_rpx_p_lb", qtrue );
 }
 
+// GLX_U: [Extras] GLM Props' animation file line: the file and its frames, or why there are none
+static void RPX_DrawAnimFile( rectDef_t *rect, float scale, vec4_t color, int iMenuFont ) {
+	char text[128];
+	const char *file;
+
+	if ( !rpxGlm.shown ) {
+		Q_strncpyz( text, "Press Preview to read its animations", sizeof( text ) );
+	} else if ( !RPX_GlaNamed( rpxGlm.gla ) ) {
+		Q_strncpyz( text, "No animation file: base pose only", sizeof( text ) );
+	} else {
+		file = strrchr( rpxGlm.gla, '/' );
+		file = file ? file + 1 : rpxGlm.gla;
+		if ( !rpxGlm.numFrames ) {
+			Com_sprintf( text, sizeof( text ), "^3%s.gla not found", file );
+		} else {
+			Com_sprintf( text, sizeof( text ), "%s.gla: %d frames%s", file, rpxGlm.numFrames,
+				rpxAnimsState == RPX_ANIMS_TOOBIG ? ", ^3animation.cfg too big" :
+				rpxAnimsState == RPX_ANIMS_OK ? "" : ", no named ones" );
+		}
+	}
+	Text_Paint( rect->x, rect->y, scale, color, text, 0, 0, ITEM_TEXTSTYLE_NORMAL, iMenuFont );
+}
+
+// GLX_U: [Extras] GLM Props' frames: what will be played and for how long, the animations they start and end
+// with, or what is wrong with them
+static void RPX_DrawAnimRange( rectDef_t *rect, float scale, vec4_t color, int iMenuFont ) {
+	const char *problem = RPX_GlmSpawnFramesProblem();
+	int start = (int)atof( RPX_CvarStr( "ui_rpx_g_start" ) ), end = (int)atof( RPX_CvarStr( "ui_rpx_g_end" ) );
+	char text[128];
+
+	if ( !atoi( RPX_CvarStr( "ui_rpx_g_anim" ) ) ) {
+		Q_strncpyz( text, "Not animated: its base pose", sizeof( text ) );
+	} else if ( problem ) {
+		Com_sprintf( text, sizeof( text ), "^3%s", problem );
+	} else {
+		int n = end - start + 1;
+		const char *from = RPX_AnimAt( start, qtrue ), *to = RPX_AnimAt( end, qfalse );
+
+		if ( from || to ) {
+			if ( from && to && !strcmp( from, to ) ) {
+				Q_strncpyz( text, from, sizeof( text ) );
+			} else {
+				Com_sprintf( text, sizeof( text ), "%s > %s", from ? from : "...", to ? to : "..." );
+			}
+			Text_Paint( rect->x, rect->y, scale, color, text, 0, 0, ITEM_TEXTSTYLE_NORMAL, iMenuFont );
+		}
+		Com_sprintf( text, sizeof( text ), "Frames %d-%d: %d, %.1f s", start, end, n, n / 20.0f );
+	}
+	Text_Paint( rect->x, rect->y + rect->h / 2, scale, color, text, 0, 0, ITEM_TEXTSTYLE_NORMAL, iMenuFont );
+}
+
 qboolean UI_RpxOwnerDraw( int ownerDraw, rectDef_t *rect, float scale, vec4_t color, int iMenuFont ) {
 	switch ( ownerDraw ) {
 	case UI_RPX_PREVIEW:
@@ -1172,6 +1562,12 @@ qboolean UI_RpxOwnerDraw( int ownerDraw, rectDef_t *rect, float scale, vec4_t co
 		return qtrue;
 	case UI_RPX_GSWATCH:
 		RPX_DrawSwatchOf( rect, "ui_rpx_g_lr", "ui_rpx_g_lg", "ui_rpx_g_lb", qtrue );
+		return qtrue;
+	case UI_RPX_GANIMFILE:
+		RPX_DrawAnimFile( rect, scale, color, iMenuFont );
+		return qtrue;
+	case UI_RPX_GANIMRANGE:
+		RPX_DrawAnimRange( rect, scale, color, iMenuFont );
 		return qtrue;
 	default:
 		return qfalse;

@@ -634,7 +634,8 @@ static void RPX_SpawnProp( qboolean grab ) {
 RPX_SpawnGlm
 
 GLX_U: [Extras] GLM Props' Spawn (grab: its Grab): a misc_model_ghoul of the selected .glm, with the
-menu's angles, scale, Solid and light, as RPX_SpawnProp() sends a misc_model_breakable. Its radius, how
+menu's angles, scale, Solid and light, as RPX_SpawnProp() sends a misc_model_breakable, and the frames of
+its Animation tab (startframe/endframe, LOOP), refused here as the ui refuses them. Its radius, how
 far from its origin the client still draws it, from the model's own size (RPX_GlmBounds(), on this
 client's copy): the server's default, 50, is less than many models reach, and they would vanish as soon
 as their origin left the screen. Not sent when this client cannot measure the model.
@@ -647,9 +648,19 @@ static void RPX_SpawnGlm( qboolean grab ) {
 	char folder[RPX_NAME_LEN], name[RPX_NAME_LEN], path[MAX_QPATH * 2], cmd[MAX_STRING_CHARS];
 	vec3_t mins, maxs;
 	float scale, reach;
-	int pitch, yaw, roll;
+	int pitch, yaw, roll, flags, start, end;
+	qboolean animated;
+	const char *problem;
 
 	if ( !RPX_Selected( RPX_GLMS, folder, sizeof( folder ), name, sizeof( name ) ) ) {
+		return;
+	}
+	animated = RPX_CvarInt( "ui_rpx_g_anim" ) ? qtrue : qfalse;
+	start = (int)RPX_CvarFloat( "ui_rpx_g_start" );
+	end = (int)RPX_CvarFloat( "ui_rpx_g_end" );
+	problem = RPX_GlmFramesProblem( animated, start, end, 0 );
+	if ( problem ) {
+		RPX_Refuse( problem );
 		return;
 	}
 	RPX_Path( path, sizeof( path ), "models/", folder, name, ".glm" );
@@ -673,8 +684,15 @@ static void RPX_SpawnGlm( qboolean grab ) {
 		Q_strcat( cmd, sizeof( cmd ), va( " modelscale \"%.2f\"", scale ) );
 	}
 
-	if ( RPX_CvarInt( "ui_rpx_g_solid" ) ) {
-		Q_strcat( cmd, sizeof( cmd ), " spawnflags \"1\"" );
+	flags = RPX_CvarInt( "ui_rpx_g_solid" ) ? 1 : 0;
+	if ( animated ) {
+		Q_strcat( cmd, sizeof( cmd ), va( " startframe \"%d\" endframe \"%d\"", start, end ) );
+		if ( RPX_CvarInt( "ui_rpx_g_loop" ) && end > start ) {
+			flags |= 2;		// LOOP
+		}
+	}
+	if ( flags ) {
+		Q_strcat( cmd, sizeof( cmd ), va( " spawnflags \"%d\"", flags ) );
 	}
 
 	if ( RPX_CvarInt( "ui_rpx_g_light" ) ) {
@@ -690,7 +708,7 @@ static void RPX_SpawnGlm( qboolean grab ) {
 		Q_strcat( cmd, sizeof( cmd ), va( " light \"%d\" color \"%.2f %.2f %.2f\"", radius, r, g, b ) );
 	}
 
-	if ( RPX_GlmBounds( path, mins, maxs, &reach ) ) {
+	if ( RPX_GlmBounds( path, mins, maxs, &reach, NULL, 0 ) ) {
 		int radius = (int)ceil( reach );
 
 		if ( radius < RPX_GLM_MIN_RADIUS ) radius = RPX_GLM_MIN_RADIUS;

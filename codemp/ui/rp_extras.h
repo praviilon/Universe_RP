@@ -123,6 +123,12 @@ static const char * const rpxSoundChannels[] = {
 	X( "ui_rpx_g_lb",			"255" ) \
 	X( "ui_rpx_g_faceme",		"1" ) \
 	X( "ui_rpx_g_lift",			"0" ) \
+	X( "ui_rpx_g_tab",			"0" )		/* GLX_U: GLM Props' tab: 0 Prop, 1 Animation */ \
+	X( "ui_rpx_g_anim",			"0" )		/* plays frames ui_rpx_g_start to ui_rpx_g_end (startframe/endframe) */ \
+	X( "ui_rpx_g_start",		"0" ) \
+	X( "ui_rpx_g_end",			"0" ) \
+	X( "ui_rpx_g_loop",			"0" )		/* spawnflags 2, LOOP */ \
+	X( "ui_rpx_filter_anims",	"" )		/* the Animation tab's list of named animations */ \
 	X( "ui_rpx_e_dir",			"0" )		/* 0 up, 1 facing me, 2 facing me, tilted by ui_rpx_e_pitch */ \
 	X( "ui_rpx_e_pitch",		"0" ) \
 	X( "ui_rpx_e_delay",		"200" ) \
@@ -201,7 +207,9 @@ static const char * const rpxSoundChannels[] = {
 
 // GLX_U: [Extras] a .glm model's size, for the GLM Props preview and the spawned prop's radius: the box
 // round the vertices of its most detailed LOD, as the file stores them (the model's base pose), and the
-// farthest of them from the origin (*reach: the same however the model is turned). The ui has no FS_Seek,
+// farthest of them from the origin (*reach: the same however the model is turned). With gla, also the
+// animation file the model names (without its .gla; '\' read as '/', no leading '/'; "*default" is the
+// game's own one-bone skeleton: no animation). The ui has no FS_Seek,
 // so the file is read forward only, a piece at a time, and only as far as that LOD's last vertex. qfalse
 // for anything that does not read as a .glm should (mdx_format.h).
 #define RPX_GLM_PIECE		16384
@@ -258,7 +266,7 @@ static QINLINE int RPX_GlmInt( const byte *p ) {
 	return LittleLong( v );
 }
 
-static QINLINE qboolean RPX_GlmBoundsRead( rpxGlmReader_t *r, vec3_t mins, vec3_t maxs, float *reach ) {
+static QINLINE qboolean RPX_GlmBoundsRead( rpxGlmReader_t *r, vec3_t mins, vec3_t maxs, float *reach, char *gla, int glaSize ) {
 	static const int ident = ( 'M' << 24 ) + ( 'G' << 16 ) + ( 'L' << 8 ) + '2';	// MDXM_IDENT
 	int surfOfs[RPX_GLM_MAX_SURFS];
 	int numSurfs, lod, table, i, j, k, verts = 0;
@@ -268,6 +276,18 @@ static QINLINE qboolean RPX_GlmBoundsRead( rpxGlmReader_t *r, vec3_t mins, vec3_
 	p = RPX_GlmAt( r, 0, 164 );
 	if ( !p || RPX_GlmInt( p ) != ident || RPX_GlmInt( p + 4 ) != 6 || RPX_GlmInt( p + 144 ) < 1 ) {
 		return qfalse;
+	}
+	if ( gla && glaSize > 0 ) {
+		// animName, 64 characters
+		int n = 0, at = 72;
+
+		while ( at < 136 && ( p[at] == '/' || p[at] == '\\' ) ) {
+			at++;
+		}
+		for ( ; at < 136 && p[at] && n < glaSize - 1; at++ ) {
+			gla[n++] = ( p[at] == '\\' ) ? '/' : (char)p[at];
+		}
+		gla[n] = '\0';
 	}
 	lod = RPX_GlmInt( p + 148 );
 	numSurfs = RPX_GlmInt( p + 152 );
@@ -343,22 +363,50 @@ static QINLINE qboolean RPX_GlmBoundsRead( rpxGlmReader_t *r, vec3_t mins, vec3_
 	return verts ? qtrue : qfalse;
 }
 
-static QINLINE qboolean RPX_GlmBounds( const char *path, vec3_t mins, vec3_t maxs, float *reach ) {
+static QINLINE qboolean RPX_GlmBounds( const char *path, vec3_t mins, vec3_t maxs, float *reach, char *gla, int glaSize ) {
 	static rpxGlmReader_t reader;	// not on the stack: 16 KB
 	rpxGlmReader_t *r = &reader;
 	qboolean ok = qfalse;
 
 	r->f = 0;
 	r->pos = r->have = 0;
+	if ( gla && glaSize > 0 ) {
+		gla[0] = '\0';
+	}
 	r->len = trap->FS_Open( path, &r->f, FS_READ );
 	if ( !r->f ) {
 		return qfalse;
 	}
 	if ( r->len > 0 ) {
-		ok = RPX_GlmBoundsRead( r, mins, maxs, reach );
+		ok = RPX_GlmBoundsRead( r, mins, maxs, reach, gla, glaSize );
 	}
 	trap->FS_Close( r->f );
 	return ok;
+}
+
+// GLX_U: [Extras] what is wrong with GLM Props' frames, or NULL: the server's limits (SP_misc_model_ghoul's
+// RP_GhoulFrames(), g_misc.c) and, when the model's animation file is known (numFrames > 0), its last frame.
+// Only when animated: without, no frame keys are sent.
+#define RPX_GLM_MAX_FRAME	65534
+
+static QINLINE const char *RPX_GlmFramesProblem( qboolean animated, int start, int end, int numFrames ) {
+	static char problem[96];
+
+	if ( !animated ) {
+		return NULL;
+	}
+	if ( start < 0 || start > RPX_GLM_MAX_FRAME || end < 0 || end > RPX_GLM_MAX_FRAME ) {
+		Com_sprintf( problem, sizeof( problem ), "Frames go from 0 to %d.", RPX_GLM_MAX_FRAME );
+		return problem;
+	}
+	if ( end < start ) {
+		return "The end frame comes before the start frame.";
+	}
+	if ( numFrames > 0 && end >= numFrames ) {
+		Com_sprintf( problem, sizeof( problem ), "Its animation file ends at frame %d.", numFrames - 1 );
+		return problem;
+	}
+	return NULL;
 }
 
 // the camera of the effect preview, the same in both modules: it circles the look-at point at "angle"

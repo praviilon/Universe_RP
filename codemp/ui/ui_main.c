@@ -8302,6 +8302,10 @@ static int UI_FeederCount(float feederID)
 	{
 		return UI_RpxFeederCount();
 	}
+	if ( (int)feederID == FEEDER_RPX_ANIMS )	// GLX_U: [Extras] GLM Props' animations
+	{
+		return UI_RpxAnimFeederCount();
+	}
 
 	switch ( (int)feederID )
 	{
@@ -8594,6 +8598,10 @@ static const char *UI_FeederItemText(float feederID, int index, int column,
 	if ( (int)feederID == FEEDER_RPX_LIST )
 	{
 		return UI_RpxFeederItemText( index );
+	}
+	if ( (int)feederID == FEEDER_RPX_ANIMS )	// GLX_U: [Extras] GLM Props' animations
+	{
+		return UI_RpxAnimFeederItemText( index );
 	}
 
 	if (feederID == FEEDER_SABER_SINGLE_INFO)
@@ -9187,6 +9195,10 @@ qboolean UI_FeederSelection(float feederFloat, int index, itemDef_t *item)
 	if ( feederID == FEEDER_RPX_LIST )
 	{
 		return UI_RpxFeederSelection( index );
+	}
+	if ( feederID == FEEDER_RPX_ANIMS )	// GLX_U: [Extras] GLM Props' animations
+	{
+		return UI_RpxAnimFeederSelection( index );
 	}
 
 	if (feederID == FEEDER_Q3HEADS)
