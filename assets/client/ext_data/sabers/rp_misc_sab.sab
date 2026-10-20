@@ -2,7 +2,7 @@
 holocomm
 {
 	name		"^3Holo Communicator"
-	saberType	SABER_SITH_SWORD
+	saberType	SABER_SINGLE
 	saberModel	"models/weapons2/Holocomm/Holocomm.glm"
 	soundOn		none
 	soundLoop	"sound/weapons/sword/servo_hand.wav"
@@ -65,7 +65,7 @@ holocomm
 comlink
 {
 	name		"^7Comlink"
-	saberType	SABER_SITH_SWORD
+	saberType	SABER_SINGLE
 	saberModel	"models/weapons2/comlink/comlink.glm"
 	soundOn		none
 	soundLoop	"sound/weapons/sword/servo_hand.wav"
@@ -127,7 +127,7 @@ comlink
 datapad
 {
 	name		"^7Datapad"
-	saberType	SABER_SITH_SWORD
+	saberType	SABER_SINGLE
 	saberModel	"models/weapons2/datapad/datapad.glm"
 	soundOn		none
 	soundLoop	"sound/weapons/sword/servo_hand.wav"
