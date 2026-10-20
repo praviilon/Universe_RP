@@ -495,18 +495,42 @@ void CG_ColorForHealth( vec4_t hcolor )
 
 /*
 ==============
+CG_Set2DRatio
+
+GLX_U: [Widescreen] how much narrower than 4:3 the screen is: the 640x480 virtual screen's aspect over
+the real one, so 1 on 4:3, 0.75 on 16:9, about 0.83 on 16:10, about 1.07 on 5:4. 2D art drawn on the
+virtual screen has its widths and x positions multiplied by it (RATIO_* in cg_local.h) so the engine's
+stretch to the window leaves it in shape. 1 with cl_ratioFix 0 or before the video size is known.
+TaystJK's UI_Set2DRatio() formula, not clamped either; the ui has its own UI_WidthRatioCoef().
+==============
+*/
+void CG_Set2DRatio( void )
+{
+	const glconfig_t *gl = &cgs.glconfig;
+
+	if ( !cl_ratioFix.integer || gl->vidWidth <= 0 || gl->vidHeight <= 0 )
+	{
+		cgs.widthRatioCoef = 1.0f;
+		return;
+	}
+
+	cgs.widthRatioCoef = (float)( SCREEN_WIDTH * gl->vidHeight ) / (float)( SCREEN_HEIGHT * gl->vidWidth );
+}
+
+/*
+==============
 CG_DrawNumField
 
 Take x,y positions as if 640 x 480 and scales them to the proper resolution
 
 ==============
 */
-void CG_DrawNumField (int x, int y, int width, int value,int charWidth,int charHeight,int style,qboolean zeroFill)
+void CG_DrawNumField (float x, float y, int width, int value,float charWidth,float charHeight,int style,qboolean zeroFill)
 {
 	char	num[16], *ptr;
 	int		l;
 	int		frame;
-	int		xWidth;
+	float	xWidth;	// GLX_U: [Widescreen] float, as are x and charWidth: a 6 px digit is 4.5 px at 16:9
 	int		i = 0;
 
 	if (width < 1) {

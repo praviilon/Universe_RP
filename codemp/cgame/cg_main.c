@@ -2649,6 +2649,7 @@ Ghoul2 Insert End
 	trap->GetGlconfig( &cgs.glconfig );
 	cgs.screenXScale = cgs.glconfig.vidWidth / 640.0;
 	cgs.screenYScale = cgs.glconfig.vidHeight / 480.0;
+	CG_Set2DRatio();	// GLX_U: [Widescreen] now that the video size is known
 
 	// get the gamestate from the client system
 	trap->GetGameState( &cgs.gameState );

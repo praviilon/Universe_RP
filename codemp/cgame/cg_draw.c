@@ -617,9 +617,9 @@ void CG_DrawHealth( menuDef_t *menuHUD )
 		trap->R_SetColor( calcColor);
 
 		CG_DrawPic(
-			focusItem->window.rect.x,
+			RATIO_LX( focusItem->window.rect.x ),
 			focusItem->window.rect.y,
-			focusItem->window.rect.w,
+			RATIO_W( focusItem->window.rect.w ),
 			focusItem->window.rect.h,
 			focusItem->window.background
 			);
@@ -635,11 +635,11 @@ void CG_DrawHealth( menuDef_t *menuHUD )
 		trap->R_SetColor( focusItem->window.foreColor );
 
 		CG_DrawNumField (
-			focusItem->window.rect.x,
+			RATIO_LX( focusItem->window.rect.x ),
 			focusItem->window.rect.y,
 			3,
 			ps->stats[STAT_HEALTH],
-			focusItem->window.rect.w,
+			RATIO_W( focusItem->window.rect.w ),
 			focusItem->window.rect.h,
 			NUM_FONT_SMALL,
 			qfalse);
@@ -704,9 +704,9 @@ void CG_DrawArmor( menuDef_t *menuHUD )
 			if (cg.HUDArmorFlag)
 			{
 				CG_DrawPic(
-					focusItem->window.rect.x,
+					RATIO_LX( focusItem->window.rect.x ),
 					focusItem->window.rect.y,
-					focusItem->window.rect.w,
+					RATIO_W( focusItem->window.rect.w ),
 					focusItem->window.rect.h,
 					focusItem->window.background
 					);
@@ -715,9 +715,9 @@ void CG_DrawArmor( menuDef_t *menuHUD )
 		else
 		{
 				CG_DrawPic(
-					focusItem->window.rect.x,
+					RATIO_LX( focusItem->window.rect.x ),
 					focusItem->window.rect.y,
-					focusItem->window.rect.w,
+					RATIO_W( focusItem->window.rect.w ),
 					focusItem->window.rect.h,
 					focusItem->window.background
 					);
@@ -734,11 +734,11 @@ void CG_DrawArmor( menuDef_t *menuHUD )
 		trap->R_SetColor( focusItem->window.foreColor );
 
 		CG_DrawNumField (
-			focusItem->window.rect.x,
+			RATIO_LX( focusItem->window.rect.x ),
 			focusItem->window.rect.y,
 			3,
 			ps->stats[STAT_ARMOR],
-			focusItem->window.rect.w,
+			RATIO_W( focusItem->window.rect.w ),
 			focusItem->window.rect.h,
 			NUM_FONT_SMALL,
 			qfalse);
@@ -817,9 +817,9 @@ static void CG_DrawSaberStyle( centity_t *cent, menuDef_t *menuHUD)
 			trap->R_SetColor( colorTable[CT_WHITE] );
 
 			CG_DrawPic(
-				focusItem->window.rect.x,
+				RATIO_RX( focusItem->window.rect.x ),
 				focusItem->window.rect.y,
-				focusItem->window.rect.w,
+				RATIO_W( focusItem->window.rect.w ),
 				focusItem->window.rect.h,
 				focusItem->window.background
 				);
@@ -835,9 +835,9 @@ static void CG_DrawSaberStyle( centity_t *cent, menuDef_t *menuHUD)
 			trap->R_SetColor( colorTable[CT_WHITE] );
 
 			CG_DrawPic(
-				focusItem->window.rect.x,
+				RATIO_RX( focusItem->window.rect.x ),
 				focusItem->window.rect.y,
-				focusItem->window.rect.w,
+				RATIO_W( focusItem->window.rect.w ),
 				focusItem->window.rect.h,
 				focusItem->window.background
 				);
@@ -851,9 +851,9 @@ static void CG_DrawSaberStyle( centity_t *cent, menuDef_t *menuHUD)
 				trap->R_SetColor( colorTable[CT_WHITE] );
 
 				CG_DrawPic(
-					focusItem->window.rect.x,
+					RATIO_RX( focusItem->window.rect.x ),
 					focusItem->window.rect.y,
-					focusItem->window.rect.w,
+					RATIO_W( focusItem->window.rect.w ),
 					focusItem->window.rect.h,
 					focusItem->window.background
 					);
@@ -869,9 +869,9 @@ static void CG_DrawSaberStyle( centity_t *cent, menuDef_t *menuHUD)
 			trap->R_SetColor(colorTable[CT_WHITE]);
 
 			CG_DrawPic(
-				focusItem->window.rect.x,
+				RATIO_RX( focusItem->window.rect.x ),
 				focusItem->window.rect.y,
-				focusItem->window.rect.w,
+				RATIO_W( focusItem->window.rect.w ),
 				focusItem->window.rect.h,
 				focusItem->window.background
 			);
@@ -885,9 +885,9 @@ static void CG_DrawSaberStyle( centity_t *cent, menuDef_t *menuHUD)
 			trap->R_SetColor(colorTable[CT_WHITE]);
 
 			CG_DrawPic(
-				focusItem->window.rect.x,
+				RATIO_RX( focusItem->window.rect.x ),
 				focusItem->window.rect.y,
-				focusItem->window.rect.w,
+				RATIO_W( focusItem->window.rect.w ),
 				focusItem->window.rect.h,
 				focusItem->window.background
 			);
@@ -901,9 +901,9 @@ static void CG_DrawSaberStyle( centity_t *cent, menuDef_t *menuHUD)
 			trap->R_SetColor( colorTable[CT_WHITE] );
 
 			CG_DrawPic(
-				focusItem->window.rect.x,
+				RATIO_RX( focusItem->window.rect.x ),
 				focusItem->window.rect.y,
-				focusItem->window.rect.w,
+				RATIO_W( focusItem->window.rect.w ),
 				focusItem->window.rect.h,
 				focusItem->window.background
 				);
@@ -917,9 +917,9 @@ static void CG_DrawSaberStyle( centity_t *cent, menuDef_t *menuHUD)
 			trap->R_SetColor( colorTable[CT_WHITE] );
 
 			CG_DrawPic(
-				focusItem->window.rect.x,
+				RATIO_RX( focusItem->window.rect.x ),
 				focusItem->window.rect.y,
-				focusItem->window.rect.w,
+				RATIO_W( focusItem->window.rect.w ),
 				focusItem->window.rect.h,
 				focusItem->window.background
 				);
@@ -934,9 +934,9 @@ static void CG_DrawSaberStyle( centity_t *cent, menuDef_t *menuHUD)
 			trap->R_SetColor( colorTable[CT_WHITE] );
 
 			CG_DrawPic(
-				focusItem->window.rect.x,
+				RATIO_RX( focusItem->window.rect.x ),
 				focusItem->window.rect.y,
-				focusItem->window.rect.w,
+				RATIO_W( focusItem->window.rect.w ),
 				focusItem->window.rect.h,
 				focusItem->window.background
 				);
@@ -950,9 +950,9 @@ static void CG_DrawSaberStyle( centity_t *cent, menuDef_t *menuHUD)
 				trap->R_SetColor( colorTable[CT_WHITE] );
 
 				CG_DrawPic(
-					focusItem->window.rect.x,
+					RATIO_RX( focusItem->window.rect.x ),
 					focusItem->window.rect.y,
-					focusItem->window.rect.w,
+					RATIO_W( focusItem->window.rect.w ),
 					focusItem->window.rect.h,
 					focusItem->window.background
 					);
@@ -1017,7 +1017,7 @@ static void CG_DrawAmmo( centity_t	*cent,menuDef_t *menuHUD)
 		trap->R_SetColor( colorTable[CT_YELLOW] );
 		if (focusItem)
 		{
-			CG_DrawProportionalString(focusItem->window.rect.x, focusItem->window.rect.y, "--", NUM_FONT_SMALL, focusItem->window.foreColor);
+			CG_DrawProportionalString(RATIO_RX( focusItem->window.rect.x ), focusItem->window.rect.y, "--", NUM_FONT_SMALL, focusItem->window.foreColor);
 		}
 	}
 	else
@@ -1065,11 +1065,11 @@ static void CG_DrawAmmo( centity_t	*cent,menuDef_t *menuHUD)
 			value =ps->ammo[weaponData[cent->currentState.weapon].ammoIndex];
 
 			CG_DrawNumField (
-				focusItem->window.rect.x,
+				RATIO_RX( focusItem->window.rect.x ),
 				focusItem->window.rect.y,
 				3,
 				value,
-				focusItem->window.rect.w,
+				RATIO_W( focusItem->window.rect.w ),
 				focusItem->window.rect.h,
 				NUM_FONT_SMALL,
 				qfalse);
@@ -1103,9 +1103,9 @@ static void CG_DrawAmmo( centity_t	*cent,menuDef_t *menuHUD)
 		trap->R_SetColor( calcColor);
 
 		CG_DrawPic(
-			focusItem->window.rect.x,
+			RATIO_RX( focusItem->window.rect.x ),
 			focusItem->window.rect.y,
-			focusItem->window.rect.w,
+			RATIO_W( focusItem->window.rect.w ),
 			focusItem->window.rect.h,
 			focusItem->window.background
 			);
@@ -1213,9 +1213,9 @@ void CG_DrawForcePower( menuDef_t *menuHUD )
 		trap->R_SetColor( calcColor);
 
 		CG_DrawPic(
-			focusItem->window.rect.x,
+			RATIO_RX( focusItem->window.rect.x ),
 			focusItem->window.rect.y,
-			focusItem->window.rect.w,
+			RATIO_W( focusItem->window.rect.w ),
 			focusItem->window.rect.h,
 			focusItem->window.background
 			);
@@ -1238,11 +1238,11 @@ void CG_DrawForcePower( menuDef_t *menuHUD )
 		}
 
 		CG_DrawNumField (
-			focusItem->window.rect.x,
+			RATIO_RX( focusItem->window.rect.x ),
 			focusItem->window.rect.y,
 			3,
 			cg.snap->ps.fd.forcePower,
-			focusItem->window.rect.w,
+			RATIO_W( focusItem->window.rect.w ),
 			focusItem->window.rect.h,
 			NUM_FONT_SMALL,
 			qfalse);
@@ -1299,7 +1299,7 @@ static void CG_DrawSimpleSaberStyle( const centity_t *cent )
 		break;
 	}
 
-	CG_DrawProportionalString( SCREEN_WIDTH - (weapX + 16 + 32), (SCREEN_HEIGHT - 80) + 40, num, UI_SMALLFONT | UI_DROPSHADOW, colorTable[calcColor] );
+	CG_DrawProportionalString( RATIO_RX( SCREEN_WIDTH - (weapX + 16 + 32) ), (SCREEN_HEIGHT - 80) + 40, num, UI_SMALLFONT | UI_DROPSHADOW, colorTable[calcColor] );
 }
 
 static void CG_DrawSimpleAmmo( const centity_t *cent )
@@ -1321,7 +1321,7 @@ static void CG_DrawSimpleAmmo( const centity_t *cent )
 	// No ammo
 	if ( currValue < 0 || (weaponData[cent->currentState.weapon].energyPerShot == 0 && weaponData[cent->currentState.weapon].altEnergyPerShot == 0) )
 	{
-		CG_DrawProportionalString( SCREEN_WIDTH - (16 + 32), (SCREEN_HEIGHT - 80) + 40, "--", UI_SMALLFONT | UI_DROPSHADOW, colorTable[CT_HUD_ORANGE] );
+		CG_DrawProportionalString( RATIO_RX( SCREEN_WIDTH - (16 + 32) ), (SCREEN_HEIGHT - 80) + 40, "--", UI_SMALLFONT | UI_DROPSHADOW, colorTable[CT_HUD_ORANGE] );
 		return;
 	}
 
@@ -1364,7 +1364,7 @@ static void CG_DrawSimpleAmmo( const centity_t *cent )
 
 	Com_sprintf( num, sizeof( num ), "%i", currValue );
 
-	CG_DrawProportionalString( SCREEN_WIDTH - (16 + 32), (SCREEN_HEIGHT - 80) + 40, num, UI_SMALLFONT | UI_DROPSHADOW, colorTable[calcColor] );
+	CG_DrawProportionalString( RATIO_RX( SCREEN_WIDTH - (16 + 32) ), (SCREEN_HEIGHT - 80) + 40, num, UI_SMALLFONT | UI_DROPSHADOW, colorTable[calcColor] );
 }
 
 static void CG_DrawSimpleForcePower( const centity_t *cent )
@@ -1408,7 +1408,7 @@ static void CG_DrawSimpleForcePower( const centity_t *cent )
 
 	Com_sprintf( num, sizeof( num ), "%i", cg.snap->ps.fd.forcePower );
 
-	CG_DrawProportionalString( SCREEN_WIDTH - (18 + 14 + 32), (SCREEN_HEIGHT - 80) + 40 + 14, num, UI_SMALLFONT | UI_DROPSHADOW, colorTable[calcColor] );
+	CG_DrawProportionalString( RATIO_RX( SCREEN_WIDTH - (18 + 14 + 32) ), (SCREEN_HEIGHT - 80) + 40 + 14, num, UI_SMALLFONT | UI_DROPSHADOW, colorTable[calcColor] );
 }
 
 /*
@@ -1428,9 +1428,9 @@ void CG_DrawHUD(centity_t	*cent)
 
 		if (cg.predictedPlayerState.pm_type != PM_SPECTATOR)
 		{
-			CG_DrawProportionalString( x+16, y+40, va( "%i", cg.snap->ps.stats[STAT_HEALTH] ), UI_SMALLFONT|UI_DROPSHADOW, colorTable[CT_HUD_RED] );
+			CG_DrawProportionalString( RATIO_LX( x+16 ), y+40, va( "%i", cg.snap->ps.stats[STAT_HEALTH] ), UI_SMALLFONT|UI_DROPSHADOW, colorTable[CT_HUD_RED] );
 
-			CG_DrawProportionalString( x+18+14, y+40+14, va( "%i", cg.snap->ps.stats[STAT_ARMOR] ), UI_SMALLFONT|UI_DROPSHADOW, colorTable[CT_HUD_GREEN] );
+			CG_DrawProportionalString( RATIO_LX( x+18+14 ), y+40+14, va( "%i", cg.snap->ps.stats[STAT_ARMOR] ), UI_SMALLFONT|UI_DROPSHADOW, colorTable[CT_HUD_GREEN] );
 
 			CG_DrawSimpleForcePower( cent );
 
@@ -1461,9 +1461,9 @@ void CG_DrawHUD(centity_t	*cent)
 			{
 				trap->R_SetColor( colorTable[CT_WHITE] );
 				CG_DrawPic(
-					focusItem->window.rect.x,
+					RATIO_LX( focusItem->window.rect.x ),
 					focusItem->window.rect.y,
-					focusItem->window.rect.w,
+					RATIO_W( focusItem->window.rect.w ),
 					focusItem->window.rect.h,
 					focusItem->window.background
 					);
@@ -1475,9 +1475,9 @@ void CG_DrawHUD(centity_t	*cent)
 			{
 				trap->R_SetColor( colorTable[CT_WHITE] );
 				CG_DrawPic(
-					focusItem->window.rect.x,
+					RATIO_LX( focusItem->window.rect.x ),
 					focusItem->window.rect.y,
-					focusItem->window.rect.w,
+					RATIO_W( focusItem->window.rect.w ),
 					focusItem->window.rect.h,
 					focusItem->window.background
 					);
@@ -1507,9 +1507,9 @@ void CG_DrawHUD(centity_t	*cent)
 			{
 				trap->R_SetColor( colorTable[CT_WHITE] );
 				CG_DrawPic(
-					focusItem->window.rect.x,
+					RATIO_RX( focusItem->window.rect.x ),
 					focusItem->window.rect.y,
-					focusItem->window.rect.w,
+					RATIO_W( focusItem->window.rect.w ),
 					focusItem->window.rect.h,
 					focusItem->window.background
 					);
@@ -1520,9 +1520,9 @@ void CG_DrawHUD(centity_t	*cent)
 			{
 				trap->R_SetColor( colorTable[CT_WHITE] );
 				CG_DrawPic(
-					focusItem->window.rect.x,
+					RATIO_RX( focusItem->window.rect.x ),
 					focusItem->window.rect.y,
-					focusItem->window.rect.w,
+					RATIO_W( focusItem->window.rect.w ),
 					focusItem->window.rect.h,
 					focusItem->window.background
 					);

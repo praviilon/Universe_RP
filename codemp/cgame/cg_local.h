@@ -1696,6 +1696,7 @@ typedef struct cgs_s {
 	float			screenXScale;		// derived from glconfig
 	float			screenYScale;
 	float			screenXBias;
+	float			widthRatioCoef;		// GLX_U: [Widescreen] CG_Set2DRatio()
 
 	int				serverCommandSequence;	// reliable command stream counter
 	int				processedSnapshotNum;// the number of snapshots cgame has requested
@@ -1829,6 +1830,14 @@ extern siegeExtended_t cg_siegeExtendedData[MAX_CLIENTS];
 //==============================================================================
 
 extern	cgs_t			cgs;
+
+// GLX_U: [Widescreen] x and width on the 640x480 screen, kept in shape on a wider (or narrower) one --
+// cgs.widthRatioCoef, CG_Set2DRatio(). Heights never change. LX: pinned to the left edge, RX: pinned
+// to the right edge, W: any width (a negative one, a mirrored image, stays mirrored).
+#define RATIO_LX( x )	( (x) * cgs.widthRatioCoef )
+#define RATIO_RX( x )	( SCREEN_WIDTH - ( SCREEN_WIDTH - (x) ) * cgs.widthRatioCoef )
+#define RATIO_W( w )	( (w) * cgs.widthRatioCoef )
+
 extern	cg_t			cg;
 extern	int				cg_duel_types[MAX_CLIENTS];	// GalaxyRP: [Force Duel] see cg_main.c
 extern	centity_t		cg_entities[MAX_GENTITIES];
@@ -1918,7 +1927,8 @@ void CG_DrawRotatePic2( float x, float y, float width, float height,float angle,
 void CG_DrawString( float x, float y, const char *string,
 				   float charWidth, float charHeight, const float *modulate );
 
-void CG_DrawNumField (int x, int y, int width, int value,int charWidth,int charHeight,int style,qboolean zeroFill);
+void CG_DrawNumField (float x, float y, int width, int value,float charWidth,float charHeight,int style,qboolean zeroFill);
+void CG_Set2DRatio( void );	// GLX_U: [Widescreen]
 
 void CG_DrawStringExt( int x, int y, const char *string, const float *setColor,
 		qboolean forceColor, qboolean shadow, int charWidth, int charHeight, int maxChars );

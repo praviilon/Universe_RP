@@ -149,6 +149,7 @@ XCVAR_DEF( cg_zyk_duel_keep_colors,				"0",					NULL,					CVAR_ARCHIVE )
 XCVAR_DEF( cg_zyk_duel_keep_duelists_colors,	"0",					NULL,					CVAR_ARCHIVE )
 XCVAR_DEF( cg_zyk_duel_only_render_duelists,	"0",					NULL,					CVAR_ARCHIVE )
 XCVAR_DEF( cl_paused,							"0",					NULL,					CVAR_ROM )
+XCVAR_DEF( cl_ratioFix,						"1",					CG_Set2DRatio,			CVAR_ARCHIVE ) // GLX_U: [Widescreen] the TaystJK engine's switch, shared with it and the ui
 XCVAR_DEF( com_buildScript,						"0",					NULL,					CVAR_NONE )
 XCVAR_DEF( com_cameraMode,						"0",					NULL,					CVAR_CHEAT )
 XCVAR_DEF( com_optvehtrace,						"0",					NULL,					CVAR_NONE )
