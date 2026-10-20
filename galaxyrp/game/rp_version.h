@@ -38,7 +38,7 @@ Project based on OpenJK and Zyk Mod. Work copyrighted (C) 2020 - 2022
 #define JK_VERSION_OLD              VER("JAmp: v" VERSION_STRING_DOTTED)
 // DAJ_RP: the repo's page, shown in two centre-prints ("Incomplete mod detected", the plugin mismatch) whose
 // lines break every 50 characters and only at spaces -- so short, and without "https://", to stay on one line
-#define JK_URL                      "github.com/praviilon/galaxy_ultimate"
+#define JK_URL                      "github.com/praviilon/Universe_RP"
 
 // Public version
 #define GAMEVERSION			        JK_VERSION

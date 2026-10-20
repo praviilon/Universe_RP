@@ -1,32 +1,23 @@
-# Galaxy RP Mod - Ultimate Edition
+# Universe RP
 
-Ultimate Edition fork modernises the **Galaxy RP** mod developed by Alex, making it natively playable on modern TaystJK engine with its Rend2 or Vulkan renderers and its logical entities system. It also introduces 64-bit mod version, as well as versions for Linux and macOS, and tackles some bugs and issues along the way. New features are also gradually added to the mod.
-
-![cover_image](https://user-images.githubusercontent.com/16083854/130863860-95907912-39bf-4684-be9a-db8e04f73603.png)
+Universe RP modernises the Galaxy RP mod developed by Alex, making it natively playable on modern TaystJK engine with its Rend2 or Vulkan renderers and its logical entities system. It also introduces 64-bit mod version, as well as versions for Linux and macOS, and tackles some bugs and issues along the way. Many new features are also gradually added to the mod.
 
 <div align="center">
 
-This project is a fork of **Zyk Mod**, which is itself a fork of [OpenJK](https://github.com/JACoders/OpenJK). The aim is to improve on the work Zyk has done and move the project into a different direction: Player Roleplaying as opposed to an "RPG" game.
-This mod will be geared towards the RP community mainly. It will have features to prevent common occurences such as "spec-hiding", "Mary-sues" and more! It will also contain features that help player immersion.
+The aim of the mod is to improve on the work which has been done before and introduce many new features that RP community may benefit from.
 
-[![version](https://img.shields.io/github/v/release/praviilon/galaxy_ultimate?label=Current%20Version&color=brightgreen)](https://github.com/praviilon/galaxy_ultimate/releases)
-[![discord](https://img.shields.io/badge/Discord-Join-blueviolet.svg?logo=discord&style=flat&logoColor=white)](https://discord.gg/aKnXckEFr5)
-[![issues](https://img.shields.io/github/issues/praviilon/galaxy_ultimate.svg?label=Issues%20%26%20Requests&color=red)](https://github.com/praviilon/galaxy_ultimate/issues)
-[![guides](https://img.shields.io/badge/GalaxyRP-Website-blue.svg)](https://www.galaxyrp.uk/)
-[![license](https://img.shields.io/github/license/praviilon/galaxy_ultimate.svg?label=License&color=yellow)](#license)
+[![version](https://img.shields.io/github/v/release/praviilon/Universe_RP?label=Current%20Version&color=brightgreen)](https://github.com/praviilon/Universe_RP/releases)
+[![issues](https://img.shields.io/github/issues/praviilon/Universe_RP.svg?label=Issues%20%26%20Requests&color=red)](https://github.com/praviilon/Universe_RP/issues)
+[![license](https://img.shields.io/github/license/praviilon/Universe_RP.svg?label=License&color=yellow)](#license)
 
 </div>
-
-# Information
-- Mod documentation and guides [here](https://www.galaxyrp.uk/)
-- Mod support **Discord** chat [here](https://discord.gg/aKnXckEFr5)
 
 # Features
 The mod contains these following main features:
 
 - An account system
 - Custom Force powers
-- Complete rebalance between gunslingers and Force users
+- Rebalance between gunslingers and Force users
 - An item shop
 - A completely revamped chat system, which makes writing much easier, and declutters the server
 - Different distances at which chat can be seen, depending on 22 chat modifiers
@@ -44,6 +35,7 @@ The mod contains these following main features:
 - An ally system, which allows a player to add or remove allies
 - An emote system, together with 57 worded emotes, with a further 3000 accessible by id
 - Players can call vote to single player maps
+- Extended Single Player map support in MP (for both JA and JO maps)
 - Siege voice chat in FFA gametype
 - Radar HUD in FFA. Cloaked players and vehicles being hidden on the radar
 - An entity system, which allows players to add, edit, list and remove entities that are in the map
@@ -51,14 +43,13 @@ The mod contains these following main features:
 - RGB Lightsaber colors
 - Hats and capes for players
 - A client-side plugin with menus
-- Many cvars at server.cfg to customize mod features
+- Many server cvars to customize mod features
 - Countless bugfixes and optimizations
-- Extended Single Player map support in MP (for both JA and JO maps)
 - Lightsaber holstering
 - And more...
 
 # Building
-The mod actually requires the only game-code files from the build project: `jampgame_`, `cgame_` and `ui_`. MP Engine files and SP files have been disabled for builds. You can follow the **OpenJK** guides for build process:
+The mod actually requires only the game-code files from the build project: `jampgame_`, `cgame_` and `ui_`. MP Engine files and SP files have been disabled for builds. You can follow the **OpenJK** guides for build process:
 
 * [Compilation guide](https://github.com/JACoders/OpenJK/wiki/Compilation-guide)
 * [Debugging guide](https://github.com/JACoders/OpenJK/wiki/Debugging)
