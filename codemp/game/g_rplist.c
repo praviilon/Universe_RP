@@ -1283,7 +1283,7 @@ Extras menus
 
 /rpxlist <kind> <request id> <offset> <folder>: the same listings as /list, for the Extras menus of
 the Galaxy RP menu (cg_rpextras.c in cgame asks and collects, the UI shows them). Not typed by
-players. kind is models, effects, sounds, music, npcs or vehicles; the folder is relative to the
+players. kind is models, effects, sounds, music, npcs, vehicles or (GLX_U) glms; the folder is relative to the
 kind's root ("." for the root itself) and ignored for npcs and vehicles.
 
 The answer is one or more
@@ -1331,6 +1331,7 @@ static const rpxKind_t rpx_kinds[] = {
 	{ "music",		3 },
 	{ "npcs",		-1 },
 	{ "vehicles",	-2 },
+	{ "glms",		5 },	// GLX_U: [Extras] GLM Props: the /list glm source
 };
 
 typedef struct {

@@ -380,6 +380,8 @@ along with this program; if not, see <http://www.gnu.org/licenses/>.
 #define UI_RPX_SWATCH		302		// the Props menu's light colour
 #define UI_RPX_LSWATCH		303		// the Lights menu's colour when on
 #define UI_RPX_LOFFSWATCH	304		// the Lights menu's colour when off (black while dark)
+#define UI_RPX_GPREVIEW		305		// GLX_U: the GLM Props menu's model preview
+#define UI_RPX_GSWATCH		306		// GLX_U: the GLM Props menu's light colour
 
 #define VOICECHAT_GETFLAG			"getflag"				// command someone to get the flag
 #define VOICECHAT_OFFENSE			"offense"				// command someone to go on offense

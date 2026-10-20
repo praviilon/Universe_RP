@@ -46,6 +46,7 @@ typedef enum {
 	RPX_VEHICLES,
 	RPX_MUSIC,
 	RPX_SOUNDS,
+	RPX_GLMS,		// GLX_U: [Extras] the GLM Props menu's .glm models
 	RPX_NUM_KINDS
 } rpxKindNum_t;
 
@@ -62,6 +63,7 @@ static const struct {
 	{ "vehicles",	NULL,		"",				"" },
 	{ "music",		"music",	"",				"" },
 	{ "sounds",		"sound",	"",				"" },
+	{ "glms",		"models",	"players",		".glm" },
 };
 
 // the /playsound channels, in the order the Sounds menu lists them (Cmd_ZykSound_f in g_cmds.c)
@@ -88,6 +90,9 @@ static const char * const rpxSoundChannels[] = {
 	X( "ui_rpx_filter_npcs",	"" ) \
 	X( "ui_rpx_filter_music",	"" ) \
 	X( "ui_rpx_filter_sounds",	"" ) \
+	X( "ui_rpx_dir_glms",		"players" )	/* GLX_U: GLM Props: its folder, selection and filter */ \
+	X( "ui_rpx_sel_glms",		"" ) \
+	X( "ui_rpx_filter_glms",	"" ) \
 	X( "ui_rpx_npcmode",		"0" )		/* 0 NPCs, 1 vehicles */ \
 	X( "ui_rpx_p_yaw",			"0" ) \
 	X( "ui_rpx_p_pitch",		"0" ) \
@@ -105,6 +110,19 @@ static const char * const rpxSoundChannels[] = {
 	X( "ui_rpx_p_lb",			"255" ) \
 	X( "ui_rpx_p_faceme",		"1" ) \
 	X( "ui_rpx_p_lift",			"0" )		/* Props: units out from the surface aimed at (/entaddaim aimoffset) */ \
+	X( "ui_rpx_g_yaw",			"0" )		/* GLX_U: GLM Props: its own, as the ui_rpx_p_* of MD3 Props */ \
+	X( "ui_rpx_g_pitch",		"0" ) \
+	X( "ui_rpx_g_roll",			"0" ) \
+	X( "ui_rpx_g_zoom",			"100" ) \
+	X( "ui_rpx_g_scale",		"100" ) \
+	X( "ui_rpx_g_solid",		"0" ) \
+	X( "ui_rpx_g_light",		"0" ) \
+	X( "ui_rpx_g_lrad",			"200" ) \
+	X( "ui_rpx_g_lr",			"255" ) \
+	X( "ui_rpx_g_lg",			"255" ) \
+	X( "ui_rpx_g_lb",			"255" ) \
+	X( "ui_rpx_g_faceme",		"1" ) \
+	X( "ui_rpx_g_lift",			"0" ) \
 	X( "ui_rpx_e_dir",			"0" )		/* 0 up, 1 facing me, 2 facing me, tilted by ui_rpx_e_pitch */ \
 	X( "ui_rpx_e_pitch",		"0" ) \
 	X( "ui_rpx_e_delay",		"200" ) \
@@ -179,6 +197,169 @@ static const char * const rpxSoundChannels[] = {
 // the most different models and effects one map's previews may load (each keeps a slot until then)
 #define RPX_PREVIEW_MODELS	150
 #define RPX_PREVIEW_EFFECTS	32
+#define RPX_PREVIEW_GLMS	50		// GLX_U: each takes a model slot, and its .gla one too
+
+// GLX_U: [Extras] a .glm model's size, for the GLM Props preview and the spawned prop's radius: the box
+// round the vertices of its most detailed LOD, as the file stores them (the model's base pose), and the
+// farthest of them from the origin (*reach: the same however the model is turned). The ui has no FS_Seek,
+// so the file is read forward only, a piece at a time, and only as far as that LOD's last vertex. qfalse
+// for anything that does not read as a .glm should (mdx_format.h).
+#define RPX_GLM_PIECE		16384
+#define RPX_GLM_MAX_SURFS	1024
+#define RPX_GLM_MAX_VERTS	65536		// in one surface
+#define RPX_GLM_MAX_COORD	65536.0f
+
+typedef struct {
+	fileHandle_t	f;
+	int				len;		// the file's length
+	int				pos;		// the file offset of buf[0]
+	int				have;		// bytes in buf
+	byte			buf[RPX_GLM_PIECE];
+} rpxGlmReader_t;
+
+// n bytes at file offset ofs, or NULL: past the end, or behind what has been read
+static QINLINE const byte *RPX_GlmAt( rpxGlmReader_t *r, int ofs, int n ) {
+	if ( ofs < r->pos || n <= 0 || n > RPX_GLM_PIECE || ofs > r->len - n ) {
+		return NULL;
+	}
+	while ( ofs + n > r->pos + r->have ) {
+		int get;
+
+		if ( ofs >= r->pos + r->have ) {
+			r->pos += r->have;		// nothing read so far is wanted
+			r->have = 0;
+		} else if ( ofs > r->pos ) {
+			int keep = r->pos + r->have - ofs;
+
+			memmove( r->buf, r->buf + ( ofs - r->pos ), keep );
+			r->pos = ofs;
+			r->have = keep;
+		}
+		get = RPX_GLM_PIECE - r->have;
+		if ( get > r->len - ( r->pos + r->have ) ) {
+			get = r->len - ( r->pos + r->have );
+		}
+		if ( get <= 0 ) {
+			return NULL;
+		}
+		get = trap->FS_Read( r->buf + r->have, get, r->f );
+		if ( get <= 0 ) {
+			return NULL;
+		}
+		r->have += get;
+	}
+	return r->buf + ( ofs - r->pos );
+}
+
+static QINLINE int RPX_GlmInt( const byte *p ) {
+	int v;
+
+	memcpy( &v, p, 4 );
+	return LittleLong( v );
+}
+
+static QINLINE qboolean RPX_GlmBoundsRead( rpxGlmReader_t *r, vec3_t mins, vec3_t maxs, float *reach ) {
+	static const int ident = ( 'M' << 24 ) + ( 'G' << 16 ) + ( 'L' << 8 ) + '2';	// MDXM_IDENT
+	int surfOfs[RPX_GLM_MAX_SURFS];
+	int numSurfs, lod, table, i, j, k, verts = 0;
+	const byte *p;
+
+	// mdxmHeader_t: ident, version, name, animName, animIndex, numBones, numLODs, ofsLODs, numSurfaces, ...
+	p = RPX_GlmAt( r, 0, 164 );
+	if ( !p || RPX_GlmInt( p ) != ident || RPX_GlmInt( p + 4 ) != 6 || RPX_GlmInt( p + 144 ) < 1 ) {
+		return qfalse;
+	}
+	lod = RPX_GlmInt( p + 148 );
+	numSurfs = RPX_GlmInt( p + 152 );
+	if ( lod < 164 || numSurfs < 1 || numSurfs > RPX_GLM_MAX_SURFS ) {
+		return qfalse;
+	}
+
+	// the first LOD: its mdxmLOD_t, then an offset a surface, from where that table starts
+	table = lod + 4;
+	for ( i = 0; i < numSurfs; i++ ) {
+		p = RPX_GlmAt( r, table + i * 4, 4 );
+		if ( !p ) {
+			return qfalse;
+		}
+		surfOfs[i] = table + RPX_GlmInt( p );
+		if ( surfOfs[i] < table + numSurfs * 4 || surfOfs[i] >= r->len ) {
+			return qfalse;
+		}
+	}
+	// in file order, as the file can only be read forward
+	for ( i = 1; i < numSurfs; i++ ) {
+		int v = surfOfs[i];
+
+		for ( j = i; j > 0 && surfOfs[j - 1] > v; j-- ) {
+			surfOfs[j] = surfOfs[j - 1];
+		}
+		surfOfs[j] = v;
+	}
+
+	VectorSet( mins, 0, 0, 0 );
+	VectorSet( maxs, 0, 0, 0 );
+	*reach = 0.0f;
+	for ( i = 0; i < numSurfs; i++ ) {
+		int numVerts, ofsVerts;
+
+		// mdxmSurface_t: ident, thisSurfaceIndex, ofsHeader, numVerts, ofsVerts, ...
+		p = RPX_GlmAt( r, surfOfs[i], 40 );
+		if ( !p ) {
+			return qfalse;
+		}
+		numVerts = RPX_GlmInt( p + 12 );
+		ofsVerts = RPX_GlmInt( p + 16 );
+		if ( numVerts < 0 || numVerts > RPX_GLM_MAX_VERTS || ofsVerts < 40 ) {
+			return qfalse;
+		}
+		// mdxmVertex_t, 32 bytes: normal, then the position
+		for ( j = 0; j < numVerts; j++ ) {
+			float lenSq = 0.0f;
+
+			p = RPX_GlmAt( r, surfOfs[i] + ofsVerts + j * 32 + 12, 12 );
+			if ( !p ) {
+				return qfalse;
+			}
+			for ( k = 0; k < 3; k++ ) {
+				float c;
+
+				memcpy( &c, p + k * 4, 4 );
+				c = LittleFloat( c );
+				if ( !( c > -RPX_GLM_MAX_COORD && c < RPX_GLM_MAX_COORD ) ) {
+					return qfalse;		// not a number, or no model's
+				}
+				if ( !verts || c < mins[k] ) mins[k] = c;
+				if ( !verts || c > maxs[k] ) maxs[k] = c;
+				lenSq += c * c;
+			}
+			if ( lenSq > *reach ) {
+				*reach = lenSq;
+			}
+			verts++;
+		}
+	}
+	*reach = sqrt( *reach );
+	return verts ? qtrue : qfalse;
+}
+
+static QINLINE qboolean RPX_GlmBounds( const char *path, vec3_t mins, vec3_t maxs, float *reach ) {
+	static rpxGlmReader_t reader;	// not on the stack: 16 KB
+	rpxGlmReader_t *r = &reader;
+	qboolean ok = qfalse;
+
+	r->f = 0;
+	r->pos = r->have = 0;
+	r->len = trap->FS_Open( path, &r->f, FS_READ );
+	if ( !r->f ) {
+		return qfalse;
+	}
+	if ( r->len > 0 ) {
+		ok = RPX_GlmBoundsRead( r, mins, maxs, reach );
+	}
+	trap->FS_Close( r->f );
+	return ok;
+}
 
 // the camera of the effect preview, the same in both modules: it circles the look-at point at "angle"
 // degrees round from +x, RPX_FX_ELEVATION up, "dist" away; for an effect going up it looks a little

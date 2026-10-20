@@ -2,7 +2,7 @@
 ===========================================================================
 GalaxyRP: [Extras] the ui half of the Extras menus of the Galaxy RP menu: ingame_rpx_props,
 ingame_rpx_effects, ingame_rpx_npcs, ingame_rpx_music, ingame_rpx_sounds, ingame_rpx_lights and
-ingame_rpx_spawners. cgame's half is cg_rpextras.c; ui/rp_extras.h says how the two work together. Here:
+ingame_rpx_spawners (GLX_U: and ingame_rpx_glmprops). cgame's half is cg_rpextras.c; ui/rp_extras.h says how the two work together. Here:
 
 - The list the open menu shows (FEEDER_RPX_LIST): read from the list file cgame writes, when
   ui_rpx_serial changes; filtered by the menu's filter field; folders open with a double click.
@@ -15,6 +15,9 @@ ingame_rpx_spawners. cgame's half is cg_rpextras.c; ui/rp_extras.h says how the 
   RPX_PREVIEW_MODELS different ones a map at most, and a model the player does not have is not
   asked for at all (a failed load keeps a slot too). The sliders then turn and zoom the loaded
   model at no cost.
+- GLX_U: the GLM Props preview (UI_RPX_GPREVIEW): the same, for a .glm, through a Ghoul2 instance of
+  its own. The instance is freed when the menu closes and made again from the model's path when it
+  opens on the same map (the model keeps its slot); RPX_GlmBounds() (rp_extras.h) gives its size.
 - The effect preview box (UI_RPX_FXBOX): renders the scene cgame left the effect in (without
   clearing it first, see CG_RpxFxPass()), and tells cgame it is on screen (ui_rpx_fxbox).
 - The light colour swatch of the Props menu (UI_RPX_SWATCH), and the Lights menu's two (UI_RPX_LSWATCH,
@@ -33,6 +36,8 @@ extern void Item_RunScript( itemDef_t *item, const char *s );
 extern void Menu_ShowItemByName( menuDef_t *menu, const char *p, qboolean bShow );
 extern int Item_ListBox_MaxScroll( itemDef_t *item );
 extern void UI_DrawRect( float x, float y, float width, float height, const float *color );
+extern void UI_InsertG2Pointer( void *ghoul2 );
+extern void UI_ClearG2Pointer( void *ghoul2 );
 
 typedef struct {
 	char		name[RPX_NAME_LEN];
@@ -64,6 +69,17 @@ static struct {
 	char		previewed[RPX_PREVIEW_MODELS][MAX_QPATH];
 	int			numPreviewed;
 } rpxProp;
+
+// GLX_U: [Extras] the GLM Props preview
+static struct {
+	char		path[MAX_QPATH];	// the model the box shows
+	qboolean	shown;				// the box shows path (a new selection or folder clears it)
+	void		*ghoul2;			// its instance while the menu is open
+	qboolean	sized;				// mins/maxs are the model's own, not the default box
+	vec3_t		mins, maxs;
+	char		previewed[RPX_PREVIEW_GLMS][MAX_QPATH];
+	int			numPreviewed;
+} rpxGlm;
 
 static int			rpxFxWindowEnd;
 static int			rpxFxDir;
@@ -335,6 +351,21 @@ static void RPX_StopFxPreview( void ) {
 	}
 }
 
+// GLX_U: [Extras] the GLM preview's instance freed (the box keeps its model, made again when drawn)
+static void RPX_GlmFree( void ) {
+	if ( rpxGlm.ghoul2 ) {
+		UI_ClearG2Pointer( rpxGlm.ghoul2 );
+		trap->G2API_CleanGhoul2Models( &rpxGlm.ghoul2 );
+		rpxGlm.ghoul2 = NULL;
+	}
+}
+
+// GLX_U: [Extras] the GLM preview emptied: "Press Preview" again
+static void RPX_GlmClear( void ) {
+	RPX_GlmFree();
+	rpxGlm.shown = qfalse;
+}
+
 // open a row: a folder, or ".." (-1)
 static void RPX_Navigate( int row ) {
 	char folder[RPX_NAME_LEN], next[RPX_NAME_LEN * 2];
@@ -374,7 +405,11 @@ static void RPX_Navigate( int row ) {
 	trap->Cvar_Set( va( "ui_rpx_dir_%s", rpxKinds[rpxKind].name ), next );
 	trap->Cvar_Set( va( "ui_rpx_sel_%s", rpxKinds[rpxKind].name ), "" );
 	RPX_Msg( "" );
-	rpxProp.model = 0;
+	if ( rpxKind == RPX_GLMS ) {
+		RPX_GlmClear();
+	} else {
+		rpxProp.model = 0;
+	}
 	RPX_StopFxPreview();
 	RPX_Request();
 }
@@ -393,6 +428,8 @@ static void RPX_CheckMap( void ) {
 	rpxSerialSeen = -1;
 	rpxProp.model = 0;
 	rpxProp.numPreviewed = 0;
+	RPX_GlmClear();
+	rpxGlm.numPreviewed = 0;
 	rpxFxWindowEnd = 0;
 }
 
@@ -476,6 +513,8 @@ qboolean UI_RpxFeederSelection( int index ) {
 		RPX_Msg( "" );
 		if ( rpxKind == RPX_MODELS ) {
 			rpxProp.model = 0;
+		} else if ( rpxKind == RPX_GLMS ) {
+			RPX_GlmClear();
 		} else if ( rpxKind == RPX_EFFECTS ) {
 			RPX_StopFxPreview();
 		}
@@ -491,6 +530,7 @@ Scripts
 
 static int RPX_KindForMenu( const char *word ) {
 	if ( !Q_stricmp( word, "props" ) ) return RPX_MODELS;
+	if ( !Q_stricmp( word, "glmprops" ) ) return RPX_GLMS;	// GLX_U: [Extras]
 	if ( !Q_stricmp( word, "effects" ) ) return RPX_EFFECTS;
 	// GalaxyRP: [Extras] the Spawners menu shows the same lists, with the same tab and selection
 	if ( !Q_stricmp( word, "npcs" ) || !Q_stricmp( word, "spawners" ) ) return atoi( RPX_CvarStr( "ui_rpx_npcmode" ) ) ? RPX_VEHICLES : RPX_NPCS;
@@ -607,6 +647,88 @@ static void RPX_PreviewProp( void ) {
 	RPX_Msg( "" );
 }
 
+// GLX_U: [Extras] the GLM preview's instance of path, with the skin the game shows a misc_model_ghoul
+// without one: model_default.skin from its folder, when there is one (CG_General in cg_ents.c)
+static qboolean RPX_GlmMake( const char *path ) {
+	char skin[MAX_QPATH];
+	char *slash;
+
+	RPX_GlmFree();
+	if ( trap->G2API_InitGhoul2Model( &rpxGlm.ghoul2, path, 0, 0, 0, 0, 0 ) < 0 || !rpxGlm.ghoul2 ||
+		!trap->G2_HaveWeGhoul2Models( rpxGlm.ghoul2 ) ) {
+		if ( rpxGlm.ghoul2 ) {
+			trap->G2API_CleanGhoul2Models( &rpxGlm.ghoul2 );
+		}
+		rpxGlm.ghoul2 = NULL;
+		return qfalse;
+	}
+	UI_InsertG2Pointer( rpxGlm.ghoul2 );
+
+	Q_strncpyz( skin, path, sizeof( skin ) );
+	slash = strrchr( skin, '/' );
+	if ( slash && (int)( slash + 1 - skin ) + 18 < (int)sizeof( skin ) ) {
+		strcpy( slash + 1, "model_default.skin" );
+		if ( RPX_LocalFileExists( skin ) ) {
+			qhandle_t h = trap->R_RegisterSkin( skin );
+
+			if ( h ) {
+				trap->G2API_SetSkin( rpxGlm.ghoul2, 0, h, h );
+			}
+		}
+	}
+	return qtrue;
+}
+
+// GLX_U: [Extras] Preview in GLM Props: as RPX_PreviewProp(), for the selected .glm
+static void RPX_PreviewGlm( void ) {
+	char folder[RPX_NAME_LEN], path[MAX_QPATH * 2];
+	int row = RPX_SelectedRow(), i;
+	float reach;
+
+	if ( rpxKind != RPX_GLMS || !RPX_HaveSelection() ) {
+		return;
+	}
+	RPX_Folder( RPX_GLMS, folder, sizeof( folder ) );
+	Com_sprintf( path, sizeof( path ), "models/%s%s%s.glm", folder, folder[0] ? "/" : "", rpxEntries[row].name );
+	if ( strlen( path ) >= MAX_QPATH ) {
+		RPX_Msg( "^3That model's path is too long for the game." );
+		return;
+	}
+
+	for ( i = 0; i < rpxGlm.numPreviewed; i++ ) {
+		if ( !Q_stricmp( rpxGlm.previewed[i], path ) ) {
+			break;
+		}
+	}
+	if ( i == rpxGlm.numPreviewed ) {
+		if ( rpxGlm.numPreviewed >= RPX_PREVIEW_GLMS ) {
+			RPX_Msg( "^3Preview limit reached until the next map." );
+			return;
+		}
+		if ( !RPX_LocalFileExists( path ) ) {
+			RPX_GlmClear();
+			RPX_Msg( "^3That model is not installed on your game (players without it will not see it either)." );
+			return;
+		}
+		Q_strncpyz( rpxGlm.previewed[rpxGlm.numPreviewed++], path, sizeof( rpxGlm.previewed[0] ) );
+	}
+
+	if ( !RPX_GlmMake( path ) ) {
+		RPX_GlmClear();
+		RPX_Msg( "^3That model could not be loaded." );
+		return;
+	}
+	Q_strncpyz( rpxGlm.path, path, sizeof( rpxGlm.path ) );
+	rpxGlm.shown = qtrue;
+	rpxGlm.sized = RPX_GlmBounds( path, rpxGlm.mins, rpxGlm.maxs, &reach );
+	if ( !rpxGlm.sized ) {
+		// the box the ui frames a menu's Ghoul2 model in when it has none (Item_Model_Paint)
+		VectorSet( rpxGlm.mins, -16, -16, -24 );
+		VectorSet( rpxGlm.maxs, 16, 16, 32 );
+	}
+	RPX_Msg( "" );
+}
+
 // the Tilt as cgame plays it (RPX_FxPreview: clamped to -90..90), in whole degrees
 static int RPX_FxTilt( void ) {
 	return (int)Com_Clamp( -90.0f, 90.0f, (float)(int)atof( RPX_CvarStr( "ui_rpx_e_pitch" ) ) );
@@ -646,10 +768,10 @@ UI_RpxScript
 
 The Extras menus' uiScripts; qfalse when name is not one of them.
 
-	rpxOpen <props|effects|npcs|music|sounds|lights|spawners> <menu>	in each menu's onOpen
+	rpxOpen <props|glmprops|effects|npcs|music|sounds|lights|spawners> <menu>	in each menu's onOpen
 	rpxNpcMode <0|1>									the NPCs and Vehicles tabs (NPCs & Vehicles, Spawners)
 	rpxEnter											the list's double click: open a folder
-	rpxPreview											Props and Effects
+	rpxPreview											Props, GLM Props and Effects
 	rpxDo <action>										a button: see CG_Rpx_f() in cg_rpextras.c
 	rpxReset <prop|angles|cam>							the preview's sliders back, or the prop's angles
 	rpxLightSame										Lights: the colour when off is the colour when on
@@ -700,13 +822,16 @@ qboolean UI_RpxScript( const char *name, char **args ) {
 	} else if ( !Q_stricmp( name, "rpxPreview" ) ) {
 		if ( rpxKind == RPX_MODELS ) {
 			RPX_PreviewProp();
+		} else if ( rpxKind == RPX_GLMS ) {
+			RPX_PreviewGlm();
 		} else if ( rpxKind == RPX_EFFECTS ) {
 			RPX_PreviewEffect();
 		}
 	} else if ( !Q_stricmp( name, "rpxDo" ) ) {
 		if ( String_Parse( args, &arg ) ) {
 			// DAJ_RP: [Extras] grabprop and grabfx: the Grab buttons under Spawn, as Spawn
-			static const char *closing[] = { "spawnprop", "spawnfx", "grabprop", "grabfx", "musicme", "musicall", "soundall" };
+			// GLX_U: [Extras] spawnglm and grabglm: GLM Props' Spawn and Grab
+			static const char *closing[] = { "spawnprop", "spawnfx", "grabprop", "grabfx", "spawnglm", "grabglm", "musicme", "musicall", "soundall" };
 			int i;
 
 			if ( !Q_stricmp( arg, "musicstop" ) || !Q_stricmp( arg, "musicmap" ) || !Q_stricmp( arg, "undo" ) ) {
@@ -778,12 +903,15 @@ qboolean UI_RpxScript( const char *name, char **args ) {
 		if ( String_Parse( args, &arg ) ) {
 			// GalaxyRP: [Extras] "prop" is the Props preview's Reset view: only what the preview alone
 			// uses. The prop's own angles, which it is spawned with, have their own button ("angles").
+			// GLX_U: in GLM Props, its own (ui_rpx_g_*)
+			const char *pfx = ( rpxKind == RPX_GLMS ) ? "g" : "p";
+
 			if ( !Q_stricmp( arg, "prop" ) ) {
-				trap->Cvar_Set( "ui_rpx_p_zoom", "100" );
+				trap->Cvar_Set( va( "ui_rpx_%s_zoom", pfx ), "100" );
 			} else if ( !Q_stricmp( arg, "angles" ) ) {
-				trap->Cvar_Set( "ui_rpx_p_yaw", "0" );
-				trap->Cvar_Set( "ui_rpx_p_pitch", "0" );
-				trap->Cvar_Set( "ui_rpx_p_roll", "0" );
+				trap->Cvar_Set( va( "ui_rpx_%s_yaw", pfx ), "0" );
+				trap->Cvar_Set( va( "ui_rpx_%s_pitch", pfx ), "0" );
+				trap->Cvar_Set( va( "ui_rpx_%s_roll", pfx ), "0" );
 			} else if ( !Q_stricmp( arg, "cam" ) ) {
 				trap->Cvar_Set( "ui_rpx_e_cdist", "160" );
 				trap->Cvar_Set( "ui_rpx_e_cang", "0" );
@@ -796,6 +924,7 @@ qboolean UI_RpxScript( const char *name, char **args ) {
 		trap->Cvar_Set( "ui_rpx_l_offb", RPX_CvarStr( "ui_rpx_l_b" ) );
 	} else if ( !Q_stricmp( name, "rpxClose" ) ) {
 		RPX_StopFxPreview();
+		RPX_GlmFree();	// GLX_U: [Extras]
 		trap->Cmd_ExecuteText( EXEC_APPEND, "rpx do stop\n" );
 	} else if ( !Q_stricmp( name, "rpxBackTab" ) ) {
 		RPX_BackTab();
@@ -841,8 +970,11 @@ static float RPX_PropPreviewYaw( qboolean faceMe, int yaw, int viewYaw ) {
 	return (float)( yaw - viewYaw );
 }
 
-static void RPX_DrawPropPreview( rectDef_t *rect, float scale, vec4_t color, int iMenuFont ) {
-	static vec4_t back = { 0.02f, 0.03f, 0.06f, 1.0f };
+// GLX_U: [Extras] the MD3 and GLM previews' box: the model (an md3's handle, or a Ghoul2 instance) with
+// the box round it (mins/maxs; sized qfalse: a stand-in), turned, zoomed and lit by its menu's cvars
+// (ui_rpx_<pfx>_*: p for MD3 Props, g for GLM Props)
+static void RPX_DrawModelPreview( rectDef_t *rect, float scale, vec4_t color, int iMenuFont, const char *pfx,
+	qhandle_t hModel, void *ghoul2, const vec3_t mins, const vec3_t maxs, qboolean sized ) {
 	refdef_t refdef;
 	refEntity_t ent;
 	vec3_t center, size, angles, rc;
@@ -850,28 +982,20 @@ static void RPX_DrawPropPreview( rectDef_t *rect, float scale, vec4_t color, int
 	char text[128];
 	int k;
 
-	RPX_CheckMap();
-	UI_FillRect( rect->x, rect->y, rect->w, rect->h, back );
-
-	if ( !rpxProp.model ) {
-		RPX_CenterText( rect, scale, color, "Press Preview to see it", iMenuFont );
-		return;
-	}
-
 	fov = 40.0f;
 	RPX_SceneRect( rect, &refdef, fov );
 	if ( refdef.fov_y < fov ) {
 		fov = refdef.fov_y;
 	}
 
-	VectorAdd( rpxProp.mins, rpxProp.maxs, center );
+	VectorAdd( mins, maxs, center );
 	VectorScale( center, 0.5f, center );
-	VectorSubtract( rpxProp.maxs, rpxProp.mins, size );
+	VectorSubtract( maxs, mins, size );
 	radius = 0.5f * VectorLength( size );
 	if ( radius < 1.0f ) {
 		radius = 1.0f;
 	}
-	zoom = atof( RPX_CvarStr( "ui_rpx_p_zoom" ) );
+	zoom = atof( RPX_CvarStr( va( "ui_rpx_%s_zoom", pfx ) ) );
 	if ( zoom < 25.0f ) zoom = 25.0f;
 	if ( zoom > 400.0f ) zoom = 400.0f;
 	dist = radius / sin( DEG2RAD( fov * 0.5f ) ) * ( 100.0f / zoom );
@@ -880,10 +1004,10 @@ static void RPX_DrawPropPreview( rectDef_t *rect, float scale, vec4_t color, int
 	// them: the spawn's yaw (cg_rpextras.c, RPX_SpawnProp) less their view yaw. With Face me that is
 	// 180 + Yaw whatever way they look (its front towards them, then Yaw); without it, Yaw is a map
 	// direction, so how it turns to them depends on which way they look (ui_rpx_viewyaw, from cgame).
-	angles[PITCH] = (int)atof( RPX_CvarStr( "ui_rpx_p_pitch" ) );
-	angles[YAW] = RPX_PropPreviewYaw( atoi( RPX_CvarStr( "ui_rpx_p_faceme" ) ) ? qtrue : qfalse,
-		(int)atof( RPX_CvarStr( "ui_rpx_p_yaw" ) ), atoi( RPX_CvarStr( "ui_rpx_viewyaw" ) ) );
-	angles[ROLL] = (int)atof( RPX_CvarStr( "ui_rpx_p_roll" ) );
+	angles[PITCH] = (int)atof( RPX_CvarStr( va( "ui_rpx_%s_pitch", pfx ) ) );
+	angles[YAW] = RPX_PropPreviewYaw( atoi( RPX_CvarStr( va( "ui_rpx_%s_faceme", pfx ) ) ) ? qtrue : qfalse,
+		(int)atof( RPX_CvarStr( va( "ui_rpx_%s_yaw", pfx ) ) ), atoi( RPX_CvarStr( "ui_rpx_viewyaw" ) ) );
+	angles[ROLL] = (int)atof( RPX_CvarStr( va( "ui_rpx_%s_roll", pfx ) ) );
 
 	memset( &ent, 0, sizeof( ent ) );
 	AnglesToAxis( angles, ent.axis );
@@ -895,33 +1019,70 @@ static void RPX_DrawPropPreview( rectDef_t *rect, float scale, vec4_t color, int
 	VectorSubtract( ent.origin, rc, ent.origin );
 	VectorCopy( ent.origin, ent.oldorigin );
 	VectorCopy( ent.origin, ent.lightingOrigin );
-	ent.hModel = rpxProp.model;
+	if ( ghoul2 ) {
+		ent.ghoul2 = ghoul2;
+		ent.radius = 1000;	// as the ui's own menu models (Item_Model_Paint)
+	} else {
+		ent.hModel = hModel;
+	}
 	ent.renderfx = RF_LIGHTING_ORIGIN | RF_NOSHADOW;
 
-	propScale = atof( RPX_CvarStr( "ui_rpx_p_scale" ) ) / 100.0f;	// a percent
+	propScale = atof( RPX_CvarStr( va( "ui_rpx_%s_scale", pfx ) ) ) / 100.0f;	// a percent
 	if ( propScale < 0.01f ) propScale = 0.01f;
 	if ( propScale > 10.23f ) propScale = 10.23f;
 
 	trap->R_ClearScene();
 	trap->R_AddRefEntityToScene( &ent );
-	if ( atoi( RPX_CvarStr( "ui_rpx_p_light" ) ) ) {
+	if ( atoi( RPX_CvarStr( va( "ui_rpx_%s_light", pfx ) ) ) ) {
 		// the prop's light, near the side of the model facing the camera, at the size it has next to
 		// the model at this scale (kept big enough to be seen)
 		vec3_t lightOrg;
-		float intensity = atof( RPX_CvarStr( "ui_rpx_p_lrad" ) ) / propScale;
+		float intensity = atof( RPX_CvarStr( va( "ui_rpx_%s_lrad", pfx ) ) ) / propScale;
 
 		if ( intensity < radius * 0.5f ) intensity = radius * 0.5f;
 		if ( intensity > radius * 6.0f ) intensity = radius * 6.0f;
 		VectorSet( lightOrg, dist - radius * 1.2f, radius * 0.4f, radius * 0.6f );
 		trap->R_AddLightToScene( lightOrg, intensity,
-			Com_Clamp( 0, 1, atof( RPX_CvarStr( "ui_rpx_p_lr" ) ) / 255.0f ),
-			Com_Clamp( 0, 1, atof( RPX_CvarStr( "ui_rpx_p_lg" ) ) / 255.0f ),
-			Com_Clamp( 0, 1, atof( RPX_CvarStr( "ui_rpx_p_lb" ) ) / 255.0f ) );
+			Com_Clamp( 0, 1, atof( RPX_CvarStr( va( "ui_rpx_%s_lr", pfx ) ) ) / 255.0f ),
+			Com_Clamp( 0, 1, atof( RPX_CvarStr( va( "ui_rpx_%s_lg", pfx ) ) ) / 255.0f ),
+			Com_Clamp( 0, 1, atof( RPX_CvarStr( va( "ui_rpx_%s_lb", pfx ) ) ) / 255.0f ) );
 	}
 	trap->R_RenderScene( &refdef );
 
-	Com_sprintf( text, sizeof( text ), "%.0f x %.0f x %.0f units", size[0] * propScale, size[1] * propScale, size[2] * propScale );
+	if ( sized ) {
+		Com_sprintf( text, sizeof( text ), "%.0f x %.0f x %.0f units", size[0] * propScale, size[1] * propScale, size[2] * propScale );
+	} else {
+		Q_strncpyz( text, "size unknown", sizeof( text ) );
+	}
 	Text_Paint( rect->x + 4, rect->y + rect->h - 18, scale * 0.8f, color, text, 0, 0, ITEM_TEXTSTYLE_NORMAL, iMenuFont );
+}
+
+static vec4_t rpxPreviewBack = { 0.02f, 0.03f, 0.06f, 1.0f };
+
+static void RPX_DrawPropPreview( rectDef_t *rect, float scale, vec4_t color, int iMenuFont ) {
+	RPX_CheckMap();
+	UI_FillRect( rect->x, rect->y, rect->w, rect->h, rpxPreviewBack );
+
+	if ( !rpxProp.model ) {
+		RPX_CenterText( rect, scale, color, "Press Preview to see it", iMenuFont );
+		return;
+	}
+	RPX_DrawModelPreview( rect, scale, color, iMenuFont, "p", rpxProp.model, NULL, rpxProp.mins, rpxProp.maxs, qtrue );
+}
+
+// GLX_U: [Extras] GLM Props' preview: its instance made again first when the menu has been opened again
+static void RPX_DrawGlmPreview( rectDef_t *rect, float scale, vec4_t color, int iMenuFont ) {
+	RPX_CheckMap();
+	UI_FillRect( rect->x, rect->y, rect->w, rect->h, rpxPreviewBack );
+
+	if ( rpxGlm.shown && !rpxGlm.ghoul2 && !RPX_GlmMake( rpxGlm.path ) ) {
+		rpxGlm.shown = qfalse;
+	}
+	if ( !rpxGlm.shown ) {
+		RPX_CenterText( rect, scale, color, "Press Preview to see it", iMenuFont );
+		return;
+	}
+	RPX_DrawModelPreview( rect, scale, color, iMenuFont, "g", 0, rpxGlm.ghoul2, rpxGlm.mins, rpxGlm.maxs, rpxGlm.sized );
 }
 
 static void RPX_DrawFxBox( rectDef_t *rect, float scale, vec4_t color, int iMenuFont ) {
@@ -1005,6 +1166,12 @@ qboolean UI_RpxOwnerDraw( int ownerDraw, rectDef_t *rect, float scale, vec4_t co
 		return qtrue;
 	case UI_RPX_SWATCH:
 		RPX_DrawSwatch( rect );
+		return qtrue;
+	case UI_RPX_GPREVIEW:	// GLX_U: [Extras] GLM Props
+		RPX_DrawGlmPreview( rect, scale, color, iMenuFont );
+		return qtrue;
+	case UI_RPX_GSWATCH:
+		RPX_DrawSwatchOf( rect, "ui_rpx_g_lr", "ui_rpx_g_lg", "ui_rpx_g_lb", qtrue );
 		return qtrue;
 	default:
 		return qfalse;

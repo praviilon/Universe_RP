@@ -461,8 +461,9 @@
 		// used to sit here, between Shop above and Camera below. See the matching note further down
 		// where its panel was.
 		// GalaxyRP: [Extras] the "Extras" button took its place: props, effects, NPCs and vehicles,
-		// music and sounds, each in a menu of its own (ingame_rpx_*.menu, ui_rpextras.c). The server
-		// refuses what a player may not do, so only the login gates it, as the buttons above.
+		// music and sounds, each in a menu of its own (ingame_rpx_*.menu, ui_rpextras.c). GLX_U: props
+		// are MD3 Props and GLM Props (.glm models, misc_model_ghoul) now, the others one place lower.
+		// The server refuses what a player may not do, so only the login gates it, as the buttons above.
 
 		itemDef
 		{
@@ -562,7 +563,7 @@
 		{
 			name				extrasPropsButton
 			group				extrasControls
-			text				"Props"
+			text				"MD3 Props"
 			type				ITEM_TYPE_BUTTON
 			style				WINDOW_STYLE_EMPTY
 			rect				160 50 150 24
@@ -574,7 +575,7 @@
 			textstyle			3
 			forecolor			1 .682 0 1
 			visible				0
-			descText			"Browse the server's models, preview one and spawn it where you aim"
+			descText			"Browse the server's .md3 models, preview one and spawn it where you aim"
 
 			mouseEnter
 			{
@@ -595,9 +596,56 @@
 
 		itemDef
 		{
-			name				extrasEffectsButton_glow
+			name				extrasGlmPropsButton_glow
 			style				WINDOW_STYLE_SHADER
 			rect				160 75 150 24
+			background			"gfx/menus/menu_blendbox2"
+			forecolor			1 1 1 1
+			visible				0
+			decoration
+		}
+
+		// GLX_U: [Extras] GLM Props: a .glm model where you aim, as a misc_model_ghoul (ingame_rpx_glmprops.menu)
+		itemDef
+		{
+			name				extrasGlmPropsButton
+			group				extrasControls
+			text				"GLM Props"
+			type				ITEM_TYPE_BUTTON
+			style				WINDOW_STYLE_EMPTY
+			rect				160 75 150 24
+			font				3
+			textscale			0.6
+			textalignx			15
+			textaligny			5
+			textalign			ITEM_ALIGN_LEFT
+			textstyle			3
+			forecolor			1 .682 0 1
+			visible				0
+			descText			"Browse the server's .glm models, preview one and spawn it where you aim"
+
+			mouseEnter
+			{
+				show			extrasGlmPropsButton_glow
+			}
+			mouseExit
+			{
+				hide			extrasGlmPropsButton_glow
+			}
+			action
+			{
+				play			"sound/interface/button1.wav" ;
+				hide			extrasGlmPropsButton_glow ;
+				close			ingame_galaxyrp ;
+				open			ingame_rpx_glmprops
+			}
+		}
+
+		itemDef
+		{
+			name				extrasEffectsButton_glow
+			style				WINDOW_STYLE_SHADER
+			rect				160 100 150 24
 			background			"gfx/menus/menu_blendbox2"
 			forecolor			1 1 1 1
 			visible				0
@@ -611,7 +659,7 @@
 			text				"Effects"
 			type				ITEM_TYPE_BUTTON
 			style				WINDOW_STYLE_EMPTY
-			rect				160 75 150 24
+			rect				160 100 150 24
 			font				3
 			textscale			0.6
 			textalignx			15
@@ -643,7 +691,7 @@
 		{
 			name				extrasNpcsButton_glow
 			style				WINDOW_STYLE_SHADER
-			rect				160 100 150 24
+			rect				160 125 150 24
 			background			"gfx/menus/menu_blendbox2"
 			forecolor			1 1 1 1
 			visible				0
@@ -657,7 +705,7 @@
 			text				"NPCs & Vehicles"
 			type				ITEM_TYPE_BUTTON
 			style				WINDOW_STYLE_EMPTY
-			rect				160 100 150 24
+			rect				160 125 150 24
 			font				3
 			textscale			0.6
 			textalignx			15
@@ -689,7 +737,7 @@
 		{
 			name				extrasMusicButton_glow
 			style				WINDOW_STYLE_SHADER
-			rect				160 125 150 24
+			rect				160 150 150 24
 			background			"gfx/menus/menu_blendbox2"
 			forecolor			1 1 1 1
 			visible				0
@@ -703,7 +751,7 @@
 			text				"Music"
 			type				ITEM_TYPE_BUTTON
 			style				WINDOW_STYLE_EMPTY
-			rect				160 125 150 24
+			rect				160 150 150 24
 			font				3
 			textscale			0.6
 			textalignx			15
@@ -735,7 +783,7 @@
 		{
 			name				extrasSoundsButton_glow
 			style				WINDOW_STYLE_SHADER
-			rect				160 150 150 24
+			rect				160 175 150 24
 			background			"gfx/menus/menu_blendbox2"
 			forecolor			1 1 1 1
 			visible				0
@@ -749,7 +797,7 @@
 			text				"Sounds"
 			type				ITEM_TYPE_BUTTON
 			style				WINDOW_STYLE_EMPTY
-			rect				160 150 150 24
+			rect				160 175 150 24
 			font				3
 			textscale			0.6
 			textalignx			15
@@ -781,7 +829,7 @@
 		{
 			name				extrasLightsButton_glow
 			style				WINDOW_STYLE_SHADER
-			rect				160 175 150 24
+			rect				160 200 150 24
 			background			"gfx/menus/menu_blendbox2"
 			forecolor			1 1 1 1
 			visible				0
@@ -796,7 +844,7 @@
 			text				"Lights"
 			type				ITEM_TYPE_BUTTON
 			style				WINDOW_STYLE_EMPTY
-			rect				160 175 150 24
+			rect				160 200 150 24
 			font				3
 			textscale			0.6
 			textalignx			15
@@ -828,7 +876,7 @@
 		{
 			name				extrasSpawnersButton_glow
 			style				WINDOW_STYLE_SHADER
-			rect				160 200 150 24
+			rect				160 225 150 24
 			background			"gfx/menus/menu_blendbox2"
 			forecolor			1 1 1 1
 			visible				0
@@ -843,7 +891,7 @@
 			text				"Spawners"
 			type				ITEM_TYPE_BUTTON
 			style				WINDOW_STYLE_EMPTY
-			rect				160 200 150 24
+			rect				160 225 150 24
 			font				3
 			textscale			0.6
 			textalignx			15

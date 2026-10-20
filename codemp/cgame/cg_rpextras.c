@@ -1,7 +1,7 @@
 /*
 ===========================================================================
 GalaxyRP: [Extras] the cgame half of the Extras menus of the Galaxy RP menu (Props, Effects, NPCs &
-Vehicles, Music, Sounds, Lights, Spawners). The menus themselves are the ui's (ui_main.c); ui/rp_extras.h says how the
+Vehicles, Music, Sounds, Lights, Spawners; GLX_U: and GLM Props). The menus themselves are the ui's (ui_main.c); ui/rp_extras.h says how the
 two work together. Here:
 
 - "rpx list <kind>": gets the listing of the kind's current folder (ui_rpx_dir_<kind>) from the server
@@ -629,6 +629,79 @@ static void RPX_SpawnProp( qboolean grab ) {
 	RPX_Queue( cmd );
 }
 
+/*
+==================
+RPX_SpawnGlm
+
+GLX_U: [Extras] GLM Props' Spawn (grab: its Grab): a misc_model_ghoul of the selected .glm, with the
+menu's angles, scale, Solid and light, as RPX_SpawnProp() sends a misc_model_breakable. Its radius, how
+far from its origin the client still draws it, from the model's own size (RPX_GlmBounds(), on this
+client's copy): the server's default, 50, is less than many models reach, and they would vanish as soon
+as their origin left the screen. Not sent when this client cannot measure the model.
+==================
+*/
+#define RPX_GLM_MIN_RADIUS	50		// the server's default for a misc_model_ghoul
+#define RPX_GLM_MAX_RADIUS	255		// the most the network carries (entityState_t::g2radius)
+
+static void RPX_SpawnGlm( qboolean grab ) {
+	char folder[RPX_NAME_LEN], name[RPX_NAME_LEN], path[MAX_QPATH * 2], cmd[MAX_STRING_CHARS];
+	vec3_t mins, maxs;
+	float scale, reach;
+	int pitch, yaw, roll;
+
+	if ( !RPX_Selected( RPX_GLMS, folder, sizeof( folder ), name, sizeof( name ) ) ) {
+		return;
+	}
+	RPX_Path( path, sizeof( path ), "models/", folder, name, ".glm" );
+	if ( strlen( path ) >= MAX_QPATH ) {
+		RPX_Refuse( "That model's path is too long for the game." );
+		return;
+	}
+
+	pitch = (int)RPX_CvarFloat( "ui_rpx_g_pitch" );
+	roll = (int)RPX_CvarFloat( "ui_rpx_g_roll" );
+	yaw = (int)RPX_CvarFloat( "ui_rpx_g_yaw" );
+	if ( RPX_CvarInt( "ui_rpx_g_faceme" ) ) {
+		yaw = RPX_FacingYaw( yaw );
+	}
+	Com_sprintf( cmd, sizeof( cmd ), "%s misc_model_ghoul model \"%s\" angles \"%d %d %d\"", RPX_AddVerb( grab ), path, pitch, yaw, roll );
+
+	scale = RPX_CvarFloat( "ui_rpx_g_scale" ) / 100.0f;	// a percent
+	if ( scale < 0.01f ) scale = 0.01f;
+	if ( scale > 10.23f ) scale = 10.23f;
+	if ( fabs( scale - 1.0f ) > 0.001f ) {
+		Q_strcat( cmd, sizeof( cmd ), va( " modelscale \"%.2f\"", scale ) );
+	}
+
+	if ( RPX_CvarInt( "ui_rpx_g_solid" ) ) {
+		Q_strcat( cmd, sizeof( cmd ), " spawnflags \"1\"" );
+	}
+
+	if ( RPX_CvarInt( "ui_rpx_g_light" ) ) {
+		int radius = RPX_CvarInt( "ui_rpx_g_lrad" );
+		// 0 to 255 in the menu, 0 to 1 for the entity
+		float r = RPX_CvarFloat( "ui_rpx_g_lr" ) / 255.0f, g = RPX_CvarFloat( "ui_rpx_g_lg" ) / 255.0f, b = RPX_CvarFloat( "ui_rpx_g_lb" ) / 255.0f;
+
+		if ( radius < 1 ) radius = 1;
+		if ( radius > 1000 ) radius = 1000;
+		r = Com_Clamp( 0.0f, 1.0f, r );
+		g = Com_Clamp( 0.0f, 1.0f, g );
+		b = Com_Clamp( 0.0f, 1.0f, b );
+		Q_strcat( cmd, sizeof( cmd ), va( " light \"%d\" color \"%.2f %.2f %.2f\"", radius, r, g, b ) );
+	}
+
+	if ( RPX_GlmBounds( path, mins, maxs, &reach ) ) {
+		int radius = (int)ceil( reach );
+
+		if ( radius < RPX_GLM_MIN_RADIUS ) radius = RPX_GLM_MIN_RADIUS;
+		if ( radius > RPX_GLM_MAX_RADIUS ) radius = RPX_GLM_MAX_RADIUS;
+		Q_strcat( cmd, sizeof( cmd ), va( " radius \"%d\"", radius ) );
+	}
+
+	RPX_AddOffset( cmd, sizeof( cmd ), "ui_rpx_g_lift" );
+	RPX_Queue( cmd );
+}
+
 static void RPX_SpawnEffect( qboolean grab ) {
 	char folder[RPX_NAME_LEN], name[RPX_NAME_LEN], file[MAX_QPATH * 2], cmd[MAX_STRING_CHARS];
 	int dir, delay, rnd, flags;
@@ -1056,6 +1129,8 @@ void CG_Rpx_f( void ) {
 		// DAJ_RP: [Extras] grab*: the Grab buttons under Spawn, the same command with /entaddgrab
 		if ( !Q_stricmp( arg, "spawnprop" ) || !Q_stricmp( arg, "grabprop" ) ) {
 			RPX_SpawnProp( !Q_stricmp( arg, "grabprop" ) );
+		} else if ( !Q_stricmp( arg, "spawnglm" ) || !Q_stricmp( arg, "grabglm" ) ) {	// GLX_U: [Extras]
+			RPX_SpawnGlm( !Q_stricmp( arg, "grabglm" ) );
 		} else if ( !Q_stricmp( arg, "spawnfx" ) || !Q_stricmp( arg, "grabfx" ) ) {
 			RPX_SpawnEffect( !Q_stricmp( arg, "grabfx" ) );
 		} else if ( !Q_stricmp( arg, "spawnnpc" ) ) {

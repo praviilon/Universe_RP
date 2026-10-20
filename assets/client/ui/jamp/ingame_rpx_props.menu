@@ -1,5 +1,5 @@
 //----------------------------------------------------------------------------------------------
-// ingame_rpx_props: the Props menu of the Extras.
+// ingame_rpx_props: the MD3 Props menu of the Extras (GLX_U: was Props; GLM Props is ingame_rpx_glmprops).
 // GalaxyRP: [Extras] generated with the others of ingame_rpx_*.menu; the Extras button of
 // ingame_galaxyrp.menu opens it. The list, the previews and the rpx scripts are ui_rpextras.c; the
 // commands the buttons send are built in cg_rpextras.c.
@@ -51,7 +51,7 @@
 			name                rpx_title
 			style               WINDOW_STYLE_SHADER
 			background          "gfx/menus/menu_blendbox"
-			text                "^9Universe ^7RP^3 Extras: ^7Props"
+			text                "^9Universe ^7RP^3 Extras: ^7MD3 Props"
 			rect                20 5 580 28
 			textalign           ITEM_ALIGN_CENTER
 			textalignx          290
