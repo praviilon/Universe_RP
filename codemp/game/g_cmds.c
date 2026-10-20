@@ -12949,7 +12949,8 @@ void Cmd_ListAccount_f( gentity_t *ent ) {
 				// paralysis, only a combat knockdown -- took this block past SV_SendServerCommand's hard
 				// 1022 characters, and going over does not truncate, it silently drops the whole section.
 				trap->SendServerCommand(ent - g_entities, "print \"\
-^3/afk: ^7Goes AFK after 20 seconds without input: a protection bubble and a comlink animation until you move, look around or press a key. Also happens on its own after a longer while.\n\
+^3/away: ^7Goes AFK after 20 seconds without input: a protection bubble and a comlink animation until you move, look around or press a key. Also happens on its own after a longer while.\n\
+^3/afk: ^7The TaystJK client's own command: puts [AFK] in front of your name, or takes it off. No protection: use /away for that.\n\
 ^3/getup: ^7Gets you up from a combat knockdown, once your timer runs out. Cannot end an admin paralysis.\n\
 ^3/helpup <player name>: ^7Helps a nearby player up from a combat knockdown. Cannot end an admin paralysis.\n\
 ^3/training <on|off>: ^7Turns training saber mode (near-zero damage) on or off.\n\
@@ -22384,14 +22385,14 @@ Cmd_Players_f
 */
 /*
 ==================
-Cmd_Afk_f
+Cmd_Away_f
 
-GLX_U: [AFK] /afk: goes AFK after RP_AFK_COMMAND_DELAY seconds without input (rp_afk_time if lower), so
+GLX_U: [AFK] /away: goes AFK after RP_AFK_COMMAND_DELAY seconds without input (rp_afk_time if lower), so
 it can't be typed to dodge a hit; any input before then cancels it (RP_AfkThink, g_active.c). Typed
 while AFK, it brings the player back.
 ==================
 */
-void Cmd_Afk_f( gentity_t *ent ) {
+void Cmd_Away_f( gentity_t *ent ) {
 	int delay;
 
 	if ( rp_afk_time.integer <= 0 )
@@ -25354,7 +25355,6 @@ command_t commands[] = {
 	{ "admindown",			Cmd_AdminDown_f,			CMD_LOGGEDIN | CMD_NOINTERMISSION },
 	{ "adminlist",			Cmd_AdminList_f,			CMD_LOGGEDIN | CMD_NOINTERMISSION },
 	{ "adminup",			Cmd_AdminUp_f,				CMD_LOGGEDIN | CMD_NOINTERMISSION },
-	{ "afk",				Cmd_Afk_f,					CMD_NOINTERMISSION },	// GLX_U: [AFK]
 	{ "admmap",				Cmd_AdmMap_f,				CMD_LOGGEDIN | CMD_NOINTERMISSION },
 	{ "admweather",			Cmd_AdmWeather_f,			CMD_LOGGEDIN | CMD_NOINTERMISSION },
 	{ "admwalkthrough",		Cmd_AdmWalkthrough_f,		CMD_LOGGEDIN | CMD_NOINTERMISSION },
@@ -25365,6 +25365,7 @@ command_t commands[] = {
 	{ "allylist",			Cmd_AllyList_f,				CMD_NOINTERMISSION },
 	{ "allyremove",			Cmd_AllyRemove_f,			CMD_NOINTERMISSION },
 	{ "attributes",			Cmd_Attributes_f,			CMD_LOGGEDIN },
+	{ "away",				Cmd_Away_f,					CMD_NOINTERMISSION },	// GLX_U: [AFK] not "afk": the TaystJK client has its own (an [AFK] rename) and never sends it
 	{ "buy",				Cmd_Buy_f,					CMD_RPG | CMD_ALIVE | CMD_NOINTERMISSION },
 	{ "changepassword",		Cmd_ChangePassword_f,		CMD_LOGGEDIN | CMD_NOINTERMISSION },
 	{ "char",				Cmd_Char_f,					CMD_LOGGEDIN | CMD_NOINTERMISSION },

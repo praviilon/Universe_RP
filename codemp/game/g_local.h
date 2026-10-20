@@ -1024,7 +1024,7 @@ typedef struct clientPersistant_s {
 
 	// GLX_U: [AFK] see RP_AfkThink() in g_active.c. All reset by ClientSpawn() (RP_AfkReset)
 	int afkLastActive;			// level.time of the last input
-	int afkRequestAt;			// a pending /afk goes off at this level.time, 0 if none
+	int afkRequestAt;			// a pending /away goes off at this level.time, 0 if none
 	int afkStart;				// when the player went AFK
 	int afkSavedInvulnerable;	// invulnerableTimer when the player went AFK (spawn/revive protection)
 	int afkBubbleUntil;			// the invulnerableTimer the AFK bubble last set
@@ -2493,7 +2493,7 @@ void SaveRegisteredItems( void );
 qboolean RP_DownedSystemEnabled( void );
 qboolean RP_MinigameFighter( gentity_t *ent );	// DAJ_RP: [Minigames] g_main.c
 // GLX_U: [AFK] g_active.c
-#define RP_AFK_COMMAND_DELAY	20		// seconds /afk waits without input (rp_afk_time if lower)
+#define RP_AFK_COMMAND_DELAY	20		// seconds /away waits without input (rp_afk_time if lower)
 qboolean RP_CanGoAfk( gentity_t *ent );
 void RP_AfkLeave( gentity_t *ent );
 void RP_AfkReset( gentity_t *ent );

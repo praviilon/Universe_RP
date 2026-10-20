@@ -1442,7 +1442,7 @@ static void RP_RunDownedTimer( gentity_t *ent )
 ===============================================================================
 GLX_U: [AFK]
 
-A player with no input for rp_afk_time seconds (or for the /afk countdown) is AFK: the spawn protection
+A player with no input for rp_afk_time seconds (or for the /away countdown) is AFK: the spawn protection
 bubble (EF_INVULNERABLE, drawn by every client; G_Damage refuses players and NPCs) and the comlink
 animation, held the way emotes are. The first input ends it. An open chat box sends no input, so a
 long message counts as idle; BUTTON_TALK (also set while alt-tabbed) and BUTTON_ANY are ignored.
@@ -1557,7 +1557,7 @@ static void RP_AfkThink( gentity_t *ent, usercmd_t *ucmd ) {
 
 	input = ( ucmd->forwardmove || ucmd->rightmove || ucmd->upmove ) ? qtrue : qfalse;
 	// a bound key held. Not BUTTON_TALK (chat box, console, alt-tab) and not BUTTON_ANY: the key that sends
-	// a chat line or closes the console is still down for a moment after, and would cancel /afk at once
+	// a chat line or closes the console is still down for a moment after, and would cancel /away at once
 	if ( ucmd->buttons & ~( BUTTON_TALK | BUTTON_WALKING | BUTTON_ANY ) )
 		input = qtrue;
 	if ( ( ucmd->buttons ^ cl->pers.afkPrevButtons ) & BUTTON_WALKING )	// walk toggled
@@ -1599,7 +1599,7 @@ static void RP_AfkTick( gentity_t *ent ) {
 		return;
 
 	if ( rp_afk_time.integer <= 0 || !RP_CanGoAfk( ent ) ) {
-		cl->pers.afkRequestAt = 0;		// a pending /afk that can no longer go off is dropped quietly
+		cl->pers.afkRequestAt = 0;		// a pending /away that can no longer go off is dropped quietly
 		return;
 	}
 
