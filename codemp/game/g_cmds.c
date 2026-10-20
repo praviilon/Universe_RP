@@ -9176,6 +9176,31 @@ static void Cmd_Tell_f( gentity_t *ent ) {
 }
 
 //siege voice command
+// GLX_U: [Voice] one event of a voice command, to the clients in mask only (any distance)
+static void zyk_voice_event_to( gentity_t *ent, int event, int sound, int generic1, const uint32_t *mask )
+{
+	gentity_t *te;
+
+	if ( !sound || !( mask[0] || mask[1] ) )
+	{
+		return;
+	}
+
+	te = G_TempEntity( vec3_origin, event );
+	te->s.groundEntityNum = ent->s.number;
+	te->s.eventParm = sound;
+	te->s.generic1 = generic1;
+	te->r.svFlags |= SVF_BROADCASTCLIENTS;
+	te->r.broadcastClients[0] = mask[0];
+	te->r.broadcastClients[1] = mask[1];
+}
+
+// GLX_U: [Voice] in FFA the speaker's allies take the place of the team. Everyone near hears the
+// speaker's own voice in the world; he and his allies with the client hear it over the radio too, with
+// the chat box line (generic1 1) or without it for an ally who /ignores him (2) -- /ignore is for
+// written chat only. Allies without the client get the generic voice and a chat line. Every sound
+// name comes from bg_customSiegeSoundNames, never from what was typed: case variants of a name used
+// to take a new sound slot each, enough to fill the table.
 static void Cmd_VoiceCommand_f(gentity_t *ent)
 {
 	gentity_t *te;
@@ -9191,19 +9216,17 @@ static void Cmd_VoiceCommand_f(gentity_t *ent)
 	}
 	*/
 
-	strcpy(content,"");
+	content[0] = '\0';
 
 	if (trap->Argc() < 2)
 	{
-		// zyk: other gamemodes will show info of how to use the voice_cmd
-		if (level.gametype < GT_TEAM)
+		// zyk: show info of how to use the voice_cmd. GLX_U: [Voice] in every gametype, with the names
+		// as they are typed (no *) and up to the end of the list (it used to read the NULL after it)
+		for (i = 0; i < MAX_CUSTOM_SIEGE_SOUNDS && bg_customSiegeSoundNames[i]; i++)
 		{
-			for (i = 0; i < MAX_CUSTOM_SIEGE_SOUNDS; i++)
-			{
-				strcpy(content,va("%s%s\n",content,bg_customSiegeSoundNames[i]));
-			}
-			trap->SendServerCommand( ent-g_entities, va("print \"Usage: /voice_cmd <arg> [f]\nThe f argument is optional, it will make the command use female voice.\nThe arg may be one of the following:\n %s\"",content) );
+			Q_strcat(content, sizeof(content), va("%s\n", bg_customSiegeSoundNames[i] + 1));
 		}
+		trap->SendServerCommand( ent-g_entities, va("print \"Usage: /voice_cmd <name> [f]\nSays it in your character's own voice. Your allies (your team in team gametypes) hear it over the radio.\nf: a female voice for allies without the " RP_MOD_NAME " client.\nThe name may be one of the following:\n%s\"", content) );
 		return;
 	}
 
@@ -9243,6 +9266,13 @@ static void Cmd_VoiceCommand_f(gentity_t *ent)
 		return;
 	}
 
+	// GLX_U: [Voice] one every 1.5 seconds, silently
+	if (ent->client->pers.rpVoiceCmdTime > level.time)
+	{
+		return;
+	}
+	ent->client->pers.rpVoiceCmdTime = level.time + 1500;
+
 	if (level.gametype >= GT_TEAM)
 	{
 		te = G_TempEntity(vec3_origin, EV_VOICECMD_SOUND);
@@ -9251,32 +9281,65 @@ static void Cmd_VoiceCommand_f(gentity_t *ent)
 		te->r.svFlags |= SVF_BROADCAST;
 	}
 	else
-	{ // zyk: in other gamemodes that are not Team ones, just do a G_Sound call to each allied player
+	{ // zyk: in other gamemodes that are not Team ones, the allies hear it. GLX_U: [Voice] see above
+		const char *name = bg_customSiegeSoundNames[i];	// "*att_attack"
+		const int sound = G_SoundIndex( name );
+		uint32_t radioLine[2] = { 0, 0 }, radioQuiet[2] = { 0, 0 }, fallback[2] = { 0, 0 };
+		const char *voice_dir = "mp_generic_male";
 		char arg2[MAX_TOKEN_CHARS];
-		char voice_dir[32];
-
-		strcpy(voice_dir,"mp_generic_male");
+		int j;
 
 		if (trap->Argc() == 3)
 		{
 			trap->Argv(2, arg2, sizeof(arg2));
 			if (Q_stricmp(arg2, "f") == 0)
-				strcpy(voice_dir,"mp_generic_female");
+				voice_dir = "mp_generic_female";
 		}
 
-		G_Sound(ent,CHAN_VOICE,G_SoundIndex(va("sound/chars/%s/misc/%s.mp3",voice_dir,arg)));
-
-		for (i = 0; i < MAX_CLIENTS; i++)
+		// the speaker and his allies, by what their client can play and whether they read him
+		for (j = 0; j < level.maxclients; j++)
 		{
-			if (zyk_is_ally(ent,&g_entities[i]) == qtrue)
+			gentity_t *other = &g_entities[j];
+			qboolean ignores;
+
+			if (other != ent && zyk_is_ally(ent, other) == qfalse)
+				continue;
+			if (other->r.svFlags & SVF_BOT)
+				continue;
+
+			ignores = other != ent && check_if_player_ignores_other(ent, other);
+
+			if (other->client->pers.clientPlugin)
 			{
-				trap->SendServerCommand(i, va("chat \"%s: ^3%s\"",ent->client->pers.netname,arg));
-				G_Sound(&g_entities[i],CHAN_VOICE,G_SoundIndex(va("sound/chars/%s/misc/%s.mp3",voice_dir,arg)));
+				Q_AddToBitflags(ignores ? radioQuiet : radioLine, j, 32);
 			}
+			else
+			{
+				Q_AddToBitflags(fallback, j, 32);
+				if (!ignores)
+					trap->SendServerCommand(j, va("chat \"%s^7: ^3%s\"", ent->client->pers.netname, name + 1));
+			}
+		}
+
+		// in the world, for everyone near
+		if (sound)
+		{
+			te = G_TempEntity(ent->r.currentOrigin, EV_VOICECMD_SOUND);
+			te->s.groundEntityNum = ent->s.number;
+			te->s.eventParm = sound;
+		}
+
+		// over the radio
+		zyk_voice_event_to(ent, EV_VOICECMD_SOUND, sound, 1, radioLine);
+		zyk_voice_event_to(ent, EV_VOICECMD_SOUND, sound, 2, radioQuiet);
+
+		// no client to play the speaker's own voice: the generic one, on their own head
+		if (fallback[0] || fallback[1])
+		{
+			zyk_voice_event_to(ent, EV_GLOBAL_SOUND, G_SoundIndex(va("sound/chars/%s/misc/%s.mp3", voice_dir, name + 1)), 0, fallback);
 		}
 	}
 }
-
 
 static char	*gc_orders[] = {
 	"hold your position",
@@ -12919,7 +12982,7 @@ void Cmd_ListAccount_f( gentity_t *ent ) {
 ^3/playsound <channel (optional)> <file path>: ^7Plays a sound, once every 15 seconds. With no arguments, lists the channels; ^3/list sounds ^7lists the files.\n\
 ^3/datetime: ^7Shows current server date and time.\n\
 ^3/drop: ^7Drops the current weapon of the player. If current weapon is melee, drops the selected Holdable Item from inventory.\n\
-^3/ignore <player name or id>: ^7Enable/disable ignoring a player. Covers every chat type.\n\
+^3/ignore <player name or id>: ^7Enable/disable ignoring a player. Covers every written chat type; voice commands still play.\n\
 ^3/ignorelist: ^7Lists ignored players.\n\
 ^3/jetpack: ^7Gives or removes jetpack from the player.\n\"");
 				// GalaxyRP fix: [Commands] split off into its own SendServerCommand call -- the Misc
@@ -12954,7 +13017,7 @@ void Cmd_ListAccount_f( gentity_t *ent ) {
 ^3/getup: ^7Gets you up from a combat knockdown, once your timer runs out. Cannot end an admin paralysis.\n\
 ^3/helpup <player name>: ^7Helps a nearby player up from a combat knockdown. Cannot end an admin paralysis.\n\
 ^3/training <on|off>: ^7Turns training saber mode (near-zero damage) on or off.\n\
-^3/voice_cmd <arg> <f or m>: ^7Activates the voice chat system.\n\
+^3/voice_cmd <name>: ^7Says a voice command in your character's voice; allies (your team in team gametypes) hear it over the radio. ^3/voice_cmd ^7alone lists the names.\n\
 ^3/where: ^7Displays your current coordinates.\n\n\"");
 			}
 			else if (RP_ListCommand(ent, arg1))
@@ -12990,9 +13053,9 @@ void Cmd_ListAccount_f( gentity_t *ent ) {
 ^3/ooc <text>: ^7Out-of-character chat. Server-wide, in every gametype.\n\
 ^3/allychat <text>: ^7Sends message to your allies. Any distance, every gametype.\n\
 ^3/tell <player name or id> <text>: ^7Private message to one player.\n\
-^3/ignore <player name or id>: ^7Enable/disable ignoring a player. Covers every chat type.\n\
+^3/ignore <player name or id>: ^7Enable/disable ignoring a player. Covers every written chat type; voice commands still play.\n\
 ^3/ignorelist: ^7Lists ignored players.\n\
-^3/voice_cmd <arg> <f or m>: ^7Activates the voice chat system.\n\
+^3/voice_cmd <name>: ^7Says a voice command in your character's voice; allies (your team in team gametypes) hear it over the radio. ^3/voice_cmd ^7alone lists the names.\n\
 \n\"");
 				trap->SendServerCommand(ent - g_entities, "print \"^3--------RP Chat Modifiers--------\n\
 ^7Type a modifier at the start of a chat box message: ^3/me draws a blaster.\n\

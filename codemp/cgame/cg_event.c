@@ -3293,6 +3293,22 @@ void CG_EntityEvent( centity_t *cent, vec3_t position ) {
 			clientInfo_t *ci = &cgs.clientinfo[clientNum];
 			centity_t *vChatEnt = &cg_entities[clientNum];
 			char descr[1024] = {0};
+			// GLX_U: [Voice] in FFA the server sends the world copy (generic1 0) to everyone near and the
+			// radio copy only to the speaker and his allies: 1 with the chat box line, 2 without it (the
+			// ally /ignores him). Team gametypes as before: radio and line for the team, world for all.
+			qboolean radio, line, world;
+
+			if ( cgs.gametype < GT_TEAM )
+			{
+				radio = es->generic1 ? qtrue : qfalse;
+				line = es->generic1 == 1 ? qtrue : qfalse;
+				world = !radio;
+			}
+			else
+			{
+				radio = line = ci->team == cg.predictedPlayerState.persistant[PERS_TEAM] ? qtrue : qfalse;
+				world = qtrue;
+			}
 
 			Q_strncpyz(descr, CG_GetStringForVoiceSound(CG_ConfigString( CS_SOUNDS + es->eventParm )), sizeof( descr ) );
 
@@ -3306,13 +3322,13 @@ void CG_EntityEvent( centity_t *cent, vec3_t position ) {
 			{
 				if (clientNum != cg.predictedPlayerState.clientNum)
 				{ //play on the head as well to simulate hearing in radio and in world
-					if (ci->team == cg.predictedPlayerState.persistant[PERS_TEAM])
+					if (radio)
 					{ //don't hear it if this person is on the other team, but they can still
 						//hear it in the world spot.
 						trap->S_StartSound (NULL, cg.snap->ps.clientNum, CHAN_MENU1, sfx);
 					}
 				}
-				if (ci->team == cg.predictedPlayerState.persistant[PERS_TEAM])
+				if (line)
 				{ //add to the chat box
 					//hear it in the world spot.
 					char vchatstr[1024] = {0};
@@ -3322,7 +3338,10 @@ void CG_EntityEvent( centity_t *cent, vec3_t position ) {
 				}
 
 				//and play in world for everyone
-				trap->S_StartSound (NULL, clientNum, CHAN_VOICE, sfx);
+				if (world)
+				{
+					trap->S_StartSound (NULL, clientNum, CHAN_VOICE, sfx);
+				}
 				vChatEnt->vChatTime = cg.time + 1000;
 			}
 		}

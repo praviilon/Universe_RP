@@ -1356,6 +1356,8 @@ typedef struct clientPersistant_s {
 	// Tr!Force: [Plugin] Client plugin check
 	qboolean		clientPlugin;
 
+	int				rpVoiceCmdTime;		// GLX_U: [Voice] level.time of the next /voice_cmd allowed
+
 	// GalaxyRP fix: [Model] non-zero while a forced kill triggered by /login, /char use, or /new is
 	// waiting to fire -- set by select_player_character()/select_account_and_default_character_data()
 	// in g_cmds.c instead of calling G_Kill() immediately, and consumed by ClientThink_real() in

@@ -1160,7 +1160,7 @@ sfxHandle_t	CG_CustomSound( int clientNum, const char *soundName ) {
 		}
 	}
 
-    if (cgs.gametype >= GT_TEAM || com_buildScript.integer)
+	// GLX_U: [Voice] in every gametype (was >= GT_TEAM): /voice_cmd plays the speaker's own voice in FFA too
 	{ //siege only
 		for (i = 0; i < MAX_CUSTOM_SIEGE_SOUNDS; i++)
 		{
@@ -1192,8 +1192,8 @@ sfxHandle_t	CG_CustomSound( int clientNum, const char *soundName ) {
 		{
 			return ci->sounds[i];
 		}
-		else if ( (cgs.gametype >= GT_TEAM || com_buildScript.integer) && i < numCSiegeSounds && !strcmp( lSoundName, bg_customSiegeSoundNames[i] ) )
-		{ //siege only
+		else if ( i < numCSiegeSounds && !strcmp( lSoundName, bg_customSiegeSoundNames[i] ) )
+		{ //siege only -- GLX_U: [Voice] in every gametype
 			return ci->siegeSounds[i];
 		}
 		else if ( (cgs.gametype == GT_DUEL || cgs.gametype == GT_POWERDUEL || com_buildScript.integer) && i < numCDuelSounds && !strcmp( lSoundName, cg_customDuelSoundNames[i] ) )
@@ -1844,7 +1844,7 @@ void CG_LoadCISounds(clientInfo_t *ci, qboolean modelloaded)
 		}
 	}
 
-	if (cgs.gametype >= GT_TEAM || com_buildScript.integer)
+	// GLX_U: [Voice] in every gametype (was >= GT_TEAM), for /voice_cmd in FFA
 	{ //load the siege sounds then
 		for ( i = 0 ; i < MAX_CUSTOM_SIEGE_SOUNDS; i++ )
 		{
