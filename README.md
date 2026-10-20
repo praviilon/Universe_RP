@@ -2,9 +2,12 @@
 
 Universe RP modernises the Galaxy RP mod developed by Alex, making it natively playable on modern TaystJK engine with its Rend2 or Vulkan renderers and its logical entities system. It also introduces 64-bit mod version, as well as versions for Linux and macOS, and tackles some bugs and issues along the way. Many new features are also gradually added to the mod.
 
+![cover_image](universe_rp_cover.jpg)
+
 <div align="center">
 
 The aim of the mod is to improve on the work which has been done before and introduce many new features that RP community may benefit from.
+Claude Code is being used to develop the project.
 
 [![version](https://img.shields.io/github/v/release/praviilon/Universe_RP?label=Current%20Version&color=brightgreen)](https://github.com/praviilon/Universe_RP/releases)
 [![issues](https://img.shields.io/github/issues/praviilon/Universe_RP.svg?label=Issues%20%26%20Requests&color=red)](https://github.com/praviilon/Universe_RP/issues)
