@@ -17,7 +17,7 @@ Global definitions
 =====================================================================
 */
 
-#define DB_PATH							"GalaxyRP/database/accounts.db"
+#define DB_PATH							RP_MOD_FOLDER "/database/accounts.db"	// GLX_U: [Branding]
 
 // GalaxyRP fix: [Database] Centralised sqlite3_open() wrapper -- see definition in g_main.c for
 // why this exists (map-change "database is locked" errors). Every place in the game module that

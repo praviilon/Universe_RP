@@ -1092,7 +1092,7 @@ void CG_Rpx_f( void ) {
 		return;
 	}
 
-	trap->Print( "rpx is used by the Extras menus of the Galaxy RP menu.\n" );
+	trap->Print( "rpx is used by the Extras menus of the " RP_MOD_NAME " menu.\n" );
 }
 
 /*

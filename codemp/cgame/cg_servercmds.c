@@ -219,7 +219,7 @@ void CG_ParseServerinfo( void ) {
 	if (!cgs.modCheck) 
 	{
 		char *gamename = Info_ValueForKey(info, "gamename");
-		cgs.modCheck = (qboolean)strstr(gamename, "GalaxyRP Mod");
+		cgs.modCheck = (qboolean)strstr(gamename, RP_MOD_TAG);
 	}
 
 	mapname = Info_ValueForKey( info, "mapname" );

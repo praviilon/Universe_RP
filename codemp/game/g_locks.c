@@ -284,7 +284,7 @@ void RP_LocksLoad( void )
 	memset( rp_lockMessageTime, 0, sizeof( rp_lockMessageTime ) );
 	RP_LockMapName( rp_lockMap, sizeof( rp_lockMap ) );
 
-	f = fopen( va( "GalaxyRP/locks/%s/locks.txt", rp_lockMap ), "r" );
+	f = fopen( va( RP_MOD_FOLDER "/locks/%s/locks.txt", rp_lockMap ), "r" );
 	if ( !f )
 		return;
 
@@ -424,7 +424,7 @@ static qboolean RP_LocksSave( void )
 
 	zyk_create_dir( va( "locks/%s", rp_lockMap ) );
 
-	f = fopen( va( "GalaxyRP/locks/%s/locks.txt", rp_lockMap ), "w" );
+	f = fopen( va( RP_MOD_FOLDER "/locks/%s/locks.txt", rp_lockMap ), "w" );
 	if ( !f )
 		return qfalse;
 

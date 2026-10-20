@@ -115,8 +115,8 @@ endif()
 # this module worked correctly here on Linux (shared libs are LIBRARY artifacts) but the DLL kept
 # landing in install-x64/bin instead of GalaxyRP on Windows (DLLs are RUNTIME artifacts there).
 install(TARGETS ${MPUI}
-	RUNTIME DESTINATION "${JKAInstallDir}/GalaxyRP"
-	LIBRARY DESTINATION "${JKAInstallDir}/GalaxyRP"
+	RUNTIME DESTINATION "${JKAInstallDir}/${RPModFolder}"
+	LIBRARY DESTINATION "${JKAInstallDir}/${RPModFolder}"
 	COMPONENT ${JKAMPCoreComponent})
 
 set_target_properties(${MPUI} PROPERTIES COMPILE_DEFINITIONS "${MPUIDefines}")

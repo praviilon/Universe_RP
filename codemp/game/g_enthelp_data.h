@@ -113,7 +113,7 @@ static const rpEntHelp_t rp_ent_help[] = {
 		NULL,
 		"common misc_ammo_floor_unit misc_shield_floor_unit misc_model_ammo_power_converter misc_model_shield_power_converter misc_model_health_power_converter" },
 	{ "emplaced_eweb", 0, NULL,
-		"Single player's E-Web. In GalaxyRP it spawns exactly as an emplaced_gun: the same turret chair model, health, keys and spawnflags.",
+		"Single player's E-Web. In " RP_MOD_NAME " it spawns exactly as an emplaced_gun: the same turret chair model, health, keys and spawnflags.",
 		"1|CANRESPAWN|Comes back after it is destroyed (4 seconds plus count ms later), with 320 health instead of 800.\n"
 		"1024|NO_DROP|Stays at its origin height instead of dropping onto the floor below.",
 		"angle||The direction it points: the base facing the gunner turns from.\n"
@@ -577,7 +577,7 @@ static const rpEntHelp_t rp_ent_help[] = {
 		"info_siege_radaricon icon gfx/hud/i_icon_medkit targetname icon1",
 		"common info_siege_objective" },
 	{ "item_ammodisp", 0, NULL,
-		"Ammo dispenser, a holdable that is kept. Using it does nothing in GalaxyRP (its toss is switched off). While carrying it, "
+		"Ammo dispenser, a holdable that is kept. Using it does nothing in " RP_MOD_NAME " (its toss is switched off). While carrying it, "
 		"or the health dispenser, pressing Use on a player of your team refills the ammo of the weapon in their hands a shot at a "
 		"time, and heals them if they are hurt.",
 		NULL,
@@ -598,14 +598,14 @@ static const rpEntHelp_t rp_ent_help[] = {
 		NULL,
 		"items common" },
 	{ "item_botroam", RP_EH_MAPONLY, "It does nothing in multiplayer: its spawn function is empty and no code reads it.",
-		"A bot roaming hint from Quake 3 maps. In GalaxyRP nothing reads it: it spawns as an empty logical entity and does nothing.",
+		"A bot roaming hint from Quake 3 maps. In " RP_MOD_NAME " nothing reads it: it spawns as an empty logical entity and does nothing.",
 		NULL,
 		NULL,
 		NULL,
 		"common" },
 	{ "item_cloak", 0, NULL,
 		"Cloaking device, a holdable that is kept: using it makes the player invisible, using it again ends it, at most once a "
-		"second. It uses no fuel in GalaxyRP. A downed player cannot cloak.",
+		"second. It uses no fuel in " RP_MOD_NAME ". A downed player cannot cloak.",
 		NULL,
 		NULL,
 		"item_cloak",
@@ -644,7 +644,7 @@ static const rpEntHelp_t rp_ent_help[] = {
 		"item_force_enlighten_light count 30",
 		"items common item_force_enlighten_dark" },
 	{ "item_healthdisp", 0, NULL,
-		"Health dispenser, a holdable that is kept. Using it does nothing in GalaxyRP (its toss is switched off). While carrying it, "
+		"Health dispenser, a holdable that is kept. Using it does nothing in " RP_MOD_NAME " (its toss is switched off). While carrying it, "
 		"or the ammo dispenser, pressing Use on a hurt player of your team heals them 4 at a time, and refills the ammo of the "
 		"weapon in their hands.",
 		NULL,
@@ -722,7 +722,7 @@ static const rpEntHelp_t rp_ent_help[] = {
 		"saber-only servers, health, shields and bacta in duels, weapons in g_weaponDisable, any item whose disable_<classname> "
 		"cvar is 1 (/entadd says so). A class the map had not precached shows as a placeholder to players with an older client until the map "
 		"restarts. The map's own pickups that nothing links to are tagged E in /entlist and can be edited like placed ones. "
-		"Weapons lie still where they are, at their angles, as in single player (players without the GalaxyRP client see them "
+		"Weapons lie still where they are, at their angles, as in single player (players without the " RP_MOD_NAME " client see them "
 		"spin above a hologram pad). Weapons players drop lie on their side. Powerups have no pad either: the Ysalamiri lies "
 		"still, the Force Boon and both Enlightenments turn slowly where they are.",
 		"1|SUSPENDED|Stays where it is placed instead of falling to the floor.\n"
@@ -901,7 +901,7 @@ static const rpEntHelp_t rp_ent_help[] = {
 		"mins|-16 -16 -16|Box corner (Entity System default: the model's own bounds).\n"
 		"maxs|16 16 16|Box corner (Entity System default: the model's own bounds).\n"
 		"modelscale||Scales the drawn model and its box, 0.01 to 10.23. The origin is raised to keep the box bottom in place.\n"
-		"modelscale_vec||Scales the box per axis (x y z). The GalaxyRP client draws the model so too, other clients unscaled.\n"
+		"modelscale_vec||Scales the box per axis (x y z). The " RP_MOD_NAME " client draws the model so too, other clients unscaled.\n"
 		"zykmodelscale||Drawn size in percent (1 to 1023), overrides the drawn size modelscale gives.\n"
 		"light||Radius of a light on the model (100 when only color is given). It goes out when the model breaks.\n"
 		"color||Light colour, red green blue from 0 to 1 (default white).\n"
@@ -931,7 +931,7 @@ static const rpEntHelp_t rp_ent_help[] = {
 	{ "misc_model_ghoul", 0, NULL,
 		"A Ghoul2 (.glm) model prop: any .glm with an optional skin, which can play a range of its animation frames once or looped and carry a light. "
 		"Using it (targetname) shows or hides it, and it takes no damage. The Entity System refuses a model not on the server or not a .glm, bad frames or radius, or no model slot. "
-		"Players need the GalaxyRP client to see a skin of its own.",
+		"Players need the " RP_MOD_NAME " client to see a skin of its own.",
 		"1|SOLID|Blocks movement and shots with its box.\n"
 		"2|LOOP|Plays the frames over and over (needs more than one frame).\n"
 		"4096|START_OFF|Starts hidden and not solid.",
@@ -1203,7 +1203,7 @@ static const rpEntHelp_t rp_ent_help[] = {
 		"10.23 (1 is normal). A breakable is raised so its box keeps its bottom where it was.\n"
 		"zykmodelscale||The drawn size as a percentage (100 is normal, up to 1023), taking over from modelscale. The box is not "
 		"changed.\n"
-		"modelscale_vec||Three scales x y z, typed in quotes, for the box: a misc_model_breakable is drawn so too by the GalaxyRP "
+		"modelscale_vec||Three scales x y z, typed in quotes, for the box: a misc_model_breakable is drawn so too by the " RP_MOD_NAME " "
 		"client (other clients draw it unscaled), a misc_model_ghoul unscaled. zykmodelscale, if given, decides the drawn size. "
 		"modelscale is then not read.",
 		NULL,
@@ -1873,7 +1873,7 @@ static const rpEntHelp_t rp_ent_help[] = {
 		NULL,
 		"common ref_tag" },
 	{ "rp_light", 0, NULL,
-		"A GalaxyRP light and nothing else: a dynamic light at its origin, with no model and nothing to collide with. Unlike the map compiler's light it exists at run time, so the Entity System can place it anywhere. Using it (by its targetname) switches it between its on and its off light.",
+		"A " RP_MOD_NAME " light and nothing else: a dynamic light at its origin, with no model and nothing to collide with. Unlike the map compiler's light it exists at run time, so the Entity System can place it anywhere. Using it (by its targetname) switches it between its on and its off light.",
 		"1|START_OFF|Starts switched off, showing its off light (dark by default).",
 		"light|300|Radius when on, in units (up to 1020).\n"
 		"color|1 1 1|Red green blue, each 0 to 1, when on.\n"
@@ -1920,7 +1920,7 @@ static const rpEntHelp_t rp_ent_help[] = {
 		"target_activate targetname unlock target door1",
 		"common target target_deactivate" },
 	{ "target_autosave", RP_EH_MAPONLY | RP_EH_REMOVED, "Single player only: multiplayer has nothing to save, so it removes itself at spawn.",
-		"Single player saved the game when this was used. GalaxyRP accepts it so single-player maps load without complaint, and it removes itself at once.",
+		"Single player saved the game when this was used. " RP_MOD_NAME " accepts it so single-player maps load without complaint, and it removes itself at once.",
 		NULL,
 		NULL,
 		NULL,
@@ -1952,8 +1952,8 @@ static const rpEntHelp_t rp_ent_help[] = {
 		"targetname||Using it starts the countdown.",
 		"target_delay targetname later wait 3 target lights1",
 		"common target" },
-	{ "target_escapetrig", RP_EH_MAPONLY | RP_EH_REMOVED, "Only works in the single-player gametype, which GalaxyRP does not run: it removes itself at spawn.",
-		"Starts, or with escapegoal ends, a timed escape in the single-player gametype (survivors get points and the round ends). In every gametype GalaxyRP runs it removes itself at spawn.",
+	{ "target_escapetrig", RP_EH_MAPONLY | RP_EH_REMOVED, "Only works in the single-player gametype, which " RP_MOD_NAME " does not run: it removes itself at spawn.",
+		"Starts, or with escapegoal ends, a timed escape in the single-player gametype (survivors get points and the round ends). In every gametype " RP_MOD_NAME " runs it removes itself at spawn.",
 		NULL,
 		"escapetime|60000|Milliseconds given for the escape.\n"
 		"escapegoal|0|Non-zero: using it ends an escape in progress instead of starting one.",
@@ -2190,7 +2190,7 @@ static const rpEntHelp_t rp_ent_help[] = {
 		"wait|0|trigger_multiple: seconds before it can fire again. -1 fires once only, 0 fires again every frame while touched.\n"
 		"random|0|trigger_multiple: seconds added to or taken from wait at random. Kept below wait.\n"
 		"delay|0|trigger_once and trigger_multiple: whole seconds between being set off and firing the targets.\n"
-		"soundSet||trigger_once and trigger_multiple: an ambient sound set from sound/sound.txt that becomes the whole map's ambience, for everyone, when it fires. GalaxyRP refuses a name that file lacks, and the set plays at once without a reconnect.\n"
+		"soundSet||trigger_once and trigger_multiple: an ambient sound set from sound/sound.txt that becomes the whole map's ambience, for everyone, when it fires. " RP_MOD_NAME " refuses a name that file lacks, and the set plays at once without a reconnect.\n"
 		"team||trigger_once and trigger_multiple: 1 or 2, only clients on that team (red or blue) can touch it, so nobody in a game without teams. trigger_hurt: Siege only.\n"
 		"targetname||Being used: trigger_once and trigger_multiple fire, trigger_hurt and trigger_lightningstrike switch on or off.",
 		NULL,

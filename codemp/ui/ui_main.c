@@ -10949,10 +10949,10 @@ void UI_DrawConnectScreen( qboolean overlay ) {
 			// Tr!Force: [AssetsCache] Detect previous game
 			char fsGame[1024];
 			trap->Cvar_VariableStringBuffer("fs_game", fsGame, 1024);
-			if (!Q_stricmp(fsGame, "GalaxyRP")) 
+			if (!Q_stricmp(fsGame, RP_MOD_FOLDER)) 
 			{
 				trap->Cvar_Set("ui_galaxyrp_game", "1");
-				trap->Print(S_COLOR_GREEN "GalaxyRP pre-loaded correctly!\n");
+				trap->Print(S_COLOR_GREEN RP_MOD_NAME " pre-loaded correctly!\n");
 			}
 
 			trap->SE_GetStringTextString("MENUS_AWAITING_CONNECTION", sStringEdTemp, sizeof(sStringEdTemp));

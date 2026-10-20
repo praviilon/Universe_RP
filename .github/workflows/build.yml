@@ -58,6 +58,13 @@ on:
       - "**.md"
       - ".gitignore"
 
+# GLX_U: [Branding] the mod's folder and name for the package paths, archive names and release title.
+# RP_MOD_FOLDER must equal RP_MOD_FOLDER in galaxyrp/game/rp_version.h (CMake installs into that
+# folder); the release job checks it. RP_MOD_NAME is RP_MOD_NAME there.
+env:
+  RP_MOD_FOLDER: GalaxyRP
+  RP_MOD_NAME: Galaxy RP
+
 jobs:
   msvc:
     name: Windows ${{ matrix.arch }} ${{ matrix.build_type }}
@@ -132,8 +139,8 @@ jobs:
         run: |
           set -euo pipefail
           shopt -s nullglob
-          SRC="build/bin/JediAcademy/GalaxyRP"
-          DST="client-package/GalaxyRP"
+          SRC="build/bin/JediAcademy/$RP_MOD_FOLDER"
+          DST="client-package/$RP_MOD_FOLDER"
           rm -rf client-package
           mkdir -p "$DST"
           cp "$SRC"/cgame*.so "$SRC"/cgame*.dll "$SRC"/cgame*.dylib \
@@ -165,24 +172,24 @@ jobs:
         shell: pwsh
         working-directory: ${{ github.workspace }}
         run: |
-          $base = "GalaxyRP-windows-${{ matrix.arch }}-${{ matrix.build_type }}"
+          $base = "${env:RP_MOD_FOLDER}-windows-${{ matrix.arch }}-${{ matrix.build_type }}"
           New-Item -ItemType Directory -Force -Path dist | Out-Null
-          Compress-Archive -Path build/bin/JediAcademy/GalaxyRP -DestinationPath "dist/$base-Full.zip"
-          Compress-Archive -Path client-package/GalaxyRP        -DestinationPath "dist/$base-Client.zip"
+          Compress-Archive -Path "build/bin/JediAcademy/$env:RP_MOD_FOLDER" -DestinationPath "dist/$base-Full.zip"
+          Compress-Archive -Path "client-package/$env:RP_MOD_FOLDER"        -DestinationPath "dist/$base-Client.zip"
           Get-ChildItem dist
 
       - uses: actions/upload-artifact@v7
         with:
-          name: GalaxyRP-windows-${{ matrix.arch }}-${{ matrix.build_type }}-Full
+          name: ${{ env.RP_MOD_FOLDER }}-windows-${{ matrix.arch }}-${{ matrix.build_type }}-Full
           # The asset itself, built by the Package step above -- not a directory for
           # upload-artifact to zip, which is what used to strip the execute bit.
-          path: dist/GalaxyRP-windows-${{ matrix.arch }}-${{ matrix.build_type }}-Full.zip
+          path: dist/${{ env.RP_MOD_FOLDER }}-windows-${{ matrix.arch }}-${{ matrix.build_type }}-Full.zip
           if-no-files-found: error
 
       - uses: actions/upload-artifact@v7
         with:
-          name: GalaxyRP-windows-${{ matrix.arch }}-${{ matrix.build_type }}-Client
-          path: dist/GalaxyRP-windows-${{ matrix.arch }}-${{ matrix.build_type }}-Client.zip
+          name: ${{ env.RP_MOD_FOLDER }}-windows-${{ matrix.arch }}-${{ matrix.build_type }}-Client
+          path: dist/${{ env.RP_MOD_FOLDER }}-windows-${{ matrix.arch }}-${{ matrix.build_type }}-Client.zip
           if-no-files-found: error
 
   ubuntu:
@@ -274,8 +281,8 @@ jobs:
         run: |
           set -euo pipefail
           shopt -s nullglob
-          SRC="install/JediAcademy/GalaxyRP"
-          DST="client-package/GalaxyRP"
+          SRC="install/JediAcademy/$RP_MOD_FOLDER"
+          DST="client-package/$RP_MOD_FOLDER"
           rm -rf client-package
           mkdir -p "$DST"
           cp "$SRC"/cgame*.so "$SRC"/cgame*.dll "$SRC"/cgame*.dylib \
@@ -310,10 +317,10 @@ jobs:
         working-directory: ${{ github.workspace }}
         run: |
           set -euo pipefail
-          BASE="GalaxyRP-linux-${{ matrix.arch }}-${{ matrix.build_type }}"
+          BASE="${RP_MOD_FOLDER}-linux-${{ matrix.arch }}-${{ matrix.build_type }}"
           mkdir -p dist
-          tar czf "dist/$BASE-Full.tar.gz"   -C install/JediAcademy GalaxyRP
-          tar czf "dist/$BASE-Client.tar.gz" -C client-package GalaxyRP
+          tar czf "dist/$BASE-Full.tar.gz"   -C install/JediAcademy "$RP_MOD_FOLDER"
+          tar czf "dist/$BASE-Client.tar.gz" -C client-package "$RP_MOD_FOLDER"
           ls -l dist
           # Assert the bit actually survived. This is the entire reason these are archives rather
           # than loose files, so it should fail the build rather than be assumed.
@@ -333,16 +340,16 @@ jobs:
 
       - uses: actions/upload-artifact@v7
         with:
-          name: GalaxyRP-linux-${{ matrix.arch }}-${{ matrix.build_type }}-Full
+          name: ${{ env.RP_MOD_FOLDER }}-linux-${{ matrix.arch }}-${{ matrix.build_type }}-Full
           # The asset itself, built by the Package step above -- not a directory for
           # upload-artifact to zip, which is what used to strip the execute bit.
-          path: dist/GalaxyRP-linux-${{ matrix.arch }}-${{ matrix.build_type }}-Full.tar.gz
+          path: dist/${{ env.RP_MOD_FOLDER }}-linux-${{ matrix.arch }}-${{ matrix.build_type }}-Full.tar.gz
           if-no-files-found: error
 
       - uses: actions/upload-artifact@v7
         with:
-          name: GalaxyRP-linux-${{ matrix.arch }}-${{ matrix.build_type }}-Client
-          path: dist/GalaxyRP-linux-${{ matrix.arch }}-${{ matrix.build_type }}-Client.tar.gz
+          name: ${{ env.RP_MOD_FOLDER }}-linux-${{ matrix.arch }}-${{ matrix.build_type }}-Client
+          path: dist/${{ env.RP_MOD_FOLDER }}-linux-${{ matrix.arch }}-${{ matrix.build_type }}-Client.tar.gz
           if-no-files-found: error
 
   macos:
@@ -416,8 +423,8 @@ jobs:
         run: |
           set -euo pipefail
           shopt -s nullglob
-          SRC="install/JediAcademy/GalaxyRP"
-          DST="client-package/GalaxyRP"
+          SRC="install/JediAcademy/$RP_MOD_FOLDER"
+          DST="client-package/$RP_MOD_FOLDER"
           rm -rf client-package
           mkdir -p "$DST"
           cp "$SRC"/cgame*.so "$SRC"/cgame*.dll "$SRC"/cgame*.dylib \
@@ -452,10 +459,10 @@ jobs:
         working-directory: ${{ github.workspace }}
         run: |
           set -euo pipefail
-          BASE="GalaxyRP-macos-${{ matrix.arch }}-${{ matrix.build_type }}"
+          BASE="${RP_MOD_FOLDER}-macos-${{ matrix.arch }}-${{ matrix.build_type }}"
           mkdir -p dist
-          tar czf "dist/$BASE-Full.tar.gz"   -C install/JediAcademy GalaxyRP
-          tar czf "dist/$BASE-Client.tar.gz" -C client-package GalaxyRP
+          tar czf "dist/$BASE-Full.tar.gz"   -C install/JediAcademy "$RP_MOD_FOLDER"
+          tar czf "dist/$BASE-Client.tar.gz" -C client-package "$RP_MOD_FOLDER"
           ls -l dist
           # Assert the bit actually survived. This is the entire reason these are archives rather
           # than loose files, so it should fail the build rather than be assumed.
@@ -469,16 +476,16 @@ jobs:
 
       - uses: actions/upload-artifact@v7
         with:
-          name: GalaxyRP-macos-${{ matrix.arch }}-${{ matrix.build_type }}-Full
+          name: ${{ env.RP_MOD_FOLDER }}-macos-${{ matrix.arch }}-${{ matrix.build_type }}-Full
           # The asset itself, built by the Package step above -- not a directory for
           # upload-artifact to zip, which is what used to strip the execute bit.
-          path: dist/GalaxyRP-macos-${{ matrix.arch }}-${{ matrix.build_type }}-Full.tar.gz
+          path: dist/${{ env.RP_MOD_FOLDER }}-macos-${{ matrix.arch }}-${{ matrix.build_type }}-Full.tar.gz
           if-no-files-found: error
 
       - uses: actions/upload-artifact@v7
         with:
-          name: GalaxyRP-macos-${{ matrix.arch }}-${{ matrix.build_type }}-Client
-          path: dist/GalaxyRP-macos-${{ matrix.arch }}-${{ matrix.build_type }}-Client.tar.gz
+          name: ${{ env.RP_MOD_FOLDER }}-macos-${{ matrix.arch }}-${{ matrix.build_type }}-Client
+          path: dist/${{ env.RP_MOD_FOLDER }}-macos-${{ matrix.arch }}-${{ matrix.build_type }}-Client.tar.gz
           if-no-files-found: error
 
   # GalaxyRP addition: [releases] tag-only, and never automatic. Ordinary pushes to develop or main
@@ -520,6 +527,14 @@ jobs:
             echo "::error::tag $GITHUB_REF_NAME does not match rp_version.h ($want). Bump the header or retag."
             exit 1
           fi
+          # GLX_U: [Branding] the packages were built into rp_version.h's RP_MOD_FOLDER and named after
+          # env.RP_MOD_FOLDER; they must be the same folder.
+          folder=$(sed -n 's/^#define[[:space:]]*RP_MOD_FOLDER[[:space:]]*"\([^"]*\)".*/\1/p' galaxyrp/game/rp_version.h)
+          echo "env.RP_MOD_FOLDER=$RP_MOD_FOLDER  rp_version.h=$folder"
+          if [ "$folder" != "$RP_MOD_FOLDER" ]; then
+            echo "::error::RP_MOD_FOLDER in rp_version.h ($folder) differs from the workflow's env.RP_MOD_FOLDER ($RP_MOD_FOLDER)."
+            exit 1
+          fi
 
       - uses: actions/download-artifact@v8
         with:
@@ -545,6 +560,6 @@ jobs:
           fi
           gh release create "$GITHUB_REF_NAME" \
             --draft \
-            --title "GalaxyRP $GITHUB_REF_NAME" \
+            --title "$RP_MOD_NAME $GITHUB_REF_NAME" \
             --generate-notes \
             dist/*

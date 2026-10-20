@@ -422,6 +422,19 @@ if(BuildMPEngine OR BuildMPDed OR BuildMPRdVanilla OR BuildSPEngine OR BuildSPRd
 	add_subdirectory(lib/minizip)
 endif()
 
+# GLX_U: [Branding] the mod folder name (install folder, pk3 name), read from rp_version.h like the
+# version is (assets/CMakeLists.txt), so code and build take it from one place. Configure runs again
+# whenever the header changes.
+file(STRINGS "${CMAKE_SOURCE_DIR}/galaxyrp/game/rp_version.h" RPModFolderDefine
+	REGEX "^#define[ \t]+RP_MOD_FOLDER[ \t]+\"[^\"]+\"")
+string(REGEX REPLACE "^#define[ \t]+RP_MOD_FOLDER[ \t]+\"([^\"]+)\".*$" "\\1" RPModFolder "${RPModFolderDefine}")
+if(NOT RPModFolder OR RPModFolder MATCHES "[ \t\"/\\]")
+	message(FATAL_ERROR "RP_MOD_FOLDER not found (or not a plain folder name) in galaxyrp/game/rp_version.h")
+endif()
+message(STATUS "Mod folder is ${RPModFolder}")
+set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS
+	"${CMAKE_SOURCE_DIR}/galaxyrp/game/rp_version.h")
+
 # Add projects
 add_subdirectory(${SPDir})
 

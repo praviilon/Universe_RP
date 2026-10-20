@@ -40,6 +40,8 @@ set "jk_restart_log_path=%~dp0%jk_restart_log%"
 :: location) rather than relying on whatever folder it happened to be double-clicked or launched
 :: from. This makes both the executable check below and "fs_homepath ." further down resolve
 :: against the engine's own folder, not wherever the script's working directory started out.
+:: GLX_U: [Branding] the mod folder is the one this script sits in, whatever it is called
+for %%I in ("%~dp0.") do set "jk_mod_folder=%%~nxI"
 cd /d "%~dp0.."
 
 :: Executable check -- by this machine's architecture first, so a build it cannot run is never
@@ -62,12 +64,12 @@ if /i "%jk_arch%"=="x86" (
 )
 if not defined jk_executable (
 	if /i "%jk_arch%"=="x86" (
-		echo ERROR: Could not find %jk_executable_32% next to the GalaxyRP folder ^(this is 32-bit Windows^).
+		echo ERROR: Could not find %jk_executable_32% next to the "%jk_mod_folder%" folder ^(this is 32-bit Windows^).
 		if exist "%jk_executable_64%" echo %jk_executable_64% is there, but a 64-bit build cannot run on 32-bit Windows: install the x86 build.
 	) else (
-		echo ERROR: Could not find %jk_executable_64% or %jk_executable_32% next to the GalaxyRP folder.
+		echo ERROR: Could not find %jk_executable_64% or %jk_executable_32% next to the "%jk_mod_folder%" folder.
 	)
-	echo Make sure a TaystJK dedicated server build is installed alongside GalaxyRP.
+	echo Make sure a TaystJK dedicated server build is installed alongside "%jk_mod_folder%".
 	pause
 	exit /b 1
 )
@@ -97,7 +99,7 @@ set /a jk_fast_failures=0
 
 call :jk_log "wrapper started -- executable %jk_executable%, port %jk_net_port%"
 if "%jk_uptime_ok%"=="0" call :jk_log "note: the system clock could not be parsed, so uptime is unknown and the give-up rule is off"
-echo GalaxyRP auto-restart wrapper. Restart log: %jk_restart_log_path%
+echo %jk_mod_folder% auto-restart wrapper. Restart log: %jk_restart_log_path%
 echo A clean shutdown ^(/quit^) stops the wrapper; a crash restarts it after %jk_restart_delay%s.
 
 :jk_restart_loop
@@ -105,7 +107,7 @@ call :jk_now_cs jk_started
 
 :: Launch. fs_portable 1 + fs_homepath . keep every file the server writes (config changes, the
 :: accounts database, logs) inside this server folder instead of the Windows user profile.
-%jk_executable% +set dedicated %jk_dedicated% +set net_port %jk_net_port% %jk_net_ip_args% +set fs_portable 1 +set fs_homepath . +set fs_game GalaxyRP +exec %jk_config%
+%jk_executable% +set dedicated %jk_dedicated% +set net_port %jk_net_port% %jk_net_ip_args% +set fs_portable 1 +set fs_homepath . +set fs_game "%jk_mod_folder%" +exec %jk_config%
 set jk_status=!errorlevel!
 
 call :jk_now_cs jk_ended

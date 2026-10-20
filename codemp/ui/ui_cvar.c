@@ -130,7 +130,7 @@ void UI_RegisterCvars( void ) {
 	if (cstate.connState > CA_CONNECTED && !trap->Cvar_VariableValue("ui_galaxyrp_game")) 
 	{
 		trap->Cvar_Set("ui_galaxyrp_game", "1");
-		trap->Print(S_COLOR_RED "GalaxyRP not fully loaded, clearing cache ...\n");
+		trap->Print(S_COLOR_RED RP_MOD_NAME " not fully loaded, clearing cache ...\n");
 		trap->Cmd_ExecuteText(EXEC_APPEND, "vid_restart\n");
 	}
 }

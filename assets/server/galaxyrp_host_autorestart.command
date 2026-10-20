@@ -35,6 +35,8 @@ jk_restart_log_max=1048576	# rotate the log once it passes 1 MB
 # cd on the next line, because after that the working directory is the engine folder.
 jk_script_dir="$(cd "$(dirname "$0")" && pwd)" || exit 1
 jk_restart_log_path="$jk_script_dir/$jk_restart_log"
+# GLX_U: [Branding] the mod folder is the one this script sits in, whatever it is called
+jk_mod_folder="$(basename "$jk_script_dir")"
 
 # GalaxyRP: [TaystJK] this script lives inside the GalaxyRP folder, one level below the engine
 # executables -- switch to that parent folder FIRST, using the script's own location (not whatever
@@ -73,8 +75,8 @@ if [ -f "$jk_executable_native" ]; then
 elif [ -f "$jk_executable_universal" ]; then
 	jk_executable="$jk_executable_universal"
 else
-	echo "ERROR: Could not find $jk_executable_native or $jk_executable_universal next to the GalaxyRP folder."
-	echo "Make sure a TaystJK dedicated server build is installed alongside GalaxyRP."
+	echo "ERROR: Could not find $jk_executable_native or $jk_executable_universal next to the $jk_mod_folder folder."
+	echo "Make sure a TaystJK dedicated server build is installed alongside $jk_mod_folder."
 	printf "Press Enter to exit..."
 	read -r _
 	exit 1
@@ -130,7 +132,7 @@ jk_restart_count=0
 jk_fast_failures=0
 
 jk_log "wrapper started -- executable $jk_executable, port $jk_net_port"
-echo "GalaxyRP auto-restart wrapper. Restart log: $jk_restart_log_path"
+echo "$jk_mod_folder auto-restart wrapper. Restart log: $jk_restart_log_path"
 echo "A clean shutdown (/quit) stops the wrapper; a crash restarts it after ${jk_restart_delay}s."
 
 while : ; do
@@ -140,7 +142,7 @@ while : ; do
 	# Launch. fs_portable 1 + an absolute fs_homepath keep every file the server writes (config
 	# changes, the accounts database, logs) inside this server folder instead of
 	# ~/Library/Application Support.
-	"./$jk_executable" +set dedicated "$jk_dedicated" +set net_port "$jk_net_port" "$@" +set fs_portable 1 +set fs_homepath "$ENGINE_DIR" +set fs_game GalaxyRP +exec "$jk_config"
+	"./$jk_executable" +set dedicated "$jk_dedicated" +set net_port "$jk_net_port" "$@" +set fs_portable 1 +set fs_homepath "$ENGINE_DIR" +set fs_game "$jk_mod_folder" +exec "$jk_config"
 	jk_status=$?
 
 	jk_ended="$(date +%s 2>/dev/null)" || jk_ended="$jk_started"

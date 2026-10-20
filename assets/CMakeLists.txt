@@ -18,7 +18,7 @@ foreach(RPVersionDefine ${RPVersionDefines})
 	endif()
 endforeach()
 set(RPVersion "${RPVersionMajor}.${RPVersionMinor}.${RPVersionBugfix}")
-message(STATUS "GalaxyRP version is ${RPVersion}")
+message(STATUS "${RPModFolder} version is ${RPVersion}")
 # GalaxyRP fix: [packaging] the version above is read only when CMake configures, and editing the
 # header did not make it configure again -- so an existing build folder kept naming the pk3 after
 # the old version until CMake was re-run by hand. Listing the header as a configure dependency makes
@@ -96,7 +96,7 @@ set(GalaxyRPExcludedLauncherFiles ${GalaxyRPAllLauncherFiles})
 list(REMOVE_ITEM GalaxyRPExcludedLauncherFiles ${GalaxyRPLauncherFiles})
 
 # Generate PK3 file
-set(PK3FILE GalaxyRP_v${RPVersion}.pk3)
+set(PK3FILE ${RPModFolder}_v${RPVersion}.pk3)
 set(PK3PATH ${CMAKE_SOURCE_DIR}/assets/client)
 set(TMPFILE ${CMAKE_CURRENT_BINARY_DIR}/${PK3FILE})
 set(OUTFILE ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/$<CONFIG>/${PK3FILE})
@@ -128,7 +128,7 @@ add_custom_command(TARGET assets POST_BUILD
 add_custom_command(TARGET assets POST_BUILD
 	COMMAND ${CMAKE_COMMAND} -E copy_directory
 		"${CMAKE_SOURCE_DIR}/assets/server" "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/$<CONFIG>"
-	COMMENT "Copying GalaxyRP server-side content to ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/$<CONFIG>"
+	COMMENT "Copying ${RPModFolder} server-side content to ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/$<CONFIG>"
 )
 # GalaxyRP fix: [packaging] copy_directory above has no exclude option, so it always copies every
 # platform's launcher script too -- remove the ones that don't belong to this build's target
@@ -149,7 +149,7 @@ endforeach()
 # BuildMPDed -- this folder never contains the engine executable or its renderer DLL, only the
 # mod content and the three game-code modules.
 install(FILES "${OUTFILE}"
-	DESTINATION "${JKAInstallDir}/GalaxyRP"
+	DESTINATION "${JKAInstallDir}/${RPModFolder}"
 	COMPONENT ${JKAMPCoreComponent})
 
 # GalaxyRP fix: [packaging] exclude the other platforms' launcher scripts here too (see
@@ -180,7 +180,7 @@ foreach(GalaxyRPLauncherFile ${GalaxyRPLauncherFiles})
 endforeach()
 
 install(DIRECTORY "${CMAKE_SOURCE_DIR}/assets/server/"
-	DESTINATION "${JKAInstallDir}/GalaxyRP"
+	DESTINATION "${JKAInstallDir}/${RPModFolder}"
 	COMPONENT ${JKAMPCoreComponent}
 	${GalaxyRPServerInstallExcludes}
 	${GalaxyRPLauncherFilePermissions})

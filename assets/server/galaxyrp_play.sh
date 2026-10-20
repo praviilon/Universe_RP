@@ -12,6 +12,8 @@ jk_executable_arm64="taystjk.arm64"
 # directory the script happened to be launched from). This makes both the executable check below
 # and the absolute homepath computed further down resolve against the engine's own folder, not
 # wherever the script's working directory started out.
+# GLX_U: [Branding] the mod folder is the one this script sits in, whatever it is called
+jk_mod_folder="$(basename "$(cd "$(dirname "$0")" && pwd)")" || exit 1
 cd "$(dirname "$0")/.." || exit 1
 ENGINE_DIR="$(pwd)"
 
@@ -48,7 +50,7 @@ for jk_candidate in $jk_candidates; do
 done
 
 if [ -z "$jk_executable" ]; then
-	echo "ERROR: Could not find $jk_looked_for next to the GalaxyRP folder (this machine: ${jk_arch:-unknown})."
+	echo "ERROR: Could not find $jk_looked_for next to the $jk_mod_folder folder (this machine: ${jk_arch:-unknown})."
 	case "$jk_arch" in
 		i386|i486|i586|i686)
 			if [ -f "$jk_executable_64" ]; then
@@ -59,7 +61,7 @@ if [ -z "$jk_executable" ]; then
 			echo "TaystJK publishes no Linux ARM builds: build TaystJK from source on this machine, which makes $jk_executable_arm64."
 			;;
 	esac
-	echo "Make sure a TaystJK client build for this machine is installed alongside GalaxyRP."
+	echo "Make sure a TaystJK client build for this machine is installed alongside $jk_mod_folder."
 	printf "Press Enter to exit..."
 	read -r _
 	exit 1
@@ -101,7 +103,7 @@ read -r option
 # neutralizes that override (fs_forcegame ends up equal to fs_gamedir, so the override no-ops)
 # and makes GalaxyRP the actual write target too.
 if [ -z "$option" ]; then
-	nohup "./$jk_executable" +set fs_portable 1 +set fs_homepath "$ENGINE_DIR" +set fs_game GalaxyRP +set fs_forcegame GalaxyRP >/dev/null 2>&1 &
+	nohup "./$jk_executable" +set fs_portable 1 +set fs_homepath "$ENGINE_DIR" +set fs_game "$jk_mod_folder" +set fs_forcegame "$jk_mod_folder" >/dev/null 2>&1 &
 else
-	nohup "./$jk_executable" +set fs_portable 1 +set fs_homepath "$ENGINE_DIR" +set fs_game GalaxyRP +set fs_forcegame GalaxyRP +connect "$option" >/dev/null 2>&1 &
+	nohup "./$jk_executable" +set fs_portable 1 +set fs_homepath "$ENGINE_DIR" +set fs_game "$jk_mod_folder" +set fs_forcegame "$jk_mod_folder" +connect "$option" >/dev/null 2>&1 &
 fi

@@ -3254,7 +3254,7 @@ void G_InitGame( int levelTime, int randomSeed, int restart ) {
 	SaveRegisteredItems();
 
 	// zyk: loading entities set as default (Entity System)
-	zyk_entities_file = fopen(va("GalaxyRP/entities/%s/default.txt",zyk_mapname),"r");
+	zyk_entities_file = fopen(va(RP_MOD_FOLDER "/entities/%s/default.txt",zyk_mapname),"r");
 
 	if (zyk_entities_file != NULL)
 	{ // zyk: default file exists. Load entities from it
@@ -3297,7 +3297,7 @@ void G_InitGame( int levelTime, int randomSeed, int restart ) {
 			}
 		}
 
-		strcpy(level.load_entities_file, va("GalaxyRP/entities/%s/default.txt",zyk_mapname));
+		strcpy(level.load_entities_file, va(RP_MOD_FOLDER "/entities/%s/default.txt",zyk_mapname));
 
 		level.load_entities_timer = level.time + 1050;
 	}
@@ -3312,13 +3312,13 @@ void G_InitGame( int levelTime, int randomSeed, int restart ) {
 	// fixes at some point and this one was missed, which is the argument for there being one copy:
 	// zyk_load_remap_file() (g_utils.c). It also validates each record now and skips the unusable
 	// ones instead of trusting the file.
-	zyk_load_remap_file(va("GalaxyRP/remaps/%s/default.txt", zyk_mapname));
+	zyk_load_remap_file(va(RP_MOD_FOLDER "/remaps/%s/default.txt", zyk_mapname));
 
 	// DAJ_RP: [Locks] this map's account locks -- see g_locks.c
 	RP_LocksLoad();
 
 	// zyk: loading duel arena, if this map has one
-	zyk_duel_arena_file = fopen(va("GalaxyRP/duelarena/%s/origin.txt", zyk_mapname), "r");
+	zyk_duel_arena_file = fopen(va(RP_MOD_FOLDER "/duelarena/%s/origin.txt", zyk_mapname), "r");
 	if (zyk_duel_arena_file != NULL)
 	{
 		char duel_arena_content[16];
@@ -3340,7 +3340,7 @@ void G_InitGame( int levelTime, int randomSeed, int restart ) {
 	}
 
 	// zyk: loading melee arena, if this map has one
-	zyk_melee_arena_file = fopen(va("GalaxyRP/meleearena/%s/origin.txt", zyk_mapname), "r");
+	zyk_melee_arena_file = fopen(va(RP_MOD_FOLDER "/meleearena/%s/origin.txt", zyk_mapname), "r");
 	if (zyk_melee_arena_file != NULL)
 	{
 		char melee_arena_content[16];

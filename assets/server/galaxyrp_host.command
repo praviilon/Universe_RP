@@ -22,6 +22,8 @@ jk_net_ip=""
 # directory Finder/Terminal happened to start it from). This makes both the executable check below
 # and the absolute homepath computed further down resolve against the engine's own folder, not
 # wherever the script's working directory started out.
+# GLX_U: [Branding] the mod folder is the one this script sits in, whatever it is called
+jk_mod_folder="$(basename "$(cd "$(dirname "$0")" && pwd)")" || exit 1
 cd "$(dirname "$0")/.." || exit 1
 ENGINE_DIR="$(pwd)"
 
@@ -54,8 +56,8 @@ if [ -f "$jk_executable_native" ]; then
 elif [ -f "$jk_executable_universal" ]; then
 	jk_executable="$jk_executable_universal"
 else
-	echo "ERROR: Could not find $jk_executable_native or $jk_executable_universal next to the GalaxyRP folder."
-	echo "Make sure a TaystJK dedicated server build is installed alongside GalaxyRP."
+	echo "ERROR: Could not find $jk_executable_native or $jk_executable_universal next to the $jk_mod_folder folder."
+	echo "Make sure a TaystJK dedicated server build is installed alongside $jk_mod_folder."
 	printf "Press Enter to exit..."
 	read -r _
 	exit 1
@@ -76,4 +78,4 @@ fi
 # Launch. fs_portable 1 + an absolute fs_homepath keep every file the server writes (config
 # changes, the accounts database, logs) inside this server folder instead of
 # ~/Library/Application Support.
-"./$jk_executable" +set dedicated "$jk_dedicated" +set net_port "$jk_net_port" "$@" +set fs_portable 1 +set fs_homepath "$ENGINE_DIR" +set fs_game GalaxyRP +exec "$jk_config"
+"./$jk_executable" +set dedicated "$jk_dedicated" +set net_port "$jk_net_port" "$@" +set fs_portable 1 +set fs_homepath "$ENGINE_DIR" +set fs_game "$jk_mod_folder" +exec "$jk_config"

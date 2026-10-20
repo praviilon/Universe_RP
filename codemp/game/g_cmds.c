@@ -7025,12 +7025,12 @@ qboolean inventory_transfer_item(gentity_t *ent, gentity_t *otherEnt, int itemID
 void inventory_add_create_item_log(gentity_t *ent, char created_item_name[MAX_STRING_CHARS]) {
 	FILE *log_file = NULL;
 
-	log_file = fopen("GalaxyRP/logs/itemlog.txt", "a+");
+	log_file = fopen(RP_MOD_FOLDER "/logs/itemlog.txt", "a+");
 
 	// GalaxyRP fix: [Items] fopen() can return NULL (e.g. if GalaxyRP/logs/ doesn't exist yet) --
 	// fputs()/fclose() on a NULL FILE* is undefined behavior. Skip logging instead of crashing.
 	if (log_file == NULL) {
-		trap->Print("Warning: could not open GalaxyRP/logs/itemlog.txt for writing.\n");
+		trap->Print("Warning: could not open " RP_MOD_FOLDER "/logs/itemlog.txt for writing.\n");
 		return;
 	}
 
@@ -12193,7 +12193,7 @@ void zyk_create_dir(char *file_path)
 		return;
 	}
 
-	Com_sprintf(path, sizeof(path), "GalaxyRP/%s", file_path);
+	Com_sprintf(path, sizeof(path), RP_MOD_FOLDER "/%s", file_path);
 
 	// zyk: i starts at 1 so a leading separator is never taken for a component of its own
 	for (i = 1; path[i] != '\0'; i++)
@@ -12736,7 +12736,7 @@ void Cmd_ListAccount_f( gentity_t *ent ) {
 
 			if (Q_stricmp( arg1, "help" ) == 0)
 			{
-				trap->SendServerCommand(ent-g_entities, "print \"\n^2/list force: ^7lists force power skills\n^2/list weapons: ^7lists weapon skills\n^2/list protect: ^7lists protection skills\n^2/list ammo: ^7lists ammo skills\n^2/list items: ^7lists holdable items skills\n^2/list [skill number]: ^7lists info about a skill\n^2/list commands: ^7lists the Galaxy Mod console commands\n^2/list chat: ^7lists chat commands and RP chat modifiers\n\"");
+				trap->SendServerCommand(ent-g_entities, "print \"\n^2/list force: ^7lists force power skills\n^2/list weapons: ^7lists weapon skills\n^2/list protect: ^7lists protection skills\n^2/list ammo: ^7lists ammo skills\n^2/list items: ^7lists holdable items skills\n^2/list [skill number]: ^7lists info about a skill\n^2/list commands: ^7lists the " RP_MOD_NAME " console commands\n^2/list chat: ^7lists chat commands and RP chat modifiers\n\"");
 				// GalaxyRP: [Listings] the server-side listings (g_rplist.c), in a message of their own so the
 				// one above keeps its headroom under SV_SendServerCommand's 1022 characters.
 				trap->SendServerCommand(ent-g_entities, "print \"^2/list md3 <folder> <page>: ^7lists the .md3 model files, starting in map_objects. ^2/ ^7for the models folder itself\n\
@@ -12943,7 +12943,7 @@ void Cmd_ListAccount_f( gentity_t *ent ) {
 				// GLX_U: [Phase] /ghost and /holo next to /scale, in a message of their own (the block above is at 926)
 				trap->SendServerCommand(ent - g_entities, "print \"^3/ghost <player name or ID (optional)>: ^7Turns you into a Force ghost: see-through, glowing, passes through people, off the radar. Again to turn it off. ^1Using it on other players needs the Player effects admin flag.\n\
 ^3/holo <player name or ID (optional)>: ^7Turns you into a hologram: blue, scanlines, passes through people, off the radar. Again to turn it off. ^1Using it on other players needs the Player effects admin flag.\n\
-^7Only players with the GalaxyRP client see the ghost and hologram look.\n\"");
+^7Only players with the " RP_MOD_NAME " client see the ghost and hologram look.\n\"");
 				// GalaxyRP fix: [Death System] split here for the same reason the Misc section above is
 				// split twice: saying what /getup and /helpup actually do -- neither ends an admin
 				// paralysis, only a combat knockdown -- took this block past SV_SendServerCommand's hard
@@ -15396,12 +15396,12 @@ void Cmd_RemapDeleteFile_f( gentity_t *ent ) {
 
 	zyk_create_dir(va("remaps/%s", zyk_mapname));
 
-	this_file = fopen(va("GalaxyRP/remaps/%s/%s.txt",zyk_mapname,arg1),"r");
+	this_file = fopen(va(RP_MOD_FOLDER "/remaps/%s/%s.txt",zyk_mapname,arg1),"r");
 	if (this_file)
 	{
 		fclose(this_file);
 
-		remove(va("GalaxyRP/remaps/%s/%s.txt",zyk_mapname,arg1));
+		remove(va(RP_MOD_FOLDER "/remaps/%s/%s.txt",zyk_mapname,arg1));
 
 		trap->SendServerCommand( ent-g_entities, va("print \"File %s deleted from server\n\"", arg1) );
 	}
@@ -15461,7 +15461,7 @@ void Cmd_RemapSave_f( gentity_t *ent ) {
 	zyk_create_dir(va("remaps/%s", zyk_mapname));
 
 	// zyk: saving remaps in the file
-	remap_file = fopen(va("GalaxyRP/remaps/%s/%s.txt",zyk_mapname,arg1),"w");
+	remap_file = fopen(va(RP_MOD_FOLDER "/remaps/%s/%s.txt",zyk_mapname,arg1),"w");
 
 	// GalaxyRP fix: [stability] the handle was used without being checked, the same gap /entsave had
 	if (!remap_file)
@@ -15534,7 +15534,7 @@ void Cmd_RemapLoad_f( gentity_t *ent ) {
 	// -- so the file loaded by hand was safe and the same file loaded automatically at map start
 	// was not. Sharing the reader is what stops that happening again; it also validates each
 	// record and skips the unusable ones rather than the whole file.
-	if (zyk_load_remap_file(va("GalaxyRP/remaps/%s/%s.txt", zyk_mapname, arg1)) == qtrue)
+	if (zyk_load_remap_file(va(RP_MOD_FOLDER "/remaps/%s/%s.txt", zyk_mapname, arg1)) == qtrue)
 	{
 		trap->SendServerCommand( ent-g_entities, va("print \"Remaps loaded from %s file\n\"", arg1) );
 	}
@@ -17460,7 +17460,7 @@ void Cmd_EntSave_f( gentity_t *ent ) {
 	zyk_create_dir(va("entities/%s", zyk_mapname));
 
 	// zyk: saving the entities into the file
-	this_file = fopen(va("GalaxyRP/entities/%s/%s.txt",zyk_mapname,arg1),"w");
+	this_file = fopen(va(RP_MOD_FOLDER "/entities/%s/%s.txt",zyk_mapname,arg1),"w");
 
 	// GalaxyRP fix: [Entity System] the result was never checked, and every line below writes
 	// through it -- a path that cannot be opened (the folder could not be created, the disk is
@@ -17828,7 +17828,7 @@ void Cmd_EntLoad_f( gentity_t *ent ) {
 	// bounded only by MAX_STRING_CHARS -- see ZYK_PRESET_NAME_MAX in g_local.h. The name is
 	// refused above if it is too long; this makes the copy itself safe whatever that limit
 	// becomes, and whatever length of map name the path picks up.
-	Q_strncpyz(level.load_entities_file, va("GalaxyRP/entities/%s/%s.txt",zyk_mapname,arg1), sizeof(level.load_entities_file));
+	Q_strncpyz(level.load_entities_file, va(RP_MOD_FOLDER "/entities/%s/%s.txt",zyk_mapname,arg1), sizeof(level.load_entities_file));
 
 	this_file = fopen(level.load_entities_file,"r");
 	if (this_file)
@@ -17923,12 +17923,12 @@ void Cmd_EntDeleteFile_f( gentity_t *ent ) {
 
 	zyk_create_dir(va("entities/%s", zyk_mapname));
 
-	this_file = fopen(va("GalaxyRP/entities/%s/%s.txt",zyk_mapname,arg1),"r");
+	this_file = fopen(va(RP_MOD_FOLDER "/entities/%s/%s.txt",zyk_mapname,arg1),"r");
 	if (this_file)
 	{
 		fclose(this_file);
 
-		remove(va("GalaxyRP/entities/%s/%s.txt",zyk_mapname,arg1));
+		remove(va(RP_MOD_FOLDER "/entities/%s/%s.txt",zyk_mapname,arg1));
 
 		trap->SendServerCommand( ent-g_entities, va("print \"File %s deleted from server\n\"", arg1) );
 	}
@@ -19310,7 +19310,7 @@ Run ^3/admweather ^7on its own to see the current weather, or ^3/admweather list
 			// GLX_U: [Phase] anyone may /ghost and /holo themselves; the flag covers using them on others
 			trap->SendServerCommand(ent - g_entities, "print \"\nThis flag enables ^3/admwalkthrough ^7and ^3/admhidden <player name (optional)> ^7on anyone (without a name they apply to you), and ^3/ghost ^7and ^3/holo <player name> ^7on other players. Anyone can use ^3/ghost ^7and ^3/holo ^7on themselves.\n\
 All four let the player pass through other players and NPCs. The ghost and hologram also change how they look and hide them from the radar; a hidden player is not drawn at all and is off the radar too, though Force Sight still sees them. The same command again turns it off, and each one replaces the others.\n\
-Damage and targeting are not affected. The ghost and hologram look is only seen by players with the GalaxyRP client; hidden works for everyone.\n\n\"");
+Damage and targeting are not affected. The ghost and hologram look is only seen by players with the " RP_MOD_NAME " client; hidden works for everyone.\n\n\"");
 		}
 		else
 		{
@@ -23956,14 +23956,14 @@ void Cmd_DuelArena_f(gentity_t *ent) {
 
 	zyk_create_dir("duelarena");
 
-	duel_arena_file = fopen(va("GalaxyRP/duelarena/%s/origin.txt", zyk_mapname), "r");
+	duel_arena_file = fopen(va(RP_MOD_FOLDER "/duelarena/%s/origin.txt", zyk_mapname), "r");
 	if (duel_arena_file == NULL)
 	{ // zyk: arena file does not exist yet, create one
 		VectorCopy(ent->client->ps.origin, level.duel_tournament_origin);
 
 		zyk_create_dir(va("duelarena/%s", zyk_mapname));
 
-		duel_arena_file = fopen(va("GalaxyRP/duelarena/%s/origin.txt", zyk_mapname), "w");
+		duel_arena_file = fopen(va(RP_MOD_FOLDER "/duelarena/%s/origin.txt", zyk_mapname), "w");
 		fprintf(duel_arena_file, "%d\n%d\n%d\n", (int)level.duel_tournament_origin[0], (int)level.duel_tournament_origin[1], (int)level.duel_tournament_origin[2]);
 		fclose(duel_arena_file);
 
@@ -23975,7 +23975,7 @@ void Cmd_DuelArena_f(gentity_t *ent) {
 	{ // zyk: arena file already exists, remove it
 		fclose(duel_arena_file);
 
-		remove(va("GalaxyRP/duelarena/%s/origin.txt", zyk_mapname));
+		remove(va(RP_MOD_FOLDER "/duelarena/%s/origin.txt", zyk_mapname));
 
 		level.duel_arena_loaded = qfalse;
 
@@ -24270,14 +24270,14 @@ void Cmd_MeleeArena_f(gentity_t *ent) {
 
 	zyk_create_dir("meleearena");
 
-	duel_arena_file = fopen(va("GalaxyRP/meleearena/%s/origin.txt", zyk_mapname), "r");
+	duel_arena_file = fopen(va(RP_MOD_FOLDER "/meleearena/%s/origin.txt", zyk_mapname), "r");
 	if (duel_arena_file == NULL)
 	{ // zyk: arena file does not exist yet, create one
 		VectorCopy(ent->client->ps.origin, level.melee_mode_origin);
 
 		zyk_create_dir(va("meleearena/%s", zyk_mapname));
 
-		duel_arena_file = fopen(va("GalaxyRP/meleearena/%s/origin.txt", zyk_mapname), "w");
+		duel_arena_file = fopen(va(RP_MOD_FOLDER "/meleearena/%s/origin.txt", zyk_mapname), "w");
 		fprintf(duel_arena_file, "%d\n%d\n%d\n", (int)level.melee_mode_origin[0], (int)level.melee_mode_origin[1], (int)level.melee_mode_origin[2]);
 		fclose(duel_arena_file);
 
@@ -24289,7 +24289,7 @@ void Cmd_MeleeArena_f(gentity_t *ent) {
 	{ // zyk: arena file already exists, remove it
 		fclose(duel_arena_file);
 
-		remove(va("GalaxyRP/meleearena/%s/origin.txt", zyk_mapname));
+		remove(va(RP_MOD_FOLDER "/meleearena/%s/origin.txt", zyk_mapname));
 
 		level.melee_arena_loaded = qfalse;
 

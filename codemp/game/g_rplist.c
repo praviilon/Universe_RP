@@ -1495,7 +1495,7 @@ void RP_ListDataCommand( gentity_t *ent ) {
 	int k, offset;
 
 	if ( argc < 4 || argc > 5 ) {
-		trap->SendServerCommand( ent - g_entities, "print \"^7This command is used by the Extras menus of the Galaxy RP menu.\n\"" );
+		trap->SendServerCommand( ent - g_entities, "print \"^7This command is used by the Extras menus of the " RP_MOD_NAME " menu.\n\"" );
 		return;
 	}
 	trap->Argv( 1, kindArg, sizeof( kindArg ) );
@@ -1514,7 +1514,7 @@ void RP_ListDataCommand( gentity_t *ent ) {
 	}
 	// nothing to answer to: the reply names the kind and the request, and neither can be trusted
 	if ( !kind || !RPX_IsNumber( req, 9 ) || !RPX_IsNumber( offArg, 6 ) ) {
-		trap->SendServerCommand( ent - g_entities, "print \"^7This command is used by the Extras menus of the Galaxy RP menu.\n\"" );
+		trap->SendServerCommand( ent - g_entities, "print \"^7This command is used by the Extras menus of the " RP_MOD_NAME " menu.\n\"" );
 		return;
 	}
 	offset = atoi( offArg );
