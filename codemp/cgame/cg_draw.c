@@ -2567,6 +2567,17 @@ veh_damage_t vehDamageData[4] =
 	{ "vehicle_right",SHIPSURF_DAMAGE_RIGHT_HEAVY,SHIPSURF_DAMAGE_RIGHT_LIGHT },
 };
 
+// GLX_U: [Widescreen] a part of the vehicle damage indicator, kept in shape and pinned to its corner:
+// left of the screen centre to the left edge, right of it to the right edge (TaystJK's split). Every
+// part goes through here, so the frame and shield glow stay on the silhouette (TaystJK left those two)
+static void CG_DrawVehicleDamagePic( const itemDef_t *item, qhandle_t shader )
+{
+	const rectDef_t *r = &item->window.rect;
+	const float x = ( r->x + r->w * 0.5f <= SCREEN_WIDTH / 2 ) ? RATIO_LX( r->x ) : RATIO_RX( r->x );
+
+	CG_DrawPic( x, r->y, RATIO_W( r->w ), r->h, shader );
+}
+
 // Draw health graphic for given part of vehicle
 void CG_DrawVehicleDamage(const centity_t *veh,int brokenLimbs,const menuDef_t	*menuHUD,float alpha,int index)
 {
@@ -2617,12 +2628,7 @@ void CG_DrawVehicleDamage(const centity_t *veh,int brokenLimbs,const menuDef_t	*
 
 		if (graphicHandle)
 		{
-			CG_DrawPic(
-				item->window.rect.x,
-				item->window.rect.y,
-				item->window.rect.w,
-				item->window.rect.h,
-				graphicHandle );
+			CG_DrawVehicleDamagePic( item, graphicHandle );	// GLX_U: [Widescreen]
 		}
 	}
 }
@@ -2670,12 +2676,7 @@ void CG_DrawVehicleDamageHUD(const centity_t *veh,int brokenLimbs,float percShie
 				trap->R_SetColor( item->window.foreColor );
 			}
 
-			CG_DrawPic(
-				item->window.rect.x,
-				item->window.rect.y,
-				item->window.rect.w,
-				item->window.rect.h,
-				veh->m_pVehicle->m_pVehicleInfo->dmgIndicBackgroundHandle );
+			CG_DrawVehicleDamagePic( item, veh->m_pVehicle->m_pVehicleInfo->dmgIndicBackgroundHandle );	// GLX_U: [Widescreen]
 		}
 	}
 
@@ -2685,12 +2686,7 @@ void CG_DrawVehicleDamageHUD(const centity_t *veh,int brokenLimbs,float percShie
 		if (veh->m_pVehicle->m_pVehicleInfo->dmgIndicFrameHandle)
 		{
 			trap->R_SetColor( item->window.foreColor );
-			CG_DrawPic(
-				item->window.rect.x,
-				item->window.rect.y,
-				item->window.rect.w,
-				item->window.rect.h,
-				veh->m_pVehicle->m_pVehicleInfo->dmgIndicFrameHandle );
+			CG_DrawVehicleDamagePic( item, veh->m_pVehicle->m_pVehicleInfo->dmgIndicFrameHandle );	// GLX_U: [Widescreen]
 		}
 	}
 
@@ -2702,12 +2698,7 @@ void CG_DrawVehicleDamageHUD(const centity_t *veh,int brokenLimbs,float percShie
 			VectorCopy4 ( colorTable[CT_HUD_GREEN], color );
 			color[3] = percShields;
 			trap->R_SetColor( color );
-			CG_DrawPic(
-				item->window.rect.x,
-				item->window.rect.y,
-				item->window.rect.w,
-				item->window.rect.h,
-				veh->m_pVehicle->m_pVehicleInfo->dmgIndicShieldHandle );
+			CG_DrawVehicleDamagePic( item, veh->m_pVehicle->m_pVehicleInfo->dmgIndicShieldHandle );	// GLX_U: [Widescreen]
 		}
 	}
 
