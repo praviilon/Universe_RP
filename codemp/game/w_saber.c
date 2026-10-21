@@ -112,6 +112,10 @@ qboolean G_CanBeEnemy( gentity_t *self, gentity_t *enemy )
 	if ( !self->inuse || !enemy->inuse || !self->client || !enemy->client )
 		return qfalse;
 
+	// GLX_U: [Duel] a player in a private duel can only target his opponent (as JA++); the check below is the other way round
+	if (self->client->ps.duelInProgress && self->client->ps.duelIndex != enemy->s.number)
+		return qfalse;
+
 	// zyk: cannot grab people in private duels
 	if (!enemy->NPC && self->client->ps.duelInProgress == qfalse && enemy->client->ps.duelInProgress == qtrue)
 	{
