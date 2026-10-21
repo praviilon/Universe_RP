@@ -127,17 +127,15 @@ Draw all the status / pacifier stuff during level loading
 ====================
 overlays UI_DrawConnectScreen
 */
-#define UI_INFOFONT (UI_BIGFONT)
+// GLX_U: [Loading] the levelshot and the load bar only (Alex cut the info text, this the last
+// "Loading..." / "Awaiting snapshot..." line). cg.infoScreenText is still set by CG_LoadingString:
+// it is the "still loading" flag CG_DrawActiveFrame checks.
 void CG_DrawInformation( void ) {
 	const char	*s;
 	const char	*info;
-	const char	*sysInfo;
-	int			y;
 	qhandle_t	levelshot;
-	int			iPropHeight = 18;	// I know, this is total crap, but as a post release asian-hack....  -Ste
 
 	info = CG_ConfigString( CS_SERVERINFO );
-	sysInfo = CG_ConfigString( CS_SYSTEMINFO );
 
 	s = Info_ValueForKey( info, "mapname" );
 	levelshot = trap->R_RegisterShaderNoMip( va( "levelshots/%s", s ) );
@@ -151,22 +149,6 @@ void CG_DrawInformation( void ) {
 
 	// draw the icons of things as they are loaded
 //	CG_DrawLoadingIcons();
-
-	// the first 150 rows are reserved for the client connection
-	// screen to write into
-	if ( cg.infoScreenText[0] ) {
-		const char *psLoading = CG_GetStringEdString("MENUS", "LOADING_MAPNAME");
-		CG_DrawProportionalString( 320, 128-32, va(/*"Loading... %s"*/ psLoading, cg.infoScreenText), UI_CENTER|UI_INFOFONT|UI_DROPSHADOW, colorWhite );
-	} else {
-		const char *psAwaitingSnapshot = CG_GetStringEdString("MENUS", "AWAITING_SNAPSHOT");
-		CG_DrawProportionalString( 320, 128-32, /*"Awaiting snapshot..."*/psAwaitingSnapshot, UI_CENTER|UI_INFOFONT|UI_DROPSHADOW, colorWhite );
-	}
-
-	// draw info string information
-
-	y = 180-32;
-
-	
 }
 
 /*
