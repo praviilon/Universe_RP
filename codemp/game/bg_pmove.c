@@ -7807,6 +7807,10 @@ static void PM_Weapon( void )
 			}
 			else if ( (pm->ps->fd.forcePowersActive&(1<<FP_DRAIN)) )
 			{//draining
+				if ( pm->ps->torsoAnim == BOTH_FORCE_DRAIN_GRAB_START || pm->ps->torsoAnim == BOTH_FORCE_DRAIN_GRAB_HOLD )
+				{ // GLX_U: [Drain Grab] holding someone: the server plays the grab on the whole body, leave it alone
+					return;
+				}
 				desiredAnim = BOTH_FORCEGRIP_HOLD;
 			}
 			else

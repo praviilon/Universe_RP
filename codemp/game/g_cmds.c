@@ -175,7 +175,7 @@ const skill_t skills[] = {
 	{5, "Team Heal",			"restores health to your allies and friendly npcs near you. The range and HP restored grow with each level",																																																																		"force",	"light",	FP_TEAM_HEAL},
 	{5, "Lightning",			"attacks with a powerful electric attack at players near you. At level 4, does more damage and pushes the enemy back",																																															"force",	"dark",		FP_LIGHTNING},
 	{5, "Grip",					"attacks a player by holding and damaging him",																																																																	"force",	"dark",		FP_GRIP},
-	{5, "Drain",				"drains force power from a player to restore your health",																																																														"force",	"dark",		FP_DRAIN},
+	{5, "Drain",				"drains force power from a player to restore your health. At levels 4 and 5, Drain on someone right in front grabs him by the throat and drains him while you hold him",																																																														"force",	"dark",		FP_DRAIN},
 	// GalaxyRP fix: [Skills audit] description no longer references the "Force Guardian class...
 	// regen force when taking damage" sub-feature -- that class/behavior was removed in an earlier,
 	// unrelated RPG-class cleanup (see the "Dead Code" comment in g_combat.c) and the description

@@ -1712,6 +1712,14 @@ struct gclient_s {
 	int			grappleIndex;
 	int			grappleState;
 
+	// GLX_U: [Drain Grab] Drain 4/5 holding someone by the throat (RP_DrainGrab*, w_force.c); zeroed on spawn
+	qboolean	drainGrabActive;
+	int			drainGrabIndex;			// the held victim
+	int			drainGrabStart;
+	int			drainGrabTick;			// next drain tick
+	int			drainGrabTicks;			// ticks so far, for the choke sound
+	int			drainGrabNextAllowed;	// no new grab before this
+
 	int			solidHack;
 
 	int			noLightningTime;

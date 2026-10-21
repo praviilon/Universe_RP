@@ -2612,8 +2612,16 @@ void ForceShootLightning( gentity_t *self )
 	}
 }
 
+// GLX_U: [Drain Grab] defined after ForceShootDrain()
+static gentity_t *RP_DrainGrabFindVictim( gentity_t *self );
+static void RP_DrainGrabBegin( gentity_t *self, gentity_t *victim );
+qboolean RP_DrainGrabHolding( gentity_t *self, gentity_t *victim );
+void RP_DrainGrabRelease( gentity_t *self );
+
 void ForceDrain( gentity_t *self )
 {
+	gentity_t *grabVictim;
+
 	if ( self->health <= 0 )
 	{
 		return;
@@ -2638,6 +2646,13 @@ void ForceDrain( gentity_t *self )
 		return;
 	}
 
+	// GLX_U: [Drain Grab] Drain 4/5 on someone right in front grabs him instead of the ranged drain
+	if ( self->client->drainGrabActive && !(self->client->ps.fd.forcePowersActive & (1 << FP_DRAIN)) )
+	{ // a hold left over from a Drain that ended some other way
+		RP_DrainGrabRelease( self );
+	}
+	grabVictim = RP_DrainGrabFindVictim( self );
+
 //	self->client->ps.forceHandExtend = HANDEXTEND_FORCEPUSH;
 //	self->client->ps.forceHandExtendTime = level.time + 1000;
 	self->client->ps.forceHandExtend = HANDEXTEND_FORCE_HOLD;
@@ -2646,6 +2661,11 @@ void ForceDrain( gentity_t *self )
 	G_Sound( self, CHAN_BODY, G_SoundIndex("sound/weapons/force/drain.wav") );
 
 	WP_ForcePowerStart( self, FP_DRAIN, 500 );
+
+	if ( grabVictim )
+	{
+		RP_DrainGrabBegin( self, grabVictim );
+	}
 }
 
 /*
@@ -2788,6 +2808,11 @@ void ForceDrainDamage( gentity_t *self, gentity_t *traceEnt, vec3_t dir, vec3_t 
 				else if (self->client->ps.fd.forcePowerLevel[FP_DRAIN] == FORCE_LEVEL_5)
 				{
 					dmg = 6;
+				}
+
+				if (RP_DrainGrabHolding(self, traceEnt))
+				{ // GLX_U: [Drain Grab] the grab drains 1 more per tick than the ranged drain; Absorb's clamp below still applies
+					dmg++;
 				}
 
 				if (traceEnt->client)
@@ -3087,6 +3112,258 @@ int ForceShootDrain( gentity_t *self )
 	self->client->ps.fd.forcePowerRegenDebounceTime = level.time + 500;
 
 	return gotOneOrMore;
+}
+
+/*
+GLX_U: [Drain Grab] single player's drain grab, for logged-in characters with Drain 4 or 5. Using Drain
+on someone right in front grabs him by the throat: the caster plays FORCE_DRAIN_GRAB_START/HOLD, the
+victim FORCE_DRAIN_GRABBED, both rooted (BG_InGrappleMove). Every 250 ms ForceDrainDamage() runs on the
+victim (Force first, health only through Drain Shield) with a +1 grab bonus, for the ranged drain's
+5 Force per tick. It ends after 10 s, on the existing Drain stop rules (key released, out of Force,
+hand-hold replaced by a knockdown or push), when the two are pulled apart or the caster leaves the
+ground, or when the victim has Absorb at the Drain level or above; then no new grab for 5 s. Every end
+goes through WP_ForcePowerStop(FP_DRAIN) -> RP_DrainGrabRelease().
+*/
+#define RP_DRAIN_GRAB_DIST		64.0f	// reach, and how far apart they may get (SP's FORCE_DRAIN_DIST)
+#define RP_DRAIN_GRAB_HOLD_DIST	46.0f	// the victim is held this far in front (SP's LOCK_FORCE_DRAIN)
+#define RP_DRAIN_GRAB_MAX_TIME	10000
+#define RP_DRAIN_GRAB_COOLDOWN	5000
+#define RP_DRAIN_GRAB_TICK		250
+#define RP_DRAIN_GRAB_COST		5		// Force per tick, as a ranged tick
+#define RP_DRAIN_GRAB_REFRESH	300		// animation and weapon timers kept at least this high while held
+
+extern qboolean G_CanBeEnemy( gentity_t *self, gentity_t *enemy );
+extern qboolean zyk_is_ally( gentity_t *ent, gentity_t *other );
+
+qboolean RP_DrainGrabHolding( gentity_t *self, gentity_t *victim )
+{
+	return (self && self->client && self->client->drainGrabActive && victim &&
+		self->client->drainGrabIndex == victim->s.number) ? qtrue : qfalse;
+}
+
+static void RP_DrainGrabSaberOff( gentity_t *ent )
+{
+	if (ent->client->ps.weapon == WP_SABER && !ent->client->ps.saberHolstered)
+	{
+		ent->client->ps.saberHolstered = 2;
+		if (ent->client->saber[0].soundOff)
+		{
+			G_Sound(ent, CHAN_AUTO, ent->client->saber[0].soundOff);
+		}
+		if (ent->client->saber[1].soundOff && ent->client->saber[1].model[0])
+		{
+			G_Sound(ent, CHAN_AUTO, ent->client->saber[1].soundOff);
+		}
+	}
+}
+
+// Absorb at the caster's Drain level or above frees the victim (and stops a grab from starting)
+static qboolean RP_DrainGrabAbsorbed( gentity_t *self, gentity_t *victim )
+{
+	return ((victim->client->ps.fd.forcePowersActive & (1 << FP_ABSORB)) &&
+		victim->client->ps.fd.forcePowerLevel[FP_ABSORB] >= self->client->ps.fd.forcePowerLevel[FP_DRAIN]) ? qtrue : qfalse;
+}
+
+// can victim be (still) held by self -- everything but the reach
+static qboolean RP_DrainGrabValidVictim( gentity_t *self, gentity_t *victim )
+{
+	if (!victim || victim == self || !victim->inuse || !victim->client || !victim->takedamage ||
+		victim->health <= 0 || (victim->client->ps.eFlags & EF_DEAD))
+		return qfalse;
+	if (victim->s.eType != ET_PLAYER && victim->s.eType != ET_NPC)
+		return qfalse;
+	if (victim->s.eType == ET_NPC && (victim->s.NPC_class == CLASS_VEHICLE || victim->s.NPC_class == CLASS_ATST ||
+		victim->s.NPC_class == CLASS_GALAKMECH))
+		return qfalse;
+	if (!BG_HasAnimation(victim->localAnimIndex, BOTH_FORCE_DRAIN_GRABBED))
+		return qfalse;	// droids, creatures
+	if (G_PlayerIsDowned(victim) || G_PlayerIsAdminParalyzed(victim))
+		return qfalse;
+	if (victim->client->ps.m_iVehicleNum || victim->client->ps.saberLockTime > level.time ||
+		victim->client->ps.forceHandExtend != HANDEXTEND_NONE || victim->client->grappleState)
+		return qfalse;	// riding, saber-locked, knocked down / pushed / gripped, in a melee grapple
+	if (!ForcePowerUsableOn(self, victim, FP_DRAIN) || !G_CanBeEnemy(self, victim) || zyk_is_ally(self, victim) ||
+		(OnSameTeam(self, victim) && !g_friendlyFire.integer))
+		return qfalse;	// duels, mini-games, ysalamiri, allies, team
+	if (RP_DrainGrabAbsorbed(self, victim))
+		return qfalse;
+	return qtrue;
+}
+
+static void RP_DrainGrabHoldAnim( gentity_t *ent, int anim )
+{
+	if (ent->client->ps.torsoAnim != anim || ent->client->ps.legsAnim != anim)
+	{
+		G_SetAnim(ent, &ent->client->pers.cmd, SETANIM_BOTH, anim, SETANIM_FLAG_OVERRIDE|SETANIM_FLAG_HOLD, 0);
+	}
+	if (ent->client->ps.torsoTimer < RP_DRAIN_GRAB_REFRESH)
+		ent->client->ps.torsoTimer = RP_DRAIN_GRAB_REFRESH;
+	if (ent->client->ps.legsTimer < RP_DRAIN_GRAB_REFRESH)
+		ent->client->ps.legsTimer = RP_DRAIN_GRAB_REFRESH;
+	if (ent->client->ps.weaponTime < RP_DRAIN_GRAB_REFRESH)
+		ent->client->ps.weaponTime = RP_DRAIN_GRAB_REFRESH;	// no attacks, no hand powers, no saber
+}
+
+// keep the victim in front of the caster, facing him (as the melee grapple does, w_saber.c)
+static void RP_DrainGrabPlaceVictim( gentity_t *self, gentity_t *victim )
+{
+	vec3_t yaw, fwd, spot, ang;
+	trace_t tr;
+
+	VectorSet(yaw, 0, self->client->ps.viewangles[YAW], 0);
+	AngleVectors(yaw, fwd, NULL, NULL);
+	VectorMA(self->client->ps.origin, RP_DRAIN_GRAB_HOLD_DIST, fwd, spot);
+
+	trap->Trace(&tr, victim->client->ps.origin, victim->r.mins, victim->r.maxs, spot, victim->s.number, victim->clipmask, qfalse, 0, 0);
+	if (!tr.startsolid && !tr.allsolid && tr.fraction == 1.0f)
+	{
+		G_SetOrigin(victim, spot);
+		VectorCopy(spot, victim->client->ps.origin);
+		trap->LinkEntity((sharedEntity_t *)victim);
+	}
+	VectorClear(victim->client->ps.velocity);
+
+	VectorSubtract(self->client->ps.origin, victim->client->ps.origin, ang);
+	vectoangles(ang, ang);
+	ang[PITCH] = 0;
+	SetClientViewAngle(victim, ang);
+}
+
+// at Drain start: a logged-in Drain 4/5 caster on the ground, someone grabbable within reach straight ahead
+static gentity_t *RP_DrainGrabFindVictim( gentity_t *self )
+{
+	vec3_t start, fwd, end;
+	trace_t tr;
+	gentity_t *victim;
+
+	if (self->client->sess.amrpgmode != 2 || self->client->ps.fd.forcePowerLevel[FP_DRAIN] < FORCE_LEVEL_4)
+		return NULL;
+	if (self->client->drainGrabNextAllowed > level.time || self->client->ps.groundEntityNum == ENTITYNUM_NONE ||
+		self->client->ps.m_iVehicleNum || self->client->grappleState ||
+		BG_InGrappleMove(self->client->ps.torsoAnim) || BG_InGrappleMove(self->client->ps.legsAnim))
+		return NULL;
+
+	VectorCopy(self->client->ps.origin, start);
+	start[2] += self->client->ps.viewheight;
+	AngleVectors(self->client->ps.viewangles, fwd, NULL, NULL);
+	VectorMA(start, RP_DRAIN_GRAB_DIST, fwd, end);
+	trap->Trace(&tr, start, vec3_origin, vec3_origin, end, self->s.number, MASK_SHOT, qfalse, 0, 0);
+	if (tr.startsolid || tr.allsolid || tr.fraction == 1.0f || tr.entityNum >= ENTITYNUM_WORLD)
+		return NULL;
+
+	victim = &g_entities[tr.entityNum];
+	if (!RP_DrainGrabValidVictim(self, victim) || victim->client->ps.groundEntityNum == ENTITYNUM_NONE ||
+		BG_InGrappleMove(victim->client->ps.torsoAnim) || BG_InGrappleMove(victim->client->ps.legsAnim))
+		return NULL;
+
+	return victim;
+}
+
+static void RP_DrainGrabBegin( gentity_t *self, gentity_t *victim )
+{
+	self->client->drainGrabActive = qtrue;
+	self->client->drainGrabIndex = victim->s.number;
+	self->client->drainGrabStart = level.time;
+	self->client->drainGrabTick = level.time + RP_DRAIN_GRAB_TICK;
+	self->client->drainGrabTicks = 0;
+
+	G_SetAnim(self, &self->client->pers.cmd, SETANIM_BOTH, BOTH_FORCE_DRAIN_GRAB_START, SETANIM_FLAG_OVERRIDE|SETANIM_FLAG_HOLD, 0);
+	if (self->client->ps.weaponTime < RP_DRAIN_GRAB_REFRESH)
+		self->client->ps.weaponTime = RP_DRAIN_GRAB_REFRESH;
+	VectorClear(self->client->ps.velocity);
+	RP_DrainGrabSaberOff(self);
+
+	RP_DrainGrabHoldAnim(victim, BOTH_FORCE_DRAIN_GRABBED);
+	RP_DrainGrabSaberOff(victim);
+	RP_DrainGrabPlaceVictim(self, victim);
+	G_EntitySound(victim, CHAN_VOICE, G_SoundIndex(va("*choke%d.wav", Q_irand(1, 3))));
+}
+
+// every way Drain stops comes here (WP_ForcePowerStop); harmless when no grab is held
+void RP_DrainGrabRelease( gentity_t *self )
+{
+	gentity_t *victim;
+
+	if (!self || !self->client || !self->client->drainGrabActive)
+		return;
+
+	self->client->drainGrabActive = qfalse;
+	self->client->drainGrabNextAllowed = level.time + RP_DRAIN_GRAB_COOLDOWN;
+
+	victim = &g_entities[self->client->drainGrabIndex];
+	if (victim->inuse && victim->client && victim->health > 0)
+	{ // let him go at once: out of the held animation (which roots him, BG_InGrappleMove) and the busy weapon
+		if (victim->client->ps.torsoAnim == BOTH_FORCE_DRAIN_GRABBED || victim->client->ps.legsAnim == BOTH_FORCE_DRAIN_GRABBED)
+		{
+			G_SetAnim(victim, &victim->client->pers.cmd, SETANIM_BOTH, BOTH_STAND1, SETANIM_FLAG_OVERRIDE, 0);
+			victim->client->ps.torsoTimer = victim->client->ps.legsTimer = 0;
+		}
+		victim->client->ps.weaponTime = 0;
+	}
+
+	if (self->health > 0 && (self->client->ps.torsoAnim == BOTH_FORCE_DRAIN_GRAB_START ||
+		self->client->ps.torsoAnim == BOTH_FORCE_DRAIN_GRAB_HOLD))
+	{
+		G_SetAnim(self, &self->client->pers.cmd, SETANIM_BOTH, BOTH_FORCE_DRAIN_GRAB_END, SETANIM_FLAG_OVERRIDE|SETANIM_FLAG_HOLD, 0);
+		if (self->client->ps.torsoAnim == BOTH_FORCE_DRAIN_GRAB_END)
+			self->client->ps.weaponTime = self->client->ps.torsoTimer;
+	}
+}
+
+// from the FP_DRAIN run case, every frame while a grab is held
+static void RP_DrainGrabUpdate( gentity_t *self )
+{
+	gentity_t *victim = &g_entities[self->client->drainGrabIndex];
+	vec3_t d;
+	int myAnim = self->client->ps.torsoAnim;
+
+	VectorSubtract(victim->client ? victim->client->ps.origin : victim->r.currentOrigin, self->client->ps.origin, d);
+
+	if (level.time - self->client->drainGrabStart >= RP_DRAIN_GRAB_MAX_TIME ||
+		self->health <= 0 || self->client->ps.groundEntityNum == ENTITYNUM_NONE ||
+		(myAnim != BOTH_FORCE_DRAIN_GRAB_START && myAnim != BOTH_FORCE_DRAIN_GRAB_HOLD) ||	// knocked or pushed out of it
+		!RP_DrainGrabValidVictim(self, victim) ||
+		VectorLength(d) > RP_DRAIN_GRAB_DIST || fabs(d[2]) > 16.0f)	// pulled apart, or lifted
+	{
+		WP_ForcePowerStop(self, FP_DRAIN);	// -> RP_DrainGrabRelease()
+		return;
+	}
+
+	// the caster: reach, then hold
+	if (level.time - self->client->drainGrabStart >= BG_AnimLength(self->localAnimIndex, (animNumber_t)BOTH_FORCE_DRAIN_GRAB_START) ||
+		myAnim == BOTH_FORCE_DRAIN_GRAB_HOLD)
+	{
+		RP_DrainGrabHoldAnim(self, BOTH_FORCE_DRAIN_GRAB_HOLD);
+	}
+	else if (self->client->ps.weaponTime < RP_DRAIN_GRAB_REFRESH)
+	{
+		self->client->ps.weaponTime = RP_DRAIN_GRAB_REFRESH;
+	}
+	RP_DrainGrabSaberOff(self);
+
+	// the victim
+	RP_DrainGrabHoldAnim(victim, BOTH_FORCE_DRAIN_GRABBED);
+	RP_DrainGrabSaberOff(victim);
+	RP_DrainGrabPlaceVictim(self, victim);
+
+	if (level.time >= self->client->drainGrabTick)
+	{
+		vec3_t fwd;
+
+		self->client->drainGrabTick = level.time + RP_DRAIN_GRAB_TICK;
+		self->client->drainGrabTicks++;
+
+		AngleVectors(self->client->ps.viewangles, fwd, NULL, NULL);
+		RP_AttackBreaksCloak(self);
+		ForceDrainDamage(self, victim, fwd, victim->client->ps.origin);	// the grab bonus is applied in there
+		BG_ForcePowerDrain(&self->client->ps, FP_DRAIN, RP_DRAIN_GRAB_COST);
+		self->client->ps.fd.forcePowerRegenDebounceTime = level.time + 500;
+
+		if (!(self->client->drainGrabTicks % 4) && victim->health > 0)
+		{
+			G_EntitySound(victim, CHAN_VOICE, G_SoundIndex(va("*choke%d.wav", Q_irand(1, 3))));
+		}
+	}
 }
 
 void ForceJumpCharge( gentity_t *self, usercmd_t *ucmd )
@@ -4974,6 +5251,8 @@ void WP_ForcePowerStop( gentity_t *self, forcePowers_t forcePower )
 		}
 		break;
 	case FP_DRAIN:
+		RP_DrainGrabRelease( self );	// GLX_U: [Drain Grab] drop whoever is held
+
 		if ( self->client->ps.fd.forcePowerLevel[FP_DRAIN] < FORCE_LEVEL_2 )
 		{//don't do it again for 3 seconds, minimum...
 			self->client->ps.fd.forcePowerDebounce[FP_DRAIN] = level.time + 3000;
@@ -5556,6 +5835,10 @@ static void WP_ForcePowerRun( gentity_t *self, forcePowers_t forcePower, usercmd
 			self->client->ps.fd.forcePower < 25)
 		{
 			WP_ForcePowerStop( self, forcePower );
+		}
+		else if ( self->client->drainGrabActive )
+		{ // GLX_U: [Drain Grab] holding someone: his own ticks, no cone
+			RP_DrainGrabUpdate( self );
 		}
 		else
 		{

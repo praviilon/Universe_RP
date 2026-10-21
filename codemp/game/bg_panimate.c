@@ -754,12 +754,15 @@ int BG_InGrappleMove(int anim)
 	case BOTH_KYLE_PA_1:
 	case BOTH_KYLE_PA_2:
 	case BOTH_KYLE_PA_3: // GLX_U: [Melee] the head lock (as JA++)
+	case BOTH_FORCE_DRAIN_GRAB_START: // GLX_U: [Drain Grab] holding someone by the throat (the set TaystJK predicts for JA+)
+	case BOTH_FORCE_DRAIN_GRAB_HOLD:
 		return 2; //beating the shit out of someone
 	case BOTH_PLAYER_PA_1:
 	case BOTH_PLAYER_PA_2:
 	case BOTH_PLAYER_PA_FLY:
 	case BOTH_PLAYER_PA_3:
 	case BOTH_PLAYER_PA_3_FLY:
+	case BOTH_FORCE_DRAIN_GRABBED:
 		return 3; //getting the shit beaten out of you
 		break;
 	}
