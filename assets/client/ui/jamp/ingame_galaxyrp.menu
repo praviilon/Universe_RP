@@ -6614,20 +6614,40 @@
 		{
 			name				cameraFov
 			group				cameraControls
-			type				ITEM_TYPE_SLIDER
+			type				ITEM_TYPE_INTSLIDER
 			text				"FOV                       "
-			cvarfloat			"cg_fov" 80 10 130
-			rect				180 50 200 25
+			cvarint			"cg_fov" 80 10 130
+			rect				180 45 200 25
 	   		textalign			ITEM_ALIGN_LEFT
 			font 				4
 			textscale 			1
 			forecolor			.615 .615 .956 1
 			visible				0
-			descText			""
+			descText			"Field of view"
 			action 
 			{ 
 				play			"sound/interface/button1"
 			}
+		}
+
+		itemDef 
+		{
+			name				cameraFovField
+			group				cameraControls
+			type				ITEM_TYPE_EDITFIELD
+			style				WINDOW_STYLE_FILLED
+			text				" "
+			cvar				"cg_fov"
+			maxchars			6
+			maxPaintChars		4
+			rect				390 45 40 25
+			textalign			ITEM_ALIGN_LEFT
+			font 				4
+			textscale 			1
+			forecolor			.615 .615 .956 1
+			backcolor			0 0 0 .6
+			visible				0
+			descText			"Type a value"
 		}
 
 		itemDef 
@@ -6640,7 +6660,7 @@
 			font				3
 			textscale			.5
 			style				WINDOW_STYLE_FILLED
-			rect				390 50 90 25
+			rect				436 45 90 25
 			textalign			ITEM_ALIGN_LEFT
 			forecolor			1 .682 0 1
 			visible				0
@@ -6653,22 +6673,103 @@
 
 		itemDef 
 		{
-			name				cameraRange
+			name				cameraGunFov
 			group				cameraControls
-			type				ITEM_TYPE_SLIDER
-			text				"Range                   "
-			cvarfloat			"cg_thirdpersonrange" 80 20 960
-			rect				180 80 200 25
+			type				ITEM_TYPE_INTSLIDER
+			text				"Gun FOV              "
+			cvarint			"cg_fovViewmodel" 0 0 130
+			rect				180 73 200 25
 	   		textalign			ITEM_ALIGN_LEFT
 			font 				4
 			textscale 			1
-			forecolor		.615 .615 .956 1
-			visible			0
-			descText			""
+			forecolor			.615 .615 .956 1
+			visible				0
+			descText			"Field of view of your weapon. 0 = same as FOV"
 			action 
 			{ 
 				play			"sound/interface/button1"
 			}
+		}
+
+		itemDef 
+		{
+			name				cameraGunFovField
+			group				cameraControls
+			type				ITEM_TYPE_EDITFIELD
+			style				WINDOW_STYLE_FILLED
+			text				" "
+			cvar				"cg_fovViewmodel"
+			maxchars			6
+			maxPaintChars		4
+			rect				390 73 40 25
+			textalign			ITEM_ALIGN_LEFT
+			font 				4
+			textscale 			1
+			forecolor			.615 .615 .956 1
+			backcolor			0 0 0 .6
+			visible				0
+			descText			"Type a value"
+		}
+
+		itemDef 
+		{
+			name				cameraGunFovDefault
+			group				cameraControls
+			text				"Default"
+			descText			"Reset Gun FOV value to default"
+			type				1
+			font				3
+			textscale			.5
+			style				WINDOW_STYLE_FILLED
+			rect				436 73 90 25
+			textalign			ITEM_ALIGN_LEFT
+			forecolor			1 .682 0 1
+			visible				0
+			action 
+			{ 
+				exec			"cg_fovViewmodel 0" ;
+				play			"sound/interface/button1.wav" ;
+			}  	  
+		}
+
+		itemDef 
+		{
+			name				cameraRange
+			group				cameraControls
+			type				ITEM_TYPE_INTSLIDER
+			text				"Range                   "
+			cvarint			"cg_thirdpersonrange" 80 20 960
+			rect				180 101 200 25
+	   		textalign			ITEM_ALIGN_LEFT
+			font 				4
+			textscale 			1
+			forecolor			.615 .615 .956 1
+			visible				0
+			descText			"Third person: camera distance"
+			action 
+			{ 
+				play			"sound/interface/button1"
+			}
+		}
+
+		itemDef 
+		{
+			name				cameraRangeField
+			group				cameraControls
+			type				ITEM_TYPE_EDITFIELD
+			style				WINDOW_STYLE_FILLED
+			text				" "
+			cvar				"cg_thirdpersonrange"
+			maxchars			6
+			maxPaintChars		4
+			rect				390 101 40 25
+			textalign			ITEM_ALIGN_LEFT
+			font 				4
+			textscale 			1
+			forecolor			.615 .615 .956 1
+			backcolor			0 0 0 .6
+			visible				0
+			descText			"Type a value"
 		}
 
 		itemDef 
@@ -6681,7 +6782,7 @@
 			font				3
 			textscale			.5
 			style				WINDOW_STYLE_FILLED
-			rect				390 80 90 25
+			rect				436 101 90 25
 			textalign			ITEM_ALIGN_LEFT
 			forecolor			1 .682 0 1
 			visible				0
@@ -6696,20 +6797,40 @@
 		{
 			name				cameraAngle
 			group				cameraControls
-			type				ITEM_TYPE_SLIDER
+			type				ITEM_TYPE_INTSLIDER
 			text				"Angle                    "
-			cvarfloat			"cg_thirdpersonangle" 0 0 360
-			rect				180 110 200 25
+			cvarint			"cg_thirdpersonangle" 0 -180 180
+			rect				180 129 200 25
 	   		textalign			ITEM_ALIGN_LEFT
 			font 				4
 			textscale 			1
-			forecolor		.615 .615 .956 1
-			visible			0
-			descText			""
+			forecolor			.615 .615 .956 1
+			visible				0
+			descText			"Third person: camera angle around you"
 			action 
 			{ 
 				play			"sound/interface/button1"
 			}
+		}
+
+		itemDef 
+		{
+			name				cameraAngleField
+			group				cameraControls
+			type				ITEM_TYPE_EDITFIELD
+			style				WINDOW_STYLE_FILLED
+			text				" "
+			cvar				"cg_thirdpersonangle"
+			maxchars			6
+			maxPaintChars		4
+			rect				390 129 40 25
+			textalign			ITEM_ALIGN_LEFT
+			font 				4
+			textscale 			1
+			forecolor			.615 .615 .956 1
+			backcolor			0 0 0 .6
+			visible				0
+			descText			"Type a value"
 		}
 
 		itemDef 
@@ -6722,7 +6843,7 @@
 			font				3
 			textscale			.5
 			style				WINDOW_STYLE_FILLED
-			rect				390 110 90 25
+			rect				436 129 90 25
 			textalign			ITEM_ALIGN_LEFT
 			forecolor			1 .682 0 1
 			visible				0
@@ -6735,22 +6856,42 @@
 
 		itemDef 
 		{
-			name				cameraPitchOffset
+			name				cameraPitch
 			group				cameraControls
-			type				ITEM_TYPE_SLIDER
+			type				ITEM_TYPE_INTSLIDER
 			text				"Pitch Offset          "
-			cvarfloat			"cg_thirdpersonpitchoffset" 0 -180 180
-			rect				180 140 200 25
+			cvarint			"cg_thirdpersonpitchoffset" 0 -90 90
+			rect				180 157 200 25
 	   		textalign			ITEM_ALIGN_LEFT
 			font 				4
 			textscale 			1
-			forecolor		.615 .615 .956 1
-			visible			0
-			descText			""
+			forecolor			.615 .615 .956 1
+			visible				0
+			descText			"Third person: camera tilt up or down"
 			action 
 			{ 
 				play			"sound/interface/button1"
 			}
+		}
+
+		itemDef 
+		{
+			name				cameraPitchField
+			group				cameraControls
+			type				ITEM_TYPE_EDITFIELD
+			style				WINDOW_STYLE_FILLED
+			text				" "
+			cvar				"cg_thirdpersonpitchoffset"
+			maxchars			6
+			maxPaintChars		4
+			rect				390 157 40 25
+			textalign			ITEM_ALIGN_LEFT
+			font 				4
+			textscale 			1
+			forecolor			.615 .615 .956 1
+			backcolor			0 0 0 .6
+			visible				0
+			descText			"Type a value"
 		}
 
 		itemDef 
@@ -6763,7 +6904,7 @@
 			font				3
 			textscale			.5
 			style				WINDOW_STYLE_FILLED
-			rect				390 140 90 25
+			rect				436 157 90 25
 			textalign			ITEM_ALIGN_LEFT
 			forecolor			1 .682 0 1
 			visible				0
@@ -6776,22 +6917,42 @@
 
 		itemDef 
 		{
-			name				cameraHorizontalOffset
+			name				cameraHorz
 			group				cameraControls
-			type				ITEM_TYPE_SLIDER
+			type				ITEM_TYPE_INTSLIDER
 			text				"Horizontal Offset"
-			cvarfloat			"cg_thirdpersonhorzoffset" 0 -35 35
-			rect				180 170 200 25
+			cvarint			"cg_thirdpersonhorzoffset" 0 -35 35
+			rect				180 185 200 25
 	   		textalign			ITEM_ALIGN_LEFT
 			font 				4
 			textscale 			1
-			forecolor		.615 .615 .956 1
-			visible			0
-			descText			""
+			forecolor			.615 .615 .956 1
+			visible				0
+			descText			"Third person: camera shift left or right"
 			action 
 			{ 
 				play			"sound/interface/button1"
 			}
+		}
+
+		itemDef 
+		{
+			name				cameraHorzField
+			group				cameraControls
+			type				ITEM_TYPE_EDITFIELD
+			style				WINDOW_STYLE_FILLED
+			text				" "
+			cvar				"cg_thirdpersonhorzoffset"
+			maxchars			6
+			maxPaintChars		4
+			rect				390 185 40 25
+			textalign			ITEM_ALIGN_LEFT
+			font 				4
+			textscale 			1
+			forecolor			.615 .615 .956 1
+			backcolor			0 0 0 .6
+			visible				0
+			descText			"Type a value"
 		}
 
 		itemDef 
@@ -6804,7 +6965,7 @@
 			font				3
 			textscale			.5
 			style				WINDOW_STYLE_FILLED
-			rect				390 170 90 25
+			rect				436 185 90 25
 			textalign			ITEM_ALIGN_LEFT
 			forecolor			1 .682 0 1
 			visible				0
@@ -6817,22 +6978,42 @@
 
 		itemDef 
 		{
-			name				cameraVerticalOffset
+			name				cameraVert
 			group				cameraControls
-			type				ITEM_TYPE_SLIDER
+			type				ITEM_TYPE_INTSLIDER
 			text				"Vertical Offset     "
-			cvarfloat			"cg_thirdpersonvertoffset" 16 -64 128
-			rect				180 200 200 25
+			cvarint			"cg_thirdpersonvertoffset" 16 -64 128
+			rect				180 213 200 25
 	   		textalign			ITEM_ALIGN_LEFT
 			font 				4
 			textscale 			1
-			forecolor		.615 .615 .956 1
-			visible			0
-			descText			""
+			forecolor			.615 .615 .956 1
+			visible				0
+			descText			"Third person: camera height"
 			action 
 			{ 
 				play			"sound/interface/button1"
 			}
+		}
+
+		itemDef 
+		{
+			name				cameraVertField
+			group				cameraControls
+			type				ITEM_TYPE_EDITFIELD
+			style				WINDOW_STYLE_FILLED
+			text				" "
+			cvar				"cg_thirdpersonvertoffset"
+			maxchars			6
+			maxPaintChars		4
+			rect				390 213 40 25
+			textalign			ITEM_ALIGN_LEFT
+			font 				4
+			textscale 			1
+			forecolor			.615 .615 .956 1
+			backcolor			0 0 0 .6
+			visible				0
+			descText			"Type a value"
 		}
 
 		itemDef 
@@ -6845,7 +7026,7 @@
 			font				3
 			textscale			.5
 			style				WINDOW_STYLE_FILLED
-			rect				390 200 90 25
+			rect				436 213 90 25
 			textalign			ITEM_ALIGN_LEFT
 			forecolor			1 .682 0 1
 			visible				0
@@ -6862,18 +7043,38 @@
 			group				cameraControls
 			type				ITEM_TYPE_SLIDER
 			text				"Camera Damp      "
-			cvarfloat			"cg_thirdpersoncameradamp" 0.3 0 1
-			rect				180 230 200 25
+			cvarfloat			"cg_thirdpersoncameradamp" 0.3 0.05 1
+			rect				180 241 200 25
 	   		textalign			ITEM_ALIGN_LEFT
 			font 				4
 			textscale 			1
-			forecolor		.615 .615 .956 1
-			visible			0
-			descText			""
+			forecolor			.615 .615 .956 1
+			visible				0
+			descText			"Third person: how fast the camera catches up with you. 1 = instantly"
 			action 
 			{ 
 				play			"sound/interface/button1"
 			}
+		}
+
+		itemDef 
+		{
+			name				cameraDampField
+			group				cameraControls
+			type				ITEM_TYPE_EDITFIELD
+			style				WINDOW_STYLE_FILLED
+			text				" "
+			cvar				"cg_thirdpersoncameradamp"
+			maxchars			6
+			maxPaintChars		4
+			rect				390 241 40 25
+			textalign			ITEM_ALIGN_LEFT
+			font 				4
+			textscale 			1
+			forecolor			.615 .615 .956 1
+			backcolor			0 0 0 .6
+			visible				0
+			descText			"Type a value"
 		}
 
 		itemDef 
@@ -6886,15 +7087,139 @@
 			font				3
 			textscale			.5
 			style				WINDOW_STYLE_FILLED
-			rect				390 230 90 25
+			rect				436 241 90 25
 			textalign			ITEM_ALIGN_LEFT
 			forecolor			1 .682 0 1
 			visible				0
 			action 
-			{
+			{ 
 				exec			"cg_thirdpersoncameradamp 0.3" ;
 				play			"sound/interface/button1.wav" ;
 			}  	  
+		}
+
+		itemDef 
+		{
+			name				cameraTargetDamp
+			group				cameraControls
+			type				ITEM_TYPE_SLIDER
+			text				"Target Damp        "
+			cvarfloat			"cg_thirdpersontargetdamp" 0.5 0.05 1
+			rect				180 269 200 25
+	   		textalign			ITEM_ALIGN_LEFT
+			font 				4
+			textscale 			1
+			forecolor			.615 .615 .956 1
+			visible				0
+			descText			"Third person: how fast the camera turns to where you aim. 1 = instantly"
+			action 
+			{ 
+				play			"sound/interface/button1"
+			}
+		}
+
+		itemDef 
+		{
+			name				cameraTargetDampField
+			group				cameraControls
+			type				ITEM_TYPE_EDITFIELD
+			style				WINDOW_STYLE_FILLED
+			text				" "
+			cvar				"cg_thirdpersontargetdamp"
+			maxchars			6
+			maxPaintChars		4
+			rect				390 269 40 25
+			textalign			ITEM_ALIGN_LEFT
+			font 				4
+			textscale 			1
+			forecolor			.615 .615 .956 1
+			backcolor			0 0 0 .6
+			visible				0
+			descText			"Type a value"
+		}
+
+		itemDef 
+		{
+			name				cameraTargetDampDefault
+			group				cameraControls
+			text				"Default"
+			descText			"Reset Target Damp value to default"
+			type				1
+			font				3
+			textscale			.5
+			style				WINDOW_STYLE_FILLED
+			rect				436 269 90 25
+			textalign			ITEM_ALIGN_LEFT
+			forecolor			1 .682 0 1
+			visible				0
+			action 
+			{ 
+				exec			"cg_thirdpersontargetdamp 0.5" ;
+				play			"sound/interface/button1.wav" ;
+			}  	  
+		}
+
+		itemDef 
+		{
+			name				cameraThirdPerson
+			group				cameraControls
+			type				ITEM_TYPE_MULTI
+			text				"Third Person:"
+			cvar				"cg_thirdPerson"
+			cvarFloatList		{  @MENUS_OFF 0 @MENUS_ON 1 }
+			rect				180 305 180 25
+	   		textalign			ITEM_ALIGN_LEFT
+			font 				4
+			textscale 			1
+			forecolor			.615 .615 .956 1
+			visible				0
+			descText			"Third person view"
+			action 
+			{ 
+				play			"sound/interface/button1"
+			}
+		}
+
+		itemDef 
+		{
+			name				cameraHud
+			group				cameraControls
+			type				ITEM_TYPE_MULTI
+			text				"HUD:"
+			cvar				"cg_draw2D"
+			cvarFloatList		{  @MENUS_OFF 0 @MENUS_ON 1 }
+			rect				370 305 180 25
+	   		textalign			ITEM_ALIGN_LEFT
+			font 				4
+			textscale 			1
+			forecolor			.615 .615 .956 1
+			visible				0
+			descText			"Show the HUD"
+			action 
+			{ 
+				play			"sound/interface/button1"
+			}
+		}
+
+		itemDef 
+		{
+			name				cameraFpls
+			group				cameraControls
+			type				ITEM_TYPE_MULTI
+			text				"First-Person Saber:"
+			cvar				"cg_fpls"
+			cvarFloatList		{  @MENUS_OFF 0 @MENUS_ON 1 }
+			rect				180 335 180 25
+	   		textalign			ITEM_ALIGN_LEFT
+			font 				4
+			textscale 			1
+			forecolor			.615 .615 .956 1
+			visible				0
+			descText			"Show your lightsaber in first person view"
+			action 
+			{ 
+				play			"sound/interface/button1"
+			}
 		}
 
 		itemDef 
@@ -6907,19 +7232,21 @@
 			font				3
 			textscale			.7
 			style				WINDOW_STYLE_FILLED
-			rect				180 280 90 30
+			rect				370 335 90 30
 			textalign			ITEM_ALIGN_LEFT
 			forecolor			1 .682 0 1
 			visible				0
 			action 
 			{ 
 				exec			"cg_fov 80" ;
+				exec			"cg_fovViewmodel 0" ;
 				exec			"cg_thirdpersonrange 80" ;
 				exec			"cg_thirdpersonangle 0" ;
 				exec			"cg_thirdpersonpitchoffset 0" ;
 				exec			"cg_thirdpersonhorzoffset 0" ;
 				exec			"cg_thirdpersonvertoffset 16" ;
 				exec			"cg_thirdpersoncameradamp 0.3" ;
+				exec			"cg_thirdpersontargetdamp 0.5" ;
 				play			"sound/interface/button1.wav" ;
 			}  	  
 		}

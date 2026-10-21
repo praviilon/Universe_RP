@@ -3898,6 +3898,24 @@ static void Scroll_ListBox_ThumbFunc(void *p) {
 	}
 }
 
+// GLX_U: [UI] a slider's new value into its cvar, kept within the slider's range: a whole number for
+// ITEM_TYPE_INTSLIDER, dragged or clicked alike (a click on the bar wrote "%f", e.g. "137.500000",
+// and could land half a thumb outside the range)
+static void Item_Slider_SetCvar( itemDef_t *item, float value )
+{
+	const editFieldDef_t *editDef = item->typeData.edit;
+
+	if ( editDef ) {
+		if ( value < editDef->minVal ) value = editDef->minVal;
+		if ( value > editDef->maxVal ) value = editDef->maxVal;
+	}
+
+	if ( item->type == ITEM_TYPE_INTSLIDER )
+		DC->setCVar( item->cvar, va( "%i", (int)floorf( value + 0.5f ) ) );
+	else
+		DC->setCVar( item->cvar, va( "%f", value ) );
+}
+
 static void Scroll_Slider_ThumbFunc(void *p) {
 	float x, value, cursorx;
 	scrollInfo_t *si = (scrollInfo_t*)p;
@@ -3922,11 +3940,8 @@ static void Scroll_Slider_ThumbFunc(void *p) {
 	value += editDef->minVal;
 	// GalaxyRP fix: [UI] round to a whole number when dragging an ITEM_TYPE_INTSLIDER (e.g. the
 	// RGB saber color sliders in ingame_saber.menu, which are bound to 0-255 integer cvars) --
-	// ported from the TaystJK engine's own ui_shared.c.
-	if (si->item->type == ITEM_TYPE_INTSLIDER)
-		DC->setCVar(si->item->cvar, va("%i", (int)value));
-	else
-		DC->setCVar(si->item->cvar, va("%f", value));
+	// ported from the TaystJK engine's own ui_shared.c. GLX_U: [UI] now Item_Slider_SetCvar()
+	Item_Slider_SetCvar(si->item, value);
 }
 
 void Item_StartCapture(itemDef_t *item, int key)
@@ -4039,7 +4054,7 @@ qboolean Item_Slider_HandleKey(itemDef_t *item, int key, qboolean down) {
 					// vm fuckage
 					// value = (((float)(DC->cursorx - x)/ SLIDER_WIDTH) * (editDef->maxVal - editDef->minVal));
 					value += editDef->minVal;
-					DC->setCVar(item->cvar, va("%f", value));
+					Item_Slider_SetCvar(item, value);	// GLX_U: [UI] was va("%f", value)
 					return qtrue;
 				}
 			}
