@@ -11,6 +11,7 @@
 - Hats and Capes for players, persisted per character. Use `/cosmetics` command to set them. `rp_allow_cosmetics` server cvar: `0` switches hats and capes off for everyone. Each character's choice is still saved and comes back when it is switched on again.
 - AFK: after `rp_afk_time` seconds without input (default 120, `0` switches it off), a player gets the protection bubble (no damage from players or NPCs) and a comlink animation, until they move, look around or press a key. `/away` does the same after 20 seconds without input, so it can't be used to dodge a hit. `/players` marks AFK players.
 - Extras: **GLM Props** menu, under existing MD3 Props: browse the server's `.glm` models (starting in `models/players`), preview one, set its animation, scale and other properties and spawn as a `misc_model_ghoul`.
+- HD HUD elements: upscaled weapon, item, ammo and powerup icons, CTF flag icons, crosshairs, and the disruptor and binocular zoom views replace the low-resolution vanilla ones.
 - Melee head lock: strafe left or right + Attack + Alt Attack grabs an opponent in a head lock: three chokes, then a push that throws them to the ground (50 damage in all, scaled by the Melee skill like every melee hit). Forward/back + both buttons is still the punch grapple, and no movement key the knee throw.
 
 ### Changed
