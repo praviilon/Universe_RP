@@ -3957,16 +3957,8 @@ void ClientThink_real( gentity_t *ent ) {
 				ent->client->ps.duelTime = 0;
 
 				// zyk: this will guarantee that the player has full health at start of the duel
-				ent->health = ent->client->ps.stats[STAT_MAX_HEALTH];
-				// GalaxyRP fix: [Duel] this used to apply the RPG Max Shield formula to everyone, with no
-				// amrpgmode check. skill_levels[] and max_rpg_health are never reset on logout, so a
-				// logged-out duellist got either 0 (never logged in on this connection) or a stale value
-				// carried over from whichever character they last played -- a private duel's starting
-				// shield depended on account history rather than on any setting. Gated now, and reading
-				// pers.max_rpg_shield rather than recomputing the formula inline: set_max_shield() in
-				// g_cmds.c keeps that field current on spawn, on level change and on every Max Shield
-				// /skillup, and computes exactly this expression.
-				ent->client->ps.stats[STAT_ARMOR] = (ent->client->sess.amrpgmode == 2) ? ent->client->pers.max_rpg_shield : rp_starting_shield.integer;
+				// GLX_U: [Duel] and full shield, each to their own maximum -- see G_DuelRefill()
+				G_DuelRefill(ent);
 			}
 
 			if (duelAgainst
@@ -3992,11 +3984,8 @@ void ClientThink_real( gentity_t *ent ) {
 				duelAgainst->client->ps.duelTime = 0;
 
 				// zyk: this will guarantee that the player has full health at start of the duel TEST
-				duelAgainst->health = duelAgainst->client->ps.stats[STAT_MAX_HEALTH];
-				// GalaxyRP fix: [Duel] the opponent's side of the same fix applied to the challenger just
-				// above -- see that comment for why the ungated formula was wrong for a logged-out
-				// duellist. Both sides must stay identical or the two duellists enter on different rules.
-				duelAgainst->client->ps.stats[STAT_ARMOR] = (duelAgainst->client->sess.amrpgmode == 2) ? duelAgainst->client->pers.max_rpg_shield : rp_starting_shield.integer;
+				// GLX_U: [Duel] the opponent's side of the same refill, so both enter on the same rule
+				G_DuelRefill(duelAgainst);
 			}
 		}
 		else
@@ -4028,14 +4017,9 @@ void ClientThink_real( gentity_t *ent ) {
 			//Winner gets full health.. providing he's still alive
 			if (ent->health > 0 && ent->client->ps.stats[STAT_HEALTH] > 0)
 			{
-				ent->client->ps.stats[STAT_HEALTH] = ent->health = ent->client->ps.stats[STAT_MAX_HEALTH];
-				// GalaxyRP fix: [Duel] rp_starting_shield is the shield a LOGGED-OUT player spawns with;
-				// an RPG character's is pers.max_rpg_shield, from their Max Shield skill. This line
-				// handed the logged-out value to everyone, so an RPG duellist who WON came out of the
-				// duel with their shield reset to that cvar (0 in the shipped config) instead of the
-				// full shield the line above gives them in health -- winning a duel strictly cost them
-				// shield. Mirrors the two duel-start sites earlier in this function.
-				ent->client->ps.stats[STAT_ARMOR] = (ent->client->sess.amrpgmode == 2) ? ent->client->pers.max_rpg_shield : rp_starting_shield.integer;
+				// GLX_U: [Duel] full health and shield, to the winner's own maximum -- the same refill
+				// the duel started with (G_DuelRefill). A logged-out winner used to get rp_starting_shield.
+				G_DuelRefill(ent);
 
 				if (g_spawnInvulnerability.integer)
 				{
@@ -5448,23 +5432,50 @@ Matching its shape rather than its reachable cases is the cheap way to keep "gra
 "actually gives something" exact complements whatever amrpgmode turns out to hold.
 ==============
 */
+// GLX_U: [Duel] the shield ceiling itself, shared by G_PublishMaxArmor() and G_DuelRefill() so a
+// duel's refill and the pickup check can never disagree. Same three arms as before.
+static int G_MaxArmor( const gentity_t *ent )
+{
+	if ( ent->client->sess.amrpgmode == 2 )
+	{
+		return ent->client->pers.max_rpg_shield;
+	}
+	else if ( ent->client->sess.amrpgmode < 2 )
+	{
+		return ent->client->ps.stats[STAT_MAX_HEALTH];
+	}
+
+	return 0;
+}
+
 void G_PublishMaxArmor( gentity_t *ent )
 {
 	if ( ent->client )
 	{
-		if ( ent->client->sess.amrpgmode == 2 )
-		{
-			ent->client->ps.stats[STAT_MAX_ARMOR] = ent->client->pers.max_rpg_shield;
-		}
-		else if ( ent->client->sess.amrpgmode < 2 )
-		{
-			ent->client->ps.stats[STAT_MAX_ARMOR] = ent->client->ps.stats[STAT_MAX_HEALTH];
-		}
-		else
-		{
-			ent->client->ps.stats[STAT_MAX_ARMOR] = 0;
-		}
+		ent->client->ps.stats[STAT_MAX_ARMOR] = G_MaxArmor( ent );
 	}
+}
+
+/*
+==============
+G_DuelRefill
+
+GLX_U: [Duel] a private duellist back to their own maximum: STAT_MAX_HEALTH (a character's max health,
+the ordinary cap logged out) and the shield ceiling above (a character's Max Shield, the ordinary cap
+logged out). Used on accept, when the sabers come out, and for the winner at the end -- the accept
+used to set a flat 100/100, so a character showed 100 health for the two-second countdown and then
+jumped to their real maximum, and a logged-out player ended up with rp_starting_shield instead.
+==============
+*/
+void G_DuelRefill( gentity_t *ent )
+{
+	if ( !ent || !ent->client )
+	{
+		return;
+	}
+
+	ent->client->ps.stats[STAT_HEALTH] = ent->health = ent->client->ps.stats[STAT_MAX_HEALTH];
+	ent->client->ps.stats[STAT_ARMOR] = G_MaxArmor( ent );
 }
 
 /*

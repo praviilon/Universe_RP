@@ -10906,11 +10906,9 @@ void Cmd_EngageDuel_f(gentity_t *ent, int duel_type)
 			}
 
 			// zyk: reset hp and shield of both players
-			ent->health = 100;
-			ent->client->ps.stats[STAT_ARMOR] = 100;
-
-			challenged->health = 100;
-			challenged->client->ps.stats[STAT_ARMOR] = 100;
+			// GLX_U: [Duel] each to their own maximum, not a flat 100 -- see G_DuelRefill()
+			G_DuelRefill(ent);
+			G_DuelRefill(challenged);
 
 			// zyk: disable jetpack of both players
 			Jetpack_Off(ent);

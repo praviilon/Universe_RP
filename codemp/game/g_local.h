@@ -2464,6 +2464,7 @@ int G_ItemRespawnTime( const gentity_t *ent );
 int G_ItemPushReturnTime( const gentity_t *ent );
 void G_ReturnPushedItem( gentity_t *ent );
 void G_PublishMaxArmor( gentity_t *ent ); // g_active.c
+void G_DuelRefill( gentity_t *ent ); // g_active.c, GLX_U: [Duel]
 
 gentity_t *Drop_Item( gentity_t *ent, gitem_t *item, float angle );
 gentity_t *LaunchItem( gitem_t *item, vec3_t origin, vec3_t velocity );
