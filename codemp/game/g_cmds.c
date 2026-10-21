@@ -8854,6 +8854,26 @@ void format_text_in_quotes(char* original_text, int buffer_size) {
 	}
 }
 
+// GLX_U: [Chat] the colour a chat modifier's format gives its message: the last ^digit before its
+// final %s (the message), white if none. Put in front of the message for format_text_in_quotes(), so
+// the text after a quote goes back to it now that the quotes are coloured in the message alone.
+static char zyk_chat_format_colour( const char *fmt )
+{
+	const char *last = NULL, *p;
+	char colour = COLOR_WHITE;
+
+	for ( p = strstr( fmt, "%s" ); p; p = strstr( p + 2, "%s" ) )
+		last = p;
+
+	for ( p = fmt; last && p + 1 < last; p++ )
+	{
+		if ( p[0] == Q_COLOR_ESCAPE && p[1] >= '0' && p[1] <= '9' )
+			colour = p[1];
+	}
+
+	return colour;
+}
+
 void G_Say( gentity_t *ent, gentity_t *target, int mode, const char *chatText ) {
 	int			j;
 	gentity_t	*other;
@@ -8931,12 +8951,17 @@ void G_Say( gentity_t *ent, gentity_t *target, int mode, const char *chatText ) 
 
 		if (best_match_index != -1) {
 			char formatted_chat[MAX_STRING_CHARS];
+			char quoted[MAX_STRING_CHARS];
 
 			delete_chat_command(text, best_match_length);
+			// GLX_U: [Chat] quotes coloured in the message alone, after its format colour: the name before
+			// it can no longer pair with a '' in it
+			Com_sprintf(quoted, sizeof(quoted), "%c%c%s", Q_COLOR_ESCAPE,
+				zyk_chat_format_colour(chat_modifiers[best_match_index].chat_format), text);
+			format_text_in_quotes(quoted, sizeof(quoted));
 			// [Alex]: format text and place it into formatted_chat
 			Com_sprintf(formatted_chat, sizeof(formatted_chat),
-				chat_modifiers[best_match_index].chat_format, ent->client->pers.netname, text);
-			format_text_in_quotes(formatted_chat, sizeof(formatted_chat));
+				chat_modifiers[best_match_index].chat_format, ent->client->pers.netname, quoted);
 
 			// [Alex]: Log chat to the server log.
 			G_LogPrintf("%s: %s: %s\n", chat_modifiers[best_match_index].chat_modifier, ent->client->pers.netname, text);
@@ -13061,7 +13086,8 @@ void Cmd_ListAccount_f( gentity_t *ent ) {
 ^7Type a modifier at the start of a chat box message: ^3/me draws a blaster.\n\
 ^7Modifiers work on normal speech only - the chat box, or ^3/say^7.\n\
 ^7Most take a range suffix: ^3low ^7to speak quietly, ^3long ^7to carry further, ^3all ^7for server-wide.\n\
-^7Text in quotes shows in ^2green^7, the speech colour: ^3/me nods. ''^2Follow me.^3''\n\
+^7Double quotes (chat box only) or two apostrophes '' (chat box or console) make text ^2green^7: ^3/me nods. ''^2Follow me.^3''\n\
+^7A single apostrophe keeps the colour: ^3/me boards the 'Tempest'\n\
 \n\
 ^7Speech ranges: ^3whisper ^765, ^3low ^765, normal 700, ^3shout ^71500, ^3long ^72000, ^3all ^7server-wide.\n\
 ^7Action ranges: ^3low ^7200, normal 1200, ^3long ^72000, ^3all ^7server-wide.\n\
