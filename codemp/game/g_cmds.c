@@ -10716,6 +10716,8 @@ void Cmd_ForceDuel_f(gentity_t *ent)
 	Cmd_EngageDuel_f(ent, 1);
 }
 
+static void RP_AllyBreak(gentity_t *a, gentity_t *b, const char *why);
+
 // GalaxyRP: [Force Duel] duel_type picks which kind of private duel this press is offering or
 // accepting -- 0 an ordinary saber duel, 1 a full force duel. Both kinds run through this one
 // function on purpose, the way TaystJK and JA++ both do it, so a full force duel inherits every
@@ -10893,6 +10895,7 @@ void Cmd_EngageDuel_f(gentity_t *ent, int duel_type)
 			// DAJ_RP: [Training Saber] both fight at their saber's real damage -- see RP_TrainingOff()
 			RP_TrainingOff(ent, "for the duel");
 			RP_TrainingOff(challenged, "for the duel");
+			RP_AllyBreak(ent, challenged, "for the duel");	// GLX_U: [Ally] and they stop being allies
 
 			// GalaxyRP: [Grapple Hook] a duel is sealed off from the map; neither duellist keeps a rope
 			// into it. Their hooks are refused for the duel's length by RP_HookMayStayOut().
@@ -14411,6 +14414,27 @@ void zyk_remove_ally(gentity_t *ent, int client_id)
 	else
 	{
 		ent->client->sess.ally1 &= ~(1 << client_id);
+	}
+}
+
+// GLX_U: [Ally] two players about to fight each other stop being allies, both ways, as RP_TrainingOff()
+// drops the training saber: G_Damage() refuses an ally's hit before any duel or mini-game check.
+extern qboolean zyk_ally_bit_set(gentity_t *owner, int client_id);
+static void RP_AllyBreak(gentity_t *a, gentity_t *b, const char *why)
+{
+	gentity_t *pair[2] = { a, b };
+	int i;
+
+	for (i = 0; i < 2; i++)
+	{
+		gentity_t *owner = pair[i], *other = pair[1 - i];
+
+		if (!zyk_ally_bit_set(owner, other->s.number))
+			continue;
+
+		zyk_remove_ally(owner, other->s.number);
+		send_ally_update(owner);
+		trap->SendServerCommand(owner->s.number, va("print \"%s^7 is no longer your ally: removed %s.\n\"", other->client->pers.netname, why));
 	}
 }
 
@@ -23598,8 +23622,11 @@ void Cmd_DuelMode_f(gentity_t *ent) {
 			level.duelists_quantity++;
 
 			// zyk: removing allies from this player
+			if (ent->client->sess.ally1 || ent->client->sess.ally2)	// GLX_U: [Ally] say so, and tell the radar
+				trap->SendServerCommand(ent->s.number, "print \"Your ally list was cleared for the Duel Tournament.\n\"");
 			ent->client->sess.ally1 = 0;
 			ent->client->sess.ally2 = 0;
+			send_ally_update(ent);
 
 			trap->SendServerCommand(-1, va("chat \"^3Duel Tournament: ^7%s ^7joined the tournament!\n\"", ent->client->pers.netname));
 		}
@@ -24267,6 +24294,18 @@ void Cmd_MeleeMode_f(gentity_t *ent) {
 		// plain logged-out player (rp_give_lift()). After every refusal above, so a refused sign-up keeps it.
 		rp_give_lift(ent);
 		RP_TrainingOff(ent, "for the Melee Battle");	// DAJ_RP: [Training Saber] and his training saber, the same way
+
+		{ // GLX_U: [Ally] and he stops being allies with everyone already signed up
+			int j;
+
+			for (j = 0; j < MAX_CLIENTS; j++)
+			{
+				gentity_t *other = &g_entities[j];
+
+				if (other != ent && level.melee_players[j] != -1 && other->inuse && other->client)
+					RP_AllyBreak(ent, other, "for the Melee Battle");
+			}
+		}
 
 		level.melee_players[ent->s.number] = 0;
 		level.melee_mode = 1;
