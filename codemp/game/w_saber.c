@@ -8188,6 +8188,11 @@ static void G_GrabSomeMofos(gentity_t *self)
 				tortureAnim = BOTH_KYLE_PA_1;
 				correspondingAnim = BOTH_PLAYER_PA_1;
 			}
+			else if (self->client->pers.cmd.rightmove != 0)
+			{ // GLX_U: [Melee] strafe + both buttons is the head lock (as JA++)
+				tortureAnim = BOTH_KYLE_PA_3;
+				correspondingAnim = BOTH_PLAYER_PA_3;
+			}
 			else
 			{ //knee-throw // zyk: when just holding attack and alt attack, uses this anim
 				tortureAnim = BOTH_KYLE_PA_2;
@@ -8339,10 +8344,18 @@ void WP_SaberPositionUpdate( gentity_t *self, usercmd_t *ucmd )
 			if ((BG_InGrappleMove(self->client->ps.torsoAnim) && self->client->ps.torsoTimer > 100) ||
 				(BG_InGrappleMove(self->client->ps.legsAnim) && self->client->ps.legsTimer > 100))
 			{ //if they're pretty far from finishing the anim then shove them into another anim
-				G_SetAnim(self, &self->client->pers.cmd, SETANIM_BOTH, BOTH_KYLE_MISS, SETANIM_FLAG_OVERRIDE|SETANIM_FLAG_HOLD, 0);
-				if (self->client->ps.torsoAnim == BOTH_KYLE_MISS)
-				{ //providing the anim set succeeded..
-					self->client->ps.weaponTime = self->client->ps.torsoTimer;
+				if (self->client->ps.torsoAnim == BOTH_KYLE_PA_3)
+				{ // GLX_U: [Melee] a broken head lock stands the attacker up instead of stumbling (as JA++)
+					G_SetAnim(self, &self->client->pers.cmd, SETANIM_BOTH, BOTH_STAND1, SETANIM_FLAG_OVERRIDE, 0);
+					self->client->ps.weaponTime = self->client->ps.torsoTimer = 0;
+				}
+				else
+				{
+					G_SetAnim(self, &self->client->pers.cmd, SETANIM_BOTH, BOTH_KYLE_MISS, SETANIM_FLAG_OVERRIDE|SETANIM_FLAG_HOLD, 0);
+					if (self->client->ps.torsoAnim == BOTH_KYLE_MISS)
+					{ //providing the anim set succeeded..
+						self->client->ps.weaponTime = self->client->ps.torsoTimer;
+					}
 				}
 			}
 		}
@@ -8359,10 +8372,18 @@ void WP_SaberPositionUpdate( gentity_t *self, usercmd_t *ucmd )
 				{
 					self->client->grappleState = 0;
 
-					G_SetAnim(self, &self->client->pers.cmd, SETANIM_BOTH, BOTH_KYLE_MISS, SETANIM_FLAG_OVERRIDE|SETANIM_FLAG_HOLD, 0);
-					if (self->client->ps.torsoAnim == BOTH_KYLE_MISS)
-					{ //providing the anim set succeeded..
-						self->client->ps.weaponTime = self->client->ps.torsoTimer;
+					if (self->client->ps.torsoAnim == BOTH_KYLE_PA_3)
+					{ // GLX_U: [Melee] as above, a broken head lock stands the attacker up
+						G_SetAnim(self, &self->client->pers.cmd, SETANIM_BOTH, BOTH_STAND1, SETANIM_FLAG_OVERRIDE, 0);
+						self->client->ps.weaponTime = self->client->ps.torsoTimer = 0;
+					}
+					else
+					{
+						G_SetAnim(self, &self->client->pers.cmd, SETANIM_BOTH, BOTH_KYLE_MISS, SETANIM_FLAG_OVERRIDE|SETANIM_FLAG_HOLD, 0);
+						if (self->client->ps.torsoAnim == BOTH_KYLE_MISS)
+						{ //providing the anim set succeeded..
+							self->client->ps.weaponTime = self->client->ps.torsoTimer;
+						}
 					}
 				}
 			}
@@ -8378,8 +8399,9 @@ void WP_SaberPositionUpdate( gentity_t *self, usercmd_t *ucmd )
 					vec3_t gFwd, idealSpot;
 					trace_t trace;
 
-					if (grappler->client->ps.torsoAnim == BOTH_KYLE_PA_1)
-					{ //grab punch
+					if (grappler->client->ps.torsoAnim == BOTH_KYLE_PA_1 ||
+						grappler->client->ps.torsoAnim == BOTH_KYLE_PA_3)
+					{ //grab punch // GLX_U: [Melee] and the head lock, at single player's distance
 						idealDist = 46.0f;
 					}
 					else
@@ -8417,6 +8439,8 @@ void WP_SaberPositionUpdate( gentity_t *self, usercmd_t *ucmd )
 					}
 
 					//check for smashy events
+					// GLX_U: [Shields] every grapple hit carries DAMAGE_NO_ARMOR, as kicks (G_KickTrace) and punches:
+					// it goes straight to health instead of being soaked by shields first.
 					if (self->client->ps.torsoAnim == BOTH_KYLE_PA_1)
 					{ //grab punch
                         if (self->client->grappleState == 1)
@@ -8426,7 +8450,7 @@ void WP_SaberPositionUpdate( gentity_t *self, usercmd_t *ucmd )
 								int grapplerAnim = grappler->client->ps.torsoAnim;
 								int grapplerTime = grappler->client->ps.torsoTimer;
 
-								G_Damage(grappler, self, self, NULL, self->client->ps.origin, 10, 0, MOD_MELEE);
+								G_Damage(grappler, self, self, NULL, self->client->ps.origin, 10, DAMAGE_NO_ARMOR, MOD_MELEE);
 								//G_Sound( grappler, CHAN_AUTO, G_SoundIndex( va( "sound/weapons/melee/punch%d", Q_irand( 1, 4 ) ) ) );
 
 								//it might try to put them into a pain anim or something, so override it back again
@@ -8448,7 +8472,7 @@ void WP_SaberPositionUpdate( gentity_t *self, usercmd_t *ucmd )
 								int grapplerAnim = grappler->client->ps.torsoAnim;
 								int grapplerTime = grappler->client->ps.torsoTimer;
 
-								G_Damage(grappler, self, self, NULL, self->client->ps.origin, 10, 0, MOD_MELEE);
+								G_Damage(grappler, self, self, NULL, self->client->ps.origin, 10, DAMAGE_NO_ARMOR, MOD_MELEE);
 								//G_Sound( grappler, CHAN_AUTO, G_SoundIndex( va( "sound/weapons/melee/punch%d", Q_irand( 1, 4 ) ) ) );
 
 								//it might try to put them into a pain anim or something, so override it back again
@@ -8469,7 +8493,7 @@ void WP_SaberPositionUpdate( gentity_t *self, usercmd_t *ucmd )
 							{
 								vec3_t tossDir;
 
-								G_Damage(grappler, self, self, NULL, self->client->ps.origin, 30, 0, MOD_MELEE);
+								G_Damage(grappler, self, self, NULL, self->client->ps.origin, 30, DAMAGE_NO_ARMOR, MOD_MELEE);
 								//G_Sound( grappler, CHAN_AUTO, G_SoundIndex( va( "sound/weapons/melee/punch%d", Q_irand( 1, 4 ) ) ) );
 
 								self->client->grappleState = 0;
@@ -8498,7 +8522,7 @@ void WP_SaberPositionUpdate( gentity_t *self, usercmd_t *ucmd )
 								int grapplerAnim = grappler->client->ps.torsoAnim;
 								int grapplerTime = grappler->client->ps.torsoTimer;
 
-								G_Damage(grappler, self, self, NULL, self->client->ps.origin, 20, 0, MOD_MELEE);
+								G_Damage(grappler, self, self, NULL, self->client->ps.origin, 20, DAMAGE_NO_ARMOR, MOD_MELEE);
 								//G_Sound( grappler, CHAN_AUTO, G_SoundIndex( va( "sound/weapons/melee/punch%d", Q_irand( 1, 4 ) ) ) );
 
 								//it might try to put them into a pain anim or something, so override it back again
@@ -8528,7 +8552,7 @@ void WP_SaberPositionUpdate( gentity_t *self, usercmd_t *ucmd )
 						{ //and another smash
 							if (self->client->ps.torsoTimer < 1000)
 							{
-								G_Damage(grappler, self, self, NULL, self->client->ps.origin, 30, 0, MOD_MELEE);
+								G_Damage(grappler, self, self, NULL, self->client->ps.origin, 30, DAMAGE_NO_ARMOR, MOD_MELEE);
 								//G_Sound( grappler, CHAN_AUTO, G_SoundIndex( va( "sound/weapons/melee/punch%d", Q_irand( 1, 4 ) ) ) );
 
 								//it might try to put them into a pain anim or something, so override it back again
@@ -8548,8 +8572,61 @@ void WP_SaberPositionUpdate( gentity_t *self, usercmd_t *ucmd )
 							}
 						}
 					}
-					else
-					{ //?
+					else if (self->client->ps.torsoAnim == BOTH_KYLE_PA_3)
+					{ // GLX_U: [Melee] head lock, completed from single player: three chokes on the victim's choke
+						// sounds, then the push (KYLE_PA_3 is ~5724 ms; these are times left on it). 50 base damage.
+						if (self->client->grappleState <= 3)
+						{ //choke
+							const int chokeTime[3] = { 4520, 3820, 2370 };
+
+							if (self->client->ps.torsoTimer < chokeTime[self->client->grappleState - 1])
+							{
+								int grapplerAnim = grappler->client->ps.torsoAnim;
+								int grapplerTime = grappler->client->ps.torsoTimer;
+
+								G_Damage(grappler, self, self, NULL, self->client->ps.origin, 10, DAMAGE_NO_ARMOR, MOD_MELEE);
+
+								//it might try to put them into a pain anim or something, so override it back again
+								if (grappler->health > 0)
+								{
+									grappler->client->ps.torsoAnim = grapplerAnim;
+									grappler->client->ps.torsoTimer = grapplerTime;
+									grappler->client->ps.legsAnim = grapplerAnim;
+									grappler->client->ps.legsTimer = grapplerTime;
+									grappler->client->ps.weaponTime = grapplerTime;
+								}
+								self->client->grappleState++;
+							}
+						}
+						else
+						{ //the push
+							if (self->client->ps.torsoTimer < 790)
+							{
+								vec3_t tossDir;
+
+								G_Damage(grappler, self, self, NULL, self->client->ps.origin, 20, DAMAGE_NO_ARMOR, MOD_MELEE);
+
+								self->client->grappleState = 0;
+
+								VectorSubtract(grappler->client->ps.origin, self->client->ps.origin, tossDir);
+								tossDir[2] = 0.0f;
+								VectorNormalize(tossDir);
+								VectorScale(tossDir, 300.0f, tossDir);
+								tossDir[2] = 250.0f;
+
+								VectorAdd(grappler->client->ps.velocity, tossDir, grappler->client->ps.velocity);
+
+								if (grappler->health > 0)
+								{ //thrown to the ground; the victim's state is cleared too, or its own break check would
+									//replace the fly anim with KYLE_MISS next frame
+									G_SetAnim(grappler, &grappler->client->pers.cmd, SETANIM_BOTH, BOTH_PLAYER_PA_3_FLY, SETANIM_FLAG_OVERRIDE|SETANIM_FLAG_HOLD, 0);
+									grappler->client->ps.forceHandExtend = HANDEXTEND_KNOCKDOWN;
+									grappler->client->ps.forceHandExtendTime = level.time + 1300;
+									grappler->client->ps.forceDodgeAnim = 0;
+									grappler->client->grappleState = 0;
+								}
+							}
+						}
 					}
 				}
 			}

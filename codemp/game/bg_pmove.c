@@ -7859,6 +7859,10 @@ static void PM_Weapon( void )
 					desiredAnim = BOTH_GETUP1;
 				}
 			}
+			else if (pm->ps->torsoAnim == BOTH_PLAYER_PA_3_FLY && pm->ps->legsAnim == BOTH_PLAYER_PA_3_FLY)
+			{ // GLX_U: [Melee] thrown out of a head lock: keep the fly-and-land anim as the knockdown (as JA++)
+				desiredAnim = BOTH_PLAYER_PA_3_FLY;
+			}
 			else
 			{
 				desiredAnim = BOTH_KNOCKDOWN1;

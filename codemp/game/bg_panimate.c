@@ -753,10 +753,13 @@ int BG_InGrappleMove(int anim)
 		return 1; //grabbing at someone
 	case BOTH_KYLE_PA_1:
 	case BOTH_KYLE_PA_2:
+	case BOTH_KYLE_PA_3: // GLX_U: [Melee] the head lock (as JA++)
 		return 2; //beating the shit out of someone
 	case BOTH_PLAYER_PA_1:
 	case BOTH_PLAYER_PA_2:
 	case BOTH_PLAYER_PA_FLY:
+	case BOTH_PLAYER_PA_3:
+	case BOTH_PLAYER_PA_3_FLY:
 		return 3; //getting the shit beaten out of you
 		break;
 	}
