@@ -1756,9 +1756,11 @@ typedef enum //# animNumber_e
 	//cinematic anims
 	//======================================================
 	//# #sep BOTH_ CINEMATIC-ONLY
-	BOTH_CIN_1,		//# Level specific cinematic 1
-	BOTH_CIN_2,		//# Level specific cinematic 2
-	BOTH_CIN_3,		//# Level specific cinematic 3
+	// GLX_U: [Couple Emotes] BOTH_CIN_1..3 renamed in place (no other number moves): JA+'s kiss numbers, so
+	// TaystJK/JAPro clients render them and vanilla clients aren't kicked
+	BOTH_KISSEE,		//# Kiss: being kissed
+	BOTH_KISSER,		//# Kiss: kissing
+	BOTH_KISSER1STOP,		//# Kiss: kissing, the release (KISSER's last 18 frames)
 	// GLX_U: [Ledge] BOTH_CIN_4..8 renamed in place (no other number moves): these are JA+'s ledge-grab numbers,
 	// so TaystJK/JAPro clients render them and vanilla clients aren't kicked; animations from OJP Enhanced
 	BOTH_LEDGE_GRAB,		//# Ledge grab: grabbing the ledge

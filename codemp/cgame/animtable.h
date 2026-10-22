@@ -1751,9 +1751,11 @@ stringID_table_t animTable [MAX_ANIMATIONS+1] =
 	//cinematic anims
 	//======================================================
 	//# #sep BOTH_ CINEMATIC-ONLY
-	ENUM2STRING(BOTH_CIN_1),		//# Level specific cinematic 1
-	ENUM2STRING(BOTH_CIN_2),		//# Level specific cinematic 2
-	ENUM2STRING(BOTH_CIN_3),		//# Level specific cinematic 3
+	// GLX_U: [Couple Emotes] BOTH_CIN_1..3 renamed in place (no other number moves): JA+'s kiss numbers, so
+	// TaystJK/JAPro clients render them and vanilla clients aren't kicked
+	ENUM2STRING(BOTH_KISSEE),		//# Kiss: being kissed
+	ENUM2STRING(BOTH_KISSER),		//# Kiss: kissing
+	ENUM2STRING(BOTH_KISSER1STOP),		//# Kiss: kissing, the release (KISSER's last 18 frames)
 	// GLX_U: [Ledge] BOTH_CIN_4..8 renamed in place (no other number moves): these are JA+'s ledge-grab numbers,
 	// so TaystJK/JAPro clients render them and vanilla clients aren't kicked; animations from OJP Enhanced
 	ENUM2STRING(BOTH_LEDGE_GRAB),		//# Ledge grab: grabbing the ledge

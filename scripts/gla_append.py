@@ -1,13 +1,19 @@
 #!/usr/bin/env python3
-# GLX_U: [Ledge] appends OJP Enhanced's five ledge-grab animations (GPL-2, the same frames JA+ shipped)
-# to our _humanoid.gla, after its last frame.
+# GLX_U: appends frames of another _humanoid.gla (same skeleton) to ours, after its last frame.
 #
-#   python3 scripts/ledge_gla_merge.py <our _humanoid.gla> <OJP _humanoid.gla> <output .gla>
+#   python3 scripts/gla_append.py <our .gla> <source .gla> <first source frame> <count> <output .gla> [our frame count]
 #
-# OJP's frames 21376-21448 (73: BOTH_LEDGE_GRAB/HOLD/LEFT/RIGHT/MERCPULL) become frames 22664-22736 here;
-# animation.cfg names them. The script refuses unless both skeletons match bone for bone and our file
-# has exactly the 22664 frames it was written for, and it checks its output: every existing frame
-# decodes byte-identical to the input, every new frame to OJP's.
+# The source's frames first..first+count-1 become our frames N..N+count-1 (N = our frame count before);
+# animation.cfg names them. The script refuses unless both skeletons match bone for bone (and, when the last
+# argument is given, our file has exactly that many frames, so a run can't be applied twice), and it checks
+# its output: every existing frame decodes byte-identical to the input, every new frame to the source's.
+#
+# Runs so far, in order:
+#   [Ledge] OJP Enhanced's ledge grab (GPL-2, the same frames JA+ shipped), from OJP's ojpenhanced GLA:
+#       gla_append.py _humanoid.gla <OJP _humanoid.gla> 21376 73 out.gla 22664      -> frames 22664-22736
+#   [Couple Emotes] JA+'s kiss (BOTH_KISSEE/KISSER/KISSER1STOP), from TaystJK's assets/japro GLA (JA++ ships
+#   the identical file):
+#       gla_append.py _humanoid.gla <JA+ _humanoid.gla> 21376 144 out.gla 22737     -> frames 22737-22880
 #
 # GLA (mdxa version 6) layout: a 100-byte header (ident, version, name[64], fScale, numFrames,
 # ofsFrames, numBones, ofsCompBonePool, ofsSkel, ofsEnd), the skeleton, then per frame and bone a
@@ -17,17 +23,13 @@ import struct
 import sys
 
 HEADER = struct.Struct('<4si64sfiiiiii')
-OUR_FRAMES = 22664          # the file this was written for
-OJP_FIRST = 21376           # BOTH_LEDGE_GRAB in OJP's animation.cfg
-COUNT = 73                  # through BOTH_LEDGE_MERCPULL's last frame (21448)
+FIELDS = ('ident', 'version', 'name', 'scale', 'frames', 'ofsFrames', 'bones', 'ofsPool', 'ofsSkel', 'ofsEnd')
 COMP = 14
+USAGE = 'usage: gla_append.py <our .gla> <source .gla> <first source frame> <count> <output .gla> [our frame count]'
 
 
-def load(path):
-    data = open(path, 'rb').read()
-    h = HEADER.unpack_from(data, 0)
-    g = dict(zip(('ident', 'version', 'name', 'scale', 'frames', 'ofsFrames', 'bones',
-                  'ofsPool', 'ofsSkel', 'ofsEnd'), h))
+def parse(path, data):
+    g = dict(zip(FIELDS, HEADER.unpack_from(data, 0)))
     if g['ident'] != b'2LGA' or g['version'] != 6 or g['ofsEnd'] != len(data):
         sys.exit('%s: not a version 6 GLA' % path)
     if g['ofsPool'] < g['ofsFrames'] + g['frames'] * g['bones'] * 3 or (len(data) - g['ofsPool']) % COMP:
@@ -57,15 +59,17 @@ def comp(g, frame, bone):
 
 
 def main():
-    if len(sys.argv) != 4:
-        sys.exit(__doc__ or 'usage: ledge_gla_merge.py ours.gla ojp.gla out.gla')
-    ours, ojp = load(sys.argv[1]), load(sys.argv[2])
+    if len(sys.argv) not in (6, 7):
+        sys.exit(USAGE)
+    ours = parse(sys.argv[1], open(sys.argv[1], 'rb').read())
+    src = parse(sys.argv[2], open(sys.argv[2], 'rb').read())
+    first, count = int(sys.argv[3]), int(sys.argv[4])
 
-    if ours['frames'] != OUR_FRAMES:
-        sys.exit('ours has %d frames, expected %d (already merged?)' % (ours['frames'], OUR_FRAMES))
-    if ojp['frames'] < OJP_FIRST + COUNT:
-        sys.exit('OJP file too short')
-    if ours['bones'] != ojp['bones'] or ours['scale'] != ojp['scale'] or skeleton(ours) != skeleton(ojp):
+    if len(sys.argv) == 7 and ours['frames'] != int(sys.argv[6]):
+        sys.exit('ours has %d frames, expected %s (already appended?)' % (ours['frames'], sys.argv[6]))
+    if count < 1 or first < 0 or src['frames'] < first + count:
+        sys.exit('the source has no frames %d-%d' % (first, first + count - 1))
+    if ours['bones'] != src['bones'] or ours['scale'] != src['scale'] or skeleton(ours) != skeleton(src):
         sys.exit('skeletons differ')
 
     bones = ours['bones']
@@ -77,9 +81,9 @@ def main():
 
     new_pool = bytearray()
     new_index = bytearray()
-    for f in range(COUNT):
+    for f in range(count):
         for b in range(bones):
-            c = comp(ojp, OJP_FIRST + f, b)
+            c = comp(src, first + f, b)
             i = known.get(c)
             if i is None:
                 i = pool_count + len(new_pool) // COMP
@@ -89,7 +93,7 @@ def main():
                 sys.exit('pool index overflow')
             new_index += bytes((i & 0xff, (i >> 8) & 0xff, (i >> 16) & 0xff))
 
-    frames = ours['frames'] + COUNT
+    frames = ours['frames'] + count
     table_end = ours['ofsFrames'] + frames * bones * 3
     ofs_pool = (table_end + 3) & ~3
     d = ours['data']
@@ -102,22 +106,20 @@ def main():
                      ofs_pool, ours['ofsSkel'], len(out))
 
     # check the result through the same reader
-    res = {'data': bytes(out)}
-    res.update(zip(('ident', 'version', 'name', 'scale', 'frames', 'ofsFrames', 'bones', 'ofsPool', 'ofsSkel',
-                    'ofsEnd'), HEADER.unpack_from(out, 0)))
+    res = parse('output', bytes(out))
     if skeleton(res) != skeleton(ours) or d[HEADER.size:ours['ofsFrames']] != out[HEADER.size:ours['ofsFrames']]:
         sys.exit('check failed: skeleton')
     for f in range(ours['frames']):
         for b in range(bones):
             if comp(res, f, b) != comp(ours, f, b):
                 sys.exit('check failed: frame %d bone %d changed' % (f, b))
-    for f in range(COUNT):
+    for f in range(count):
         for b in range(bones):
-            if comp(res, ours['frames'] + f, b) != comp(ojp, OJP_FIRST + f, b):
+            if comp(res, ours['frames'] + f, b) != comp(src, first + f, b):
                 sys.exit('check failed: new frame %d bone %d' % (f, b))
 
-    open(sys.argv[3], 'wb').write(out)
-    print('%d -> %d frames, %d new pool entries, %d -> %d bytes; ledge frames %d-%d'
+    open(sys.argv[5], 'wb').write(out)
+    print('%d -> %d frames, %d new pool entries, %d -> %d bytes; new frames %d-%d'
           % (ours['frames'], frames, len(new_pool) // COMP, len(d), len(out), ours['frames'], frames - 1))
 
 
