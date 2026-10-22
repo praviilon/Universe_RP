@@ -2535,6 +2535,9 @@ qboolean G_PlayerIsDowned( gentity_t *ent );
 // accompanied by bit 6). G_PlayerIsDowned() stays true for both states -- everything that merely
 // asks "can this player act?" wants that one; only the revive paths care which it is.
 qboolean G_PlayerIsAdminParalyzed( gentity_t *ent );
+// GLX_U: [Ledge] hanging from a ledge (the ledge grab, bg_pmove.c), and letting go of it
+qboolean RP_LedgeHanging( gentity_t *ent );
+void RP_LedgeLetGo( gentity_t *ent );
 // GalaxyRP fix: [Death System] clears the downed state's four fields together -- player_statuses
 // the DOWNED and ADMIN_PARALYSIS bits, pers.downedTime and FL_NOTARGET -- and nothing else: no animation, no messages, no
 // grace period. Every exit from the state goes through it (RP_ReleaseFromDownedState() and help_up()

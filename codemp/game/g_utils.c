@@ -4991,3 +4991,19 @@ qboolean G_PlayerIsAdminParalyzed( gentity_t *ent )
 
 	return (ent->client->pers.player_statuses & (1 << PLAYER_STATUS_ADMIN_PARALYSIS)) ? qtrue : qfalse;
 }
+
+// GLX_U: [Ledge] hanging from a ledge: holding on (PMF_STUCK_TO_WALL) in a ledge anim
+qboolean RP_LedgeHanging( gentity_t *ent )
+{
+	return ( ent && ent->client && (ent->client->ps.pm_flags & PMF_STUCK_TO_WALL)
+		&& BG_InLedgeMove( ent->client->ps.legsAnim ) ) ? qtrue : qfalse;
+}
+
+// GLX_U: [Ledge] makes a hanging player let go (hit, pushed, pulled, gripped, downed); harmless otherwise
+void RP_LedgeLetGo( gentity_t *ent )
+{
+	if ( RP_LedgeHanging( ent ) )
+	{
+		BG_LetGoofLedge( &ent->client->ps );
+	}
+}

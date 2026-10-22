@@ -1876,6 +1876,7 @@ qboolean BG_InKataAnim(int anim);
 qboolean BG_KickingAnim( int anim );
 int BG_InGrappleMove(int anim);
 qboolean BG_InLedgeMove( int anim );	// GLX_U: [Ledge]
+void BG_LetGoofLedge( playerState_t *ps );
 float BG_GetLegsAnimPoint( playerState_t *ps, int animIndex );
 int BG_BrokenParryForAttack( int move );
 int BG_BrokenParryForParry( int move );

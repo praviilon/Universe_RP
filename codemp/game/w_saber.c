@@ -8178,6 +8178,7 @@ static void G_GrabSomeMofos(gentity_t *self)
 
 		if (grabbed->inuse && (grabbed->s.eType == ET_PLAYER || grabbed->s.eType == ET_NPC) &&
 			grabbed->client && grabbed->health > 0 &&
+			!RP_LedgeHanging(grabbed) && // GLX_U: [Ledge] not off a ledge
 			G_CanBeEnemy(self, grabbed) &&
 			G_PrettyCloseIGuess(grabbed->client->ps.origin[2], self->client->ps.origin[2], 4.0f) &&
 			(!BG_InGrappleMove(grabbed->client->ps.torsoAnim) || grabbed->client->ps.torsoAnim == BOTH_KYLE_GRAB) &&

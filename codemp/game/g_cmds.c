@@ -1172,6 +1172,12 @@ void Cmd_Emote_f( gentity_t *ent )
 
 	if (end_ptr != anim_id && *end_ptr == '\0')
 	{
+		if (anim_id_int >= BOTH_LEDGE_GRAB && anim_id_int <= BOTH_LEDGE_MERCPULL)
+		{// GLX_U: [Ledge] the ledge grab's anims belong to the ledge grab
+			trap->SendServerCommand( ent-g_entities, "print \"That animation is only for ledge grabbing.\n\"" );
+			return;
+		}
+
 		if (anim_id_int >= 0 && anim_id_int < MAX_ANIMATIONS)
 		{
 			play_animation(ent, (int)anim_id_int, 1000);
@@ -2113,6 +2119,7 @@ static void RP_EnterDownedState( gentity_t *ent, int downedSeconds, qboolean adm
 	{
 		Weapon_HookFree( ent->client->hook );
 	}
+	RP_LedgeLetGo( ent );	// GLX_U: [Ledge] and of any ledge
 
 	// GalaxyRP fix: [Cloak Item] a live player's first lethal hit lands them here (paralyzed/"downed"),
 	// not in player_die() -- that only fires on an actual final kill, which this "New Death System" can

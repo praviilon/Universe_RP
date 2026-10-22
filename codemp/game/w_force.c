@@ -892,6 +892,12 @@ qboolean WP_ForcePowerUsable( gentity_t *self, forcePowers_t forcePower )
 		return qfalse;
 	}
 
+	// GLX_U: [Ledge] no Force power starts while hanging from a ledge (as above, one already running can be switched off)
+	if ( RP_LedgeHanging( self ) )
+	{
+		return qfalse;
+	}
+
 	if (self->client->ps.pm_flags & PMF_FOLLOW)
 	{ //specs can't use powers through people
 		return qfalse;
@@ -3177,8 +3183,8 @@ static qboolean RP_DrainGrabValidVictim( gentity_t *self, gentity_t *victim )
 		return qfalse;
 	if (!BG_HasAnimation(victim->localAnimIndex, BOTH_FORCE_DRAIN_GRABBED))
 		return qfalse;	// droids, creatures
-	if (G_PlayerIsDowned(victim) || G_PlayerIsAdminParalyzed(victim))
-		return qfalse;
+	if (G_PlayerIsDowned(victim) || G_PlayerIsAdminParalyzed(victim) || RP_LedgeHanging(victim))
+		return qfalse;	// GLX_U: [Ledge] (or hanging from a ledge)
 	if (victim->client->ps.m_iVehicleNum || victim->client->ps.saberLockTime > level.time ||
 		victim->client->ps.forceHandExtend != HANDEXTEND_NONE || victim->client->grappleState)
 		return qfalse;	// riding, saber-locked, knocked down / pushed / gripped, in a melee grapple
@@ -4680,6 +4686,12 @@ void ForceThrow( gentity_t *self, qboolean pull )
 				qboolean canPullWeapon = qtrue;
 				float dirLen = 0;
 
+				if ( RP_LedgeHanging( push_list[x] ) )
+				{// GLX_U: [Ledge] pushed or pulled off a ledge: no resistance, and he lets go
+					otherPushPower = 0;
+					RP_LedgeLetGo( push_list[x] );
+				}
+
 				if ( g_debugMelee.integer )
 				{
 					if ( (push_list[x]->client->ps.pm_flags&PMF_STUCK_TO_WALL) )
@@ -5363,6 +5375,7 @@ void DoGripAction(gentity_t *self, forcePowers_t forcePower)
 	}
 
 	Jetpack_Off(gripEnt); //make sure the guy being gripped has his jetpack off.
+	RP_LedgeLetGo(gripEnt); // GLX_U: [Ledge] and off any ledge he hangs from
 
 	if (gripLevel == FORCE_LEVEL_1)
 	{

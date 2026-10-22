@@ -5936,6 +5936,12 @@ void G_Damage( gentity_t *targ, gentity_t *inflictor, gentity_t *attacker, vec3_
 			targ->health, take, asave );
 	}
 
+	// GLX_U: [Ledge] any damage taken (health or shields) makes a player hanging from a ledge let go
+	if ( client && ( take > 0 || asave > 0 ) )
+	{
+		RP_LedgeLetGo( targ );
+	}
+
 	// add to the damage inflicted on a player this frame
 	// the total will be turned into screen blends and view angle kicks
 	// at the end of the frame
