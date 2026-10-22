@@ -3124,7 +3124,7 @@ hand-hold replaced by a knockdown or push), when the two are pulled apart or the
 ground, or when the victim has Absorb at the Drain level or above; then no new grab for 5 s. Every end
 goes through WP_ForcePowerStop(FP_DRAIN) -> RP_DrainGrabRelease().
 */
-#define RP_DRAIN_GRAB_DIST		64.0f	// reach, and how far apart they may get (SP's FORCE_DRAIN_DIST)
+#define RP_DRAIN_GRAB_DIST		55.0f	// reach, and how far apart they may get
 #define RP_DRAIN_GRAB_HOLD_DIST	46.0f	// the victim is held this far in front (SP's LOCK_FORCE_DRAIN)
 #define RP_DRAIN_GRAB_MAX_TIME	10000
 #define RP_DRAIN_GRAB_COOLDOWN	5000
