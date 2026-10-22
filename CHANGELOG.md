@@ -14,6 +14,7 @@
 - HD HUD elements: upscaled weapon, item, ammo and powerup icons, CTF flag icons, crosshairs, and the disruptor and binocular zoom views replace the low-resolution vanilla ones.
 - Force Drain grab, for logged-in characters with Drain 4 or 5: using Drain on someone right in front grabs him by the throat and drains him while you hold him, instead of the ranged drain. It drains the same way (Force first, health only through Drain Shield) but a little more per Force spent, and both of you are rooted while it lasts. It ends when you let go, run out of Force, are knocked down or pulled away, or after 10 seconds, and can't be used again for 5 seconds. The victim breaks free by activating Absorb at your Drain level or higher. Works on humanoid NPCs too.
 - Melee head lock: strafe left or right + Attack + Alt Attack grabs an opponent in a head lock: three chokes, then a push that throws them to the ground (50 damage in all, scaled by the Melee skill like every melee hit). Forward/back + both buttons is still the punch grapple, and no movement key the knee throw.
+- Ledge grab (from OJP Enhanced): jumping or falling next to a ledge grabs it by itself. While hanging, forward or jump pulls you up, back or crouch lets go and strafe moves along the ledge; a hit, push, pull, grip or knockdown makes you let go. Server cvar `rp_ledgeGrab` (default 1), for players running the Universe RP client.
 
 ### Changed
 - `/admholo` and `/admghost` are renamed to `/holo` and `/ghost`. Any logged-in player can use them on themselves; using them on another player still needs the "Player effects" admin flag. `/admwalkthrough` and `/admhidden` are unchanged.
@@ -24,6 +25,7 @@
 ### Fixed
 - The top-right HUD no longer keeps an empty gap where the removed leader/duel info used to be, so the team score line and powerup icons sit at the top again. Jedi Master still shows its "Get Saber!" hint.
 - Melee grapples (the punch, the knee throw and the head lock) no longer hit shields first: their damage goes straight to health, as kicks and punches already do.
+- Melee grapples: the punch grapple's last hit now always knocks the opponent down (after a get-up, dodge, taunt or emote it could turn into a get-up instead). The knee throw's victim now lands face down and gets up through his own animation, instead of popping back up halfway through it.
 
 ## [3.8.5]
 
