@@ -1791,10 +1791,12 @@ typedef enum //# animNumber_e
 	BOTH_CIN_29,		//# Level specific cinematic
 	BOTH_CIN_30,		//# Level specific cinematic
 	BOTH_CIN_31,		//# Level specific cinematic
-	BOTH_CIN_32,		//# Level specific cinematic
-	BOTH_CIN_33,		//# Level specific cinematic
-	BOTH_CIN_34,		//# Level specific cinematic
-	BOTH_CIN_35,		//# Level specific cinematic
+	// GLX_U: [Anims] BOTH_CIN_32..35 swapped with four custom animations that play without /anim (no other number
+	// moves): in single-player slots non-plugin clients aren't kicked (TaystJK has its own empty BOTH_CIN_1..19 here)
+	BOTH_HELPEDUP,		//# /helpup: being helped up (was 1619)
+	BOTH_HELPUP,		//# /helpup: helping up (was 1620)
+	BOTH_OBJECT,		//# Holo Communicator prop's readyAnim (was 1587)
+	BOTH_QUICKDRAW2,		//# Comlink prop's readyAnim (was 1596)
 	BOTH_CIN_36,		//# Level specific cinematic
 	BOTH_CIN_37,		//# Level specific cinematic
 	BOTH_CIN_38,		//# Level specific cinematic
@@ -1855,7 +1857,7 @@ typedef enum //# animNumber_e
 	BOTH_CARRY,
 	BOTH_LEANFRONT,
 	BOTH_GUARD,
-	BOTH_OBJECT,
+	BOTH_CIN_34,		//# GLX_U: [Anims] empty cinematic slot (BOTH_OBJECT moved to 1526)
 	BOTH_ANAKINKATA,
 	BOTH_ANAKINKATA2,
 	BOTH_ANAKINKATA3,
@@ -1864,7 +1866,7 @@ typedef enum //# animNumber_e
 	BOTH_GUNSPINS,
 	BOTH_PISTOLREADY,
 	BOTH_QUICKDRAW,
-	BOTH_QUICKDRAW2,
+	BOTH_CIN_35,		//# GLX_U: [Anims] empty cinematic slot (BOTH_QUICKDRAW2 moved to 1527)
 	BOTH_SABERDRAW1,
 	BOTH_SABERDRAW2,
 	BOTH_SABERDRAW3,
@@ -1887,8 +1889,8 @@ typedef enum //# animNumber_e
 	BOTH_SITPALM,
 	BOTH_SITPALM2,
 	BOTH_PUSHUP,
-	BOTH_HELPEDUP,
-	BOTH_HELPUP,
+	BOTH_CIN_32,		//# GLX_U: [Anims] empty cinematic slot (BOTH_HELPEDUP moved to 1524)
+	BOTH_CIN_33,		//# GLX_U: [Anims] empty cinematic slot (BOTH_HELPUP moved to 1525)
 	BOTH_FORCECASUAL,
 
 	//# #eol

@@ -1787,10 +1787,12 @@ stringID_table_t animTable [MAX_ANIMATIONS+1] =
 	ENUM2STRING(BOTH_CIN_29),		//# Level specific cinematic
 	ENUM2STRING(BOTH_CIN_30),		//# Level specific cinematic
 	ENUM2STRING(BOTH_CIN_31),		//# Level specific cinematic
-	ENUM2STRING(BOTH_CIN_32),		//# Level specific cinematic
-	ENUM2STRING(BOTH_CIN_33),		//# Level specific cinematic
-	ENUM2STRING(BOTH_CIN_34),		//# Level specific cinematic
-	ENUM2STRING(BOTH_CIN_35),		//# Level specific cinematic
+	// GLX_U: [Anims] BOTH_CIN_32..35 swapped with four custom animations that play without /anim (no other number
+	// moves): in single-player slots non-plugin clients aren't kicked (TaystJK has its own empty BOTH_CIN_1..19 here)
+	ENUM2STRING(BOTH_HELPEDUP),		//# /helpup: being helped up (was 1619)
+	ENUM2STRING(BOTH_HELPUP),		//# /helpup: helping up (was 1620)
+	ENUM2STRING(BOTH_OBJECT),		//# Holo Communicator prop's readyAnim (was 1587)
+	ENUM2STRING(BOTH_QUICKDRAW2),		//# Comlink prop's readyAnim (was 1596)
 	ENUM2STRING(BOTH_CIN_36),		//# Level specific cinematic
 	ENUM2STRING(BOTH_CIN_37),		//# Level specific cinematic
 	ENUM2STRING(BOTH_CIN_38),		//# Level specific cinematic
@@ -1850,7 +1852,7 @@ stringID_table_t animTable [MAX_ANIMATIONS+1] =
 	ENUM2STRING(BOTH_CARRY),
 	ENUM2STRING(BOTH_LEANFRONT),
 	ENUM2STRING(BOTH_GUARD),
-	ENUM2STRING(BOTH_OBJECT),
+	ENUM2STRING(BOTH_CIN_34),		//# GLX_U: [Anims] empty cinematic slot (BOTH_OBJECT moved to 1526)
 	ENUM2STRING(BOTH_ANAKINKATA),
 	ENUM2STRING(BOTH_ANAKINKATA2),
 	ENUM2STRING(BOTH_ANAKINKATA3),
@@ -1859,7 +1861,7 @@ stringID_table_t animTable [MAX_ANIMATIONS+1] =
 	ENUM2STRING(BOTH_GUNSPINS),
 	ENUM2STRING(BOTH_PISTOLREADY),
 	ENUM2STRING(BOTH_QUICKDRAW),
-	ENUM2STRING(BOTH_QUICKDRAW2),
+	ENUM2STRING(BOTH_CIN_35),		//# GLX_U: [Anims] empty cinematic slot (BOTH_QUICKDRAW2 moved to 1527)
 	ENUM2STRING(BOTH_SABERDRAW1),
 	ENUM2STRING(BOTH_SABERDRAW2),
 	ENUM2STRING(BOTH_SABERDRAW3),
@@ -1882,8 +1884,8 @@ stringID_table_t animTable [MAX_ANIMATIONS+1] =
 	ENUM2STRING(BOTH_SITPALM),
 	ENUM2STRING(BOTH_SITPALM2),
 	ENUM2STRING(BOTH_PUSHUP),
-	ENUM2STRING(BOTH_HELPEDUP),
-	ENUM2STRING(BOTH_HELPUP),
+	ENUM2STRING(BOTH_CIN_32),		//# GLX_U: [Anims] empty cinematic slot (BOTH_HELPEDUP moved to 1524)
+	ENUM2STRING(BOTH_CIN_33),		//# GLX_U: [Anims] empty cinematic slot (BOTH_HELPUP moved to 1525)
 	ENUM2STRING(BOTH_FORCECASUAL),
 
 	//must be terminated
