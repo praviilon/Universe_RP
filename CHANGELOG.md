@@ -16,6 +16,7 @@
 - Melee head lock: strafe left or right + Attack + Alt Attack grabs an opponent in a head lock: three chokes, then a push that throws them to the ground (50 damage in all, scaled by the Melee skill like every melee hit). Forward/back + both buttons is still the punch grapple, and no movement key the knee throw.
 - Ledge grab (from OJP Enhanced): jumping or falling next to a ledge grabs it by itself. While hanging, forward or jump pulls you up, back or crouch lets go and strafe moves along the ledge; a hit, push, pull, grip or knockdown makes you let go. Server cvar `rp_ledgeGrab` (default 1), for players running the Universe RP client.
 - `/wehug` and `/wekiss` (as in JA++): hug or kiss the player in your crosshair, both of you playing the paired animation. The kissed player can slap out of the kiss with Force Push. A hit, push, grip or knockdown ends it; `rp_allow_emotes` controls them like `/emote`.
+- 22 animations from JA+ (melee kicks, back falls, the backflip attack, stabs and stance changes), playable with `/anim 1501`–`1522`. TaystJK and JAPro players see them too.
 
 ### Changed
 - `/admholo` and `/admghost` are renamed to `/holo` and `/ghost`. Any logged-in player can use them on themselves; using them on another player still needs the "Player effects" admin flag. `/admwalkthrough` and `/admhidden` are unchanged.
@@ -27,6 +28,7 @@
 - The top-right HUD no longer keeps an empty gap where the removed leader/duel info used to be, so the team score line and powerup icons sit at the top again. Jedi Master still shows its "Get Saber!" hint.
 - Melee grapples (the punch, the knee throw and the head lock) no longer hit shields first: their damage goes straight to health, as kicks and punches already do.
 - Melee grapples: the punch grapple's last hit now always knocks the opponent down (after a get-up, dodge, taunt or emote it could turn into a get-up instead). The knee throw's victim now lands face down and gets up through his own animation, instead of popping back up halfway through it.
+- Players on other clients (vanilla, TaystJK, JAPro) are no longer kicked ("Bad animation number") when someone near them uses `/helpup`, holds the Holo Communicator or Comlink prop, or plays the datapad emotes: those animations now use numbers every client knows. They play at new `/anim` numbers (1524–1529).
 
 ## [3.8.5]
 
