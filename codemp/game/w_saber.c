@@ -8513,6 +8513,8 @@ void WP_SaberPositionUpdate( gentity_t *self, usercmd_t *ucmd )
 								{ //if still alive knock them down
 									grappler->client->ps.forceHandExtend = HANDEXTEND_KNOCKDOWN;
 									grappler->client->ps.forceHandExtendTime = level.time + 1300;
+									grappler->client->ps.forceDodgeAnim = 0;	// GLX_U: [Melee] a leftover get-up/dodge/taunt value would make it a get-up
+									grappler->client->grappleState = 0;		// GLX_U: [Melee] or his own break check plays KYLE_MISS (as the head lock)
 								}
 							}
 						}
@@ -8556,14 +8558,21 @@ void WP_SaberPositionUpdate( gentity_t *self, usercmd_t *ucmd )
 						{ //and another smash
 							if (self->client->ps.torsoTimer < 1000)
 							{
+								int grapplerAnim = grappler->client->ps.torsoAnim;
+								int grapplerTime = grappler->client->ps.torsoTimer;
+
 								G_Damage(grappler, self, self, NULL, self->client->ps.origin, 30, DAMAGE_NO_ARMOR, MOD_MELEE);
 								//G_Sound( grappler, CHAN_AUTO, G_SoundIndex( va( "sound/weapons/melee/punch%d", Q_irand( 1, 4 ) ) ) );
 
 								//it might try to put them into a pain anim or something, so override it back again
 								if (grappler->health > 0)
-								{
-									grappler->client->ps.torsoTimer = 1000;
-									//G_SetAnim(grappler, &grappler->client->pers.cmd, SETANIM_BOTH, BOTH_GETUP3, SETANIM_FLAG_OVERRIDE|SETANIM_FLAG_HOLD, 0);
+								{ // GLX_U: [Melee] his own animation lands him face down and gets him up (~6.7 s): hold him in it to the end,
+								  // instead of freeing his upper body when the attacker's ends (base: torsoTimer 1000)
+									grappler->client->ps.torsoAnim = grapplerAnim;
+									grappler->client->ps.torsoTimer = grapplerTime;
+									grappler->client->ps.legsAnim = grapplerAnim;
+									grappler->client->ps.legsTimer = grapplerTime;
+									grappler->client->ps.weaponTime = grapplerTime;
 									grappler->client->grappleState = 0;
 								}
 								else
