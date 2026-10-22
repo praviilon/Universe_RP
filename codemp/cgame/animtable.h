@@ -1763,29 +1763,30 @@ stringID_table_t animTable [MAX_ANIMATIONS+1] =
 	ENUM2STRING(BOTH_LEDGE_LEFT),		//# Ledge grab: shimmy left
 	ENUM2STRING(BOTH_LEDGE_RIGHT),		//# Ledge grab: shimmy right
 	ENUM2STRING(BOTH_LEDGE_MERCPULL),		//# Ledge grab: pulling up
-	ENUM2STRING(BOTH_CIN_9),		//# Level specific cinematic 9
-	ENUM2STRING(BOTH_CIN_10),		//# Level specific cinematic 10
-	ENUM2STRING(BOTH_CIN_11),		//# Level specific cinematic 11
-	ENUM2STRING(BOTH_CIN_12),		//# Level specific cinematic 12
-	ENUM2STRING(BOTH_CIN_13),		//# Level specific cinematic 13
-	ENUM2STRING(BOTH_CIN_14),		//# Level specific cinematic 14
-	ENUM2STRING(BOTH_CIN_15),		//# Level specific cinematic 15
-	ENUM2STRING(BOTH_CIN_16),		//# Level specific cinematic 16
-	ENUM2STRING(BOTH_CIN_17),		//# Level specific cinematic 17
-	ENUM2STRING(BOTH_CIN_18),		//# Level specific cinematic 18
-	ENUM2STRING(BOTH_CIN_19),		//# Level specific cinematic 19
-	ENUM2STRING(BOTH_CIN_20),		//# Level specific cinematic 20
-	ENUM2STRING(BOTH_CIN_21),		//# Level specific cinematic 21
-	ENUM2STRING(BOTH_CIN_22),		//# Level specific cinematic 22
-	ENUM2STRING(BOTH_CIN_23),		//# Level specific cinematic 23
-	ENUM2STRING(BOTH_CIN_24),		//# Level specific cinematic 24
-	ENUM2STRING(BOTH_CIN_25),		//# Level specific cinematic 25
-
-	ENUM2STRING(BOTH_CIN_26),		//# Level specific cinematic
-	ENUM2STRING(BOTH_CIN_27),		//# Level specific cinematic
-	ENUM2STRING(BOTH_CIN_28),		//# Level specific cinematic
-	ENUM2STRING(BOTH_CIN_29),		//# Level specific cinematic
-	ENUM2STRING(BOTH_CIN_30),		//# Level specific cinematic
+	// GLX_U: [JA+ Anims] BOTH_CIN_9..30 renamed in place (no other number moves): JA+'s numbers for its moves, so
+	// TaystJK/JAPro clients render them and vanilla clients aren't kicked; frames from JA+'s GLA (animation.cfg)
+	ENUM2STRING(BOTH_MELEE_BACKKICK),		//# JA+: melee back kick
+	ENUM2STRING(BOTH_MELEE_SPINKICK),		//# JA+: melee spin kick
+	ENUM2STRING(TORSO_MAND_FLAME),		//# JA+: flamethrower pose (torso)
+	ENUM2STRING(BOTH_STAND1TO2_NEW),		//# JA+: stance change
+	ENUM2STRING(BOTH_STAND2TO1_NEW),		//# JA+: stance change back (STAND1TO2_NEW reversed)
+	ENUM2STRING(BOTH_S1_S7_NEW),		//# JA+: stance change
+	ENUM2STRING(BOTH_S7_S1_NEW),		//# JA+: stance change back (S1_S7_NEW reversed)
+	ENUM2STRING(BOTH_S6_S1_LARM),		//# JA+: stance change, left arm
+	ENUM2STRING(BOTH_S1_S6_LARM),		//# JA+: stance change back (S6_S1_LARM reversed)
+	ENUM2STRING(BOTH_S6_S1_2ARMS),		//# JA+: stance change, both arms
+	ENUM2STRING(BOTH_S1_S6_2ARMS),		//# JA+: stance change back (S6_S1_2ARMS reversed)
+	ENUM2STRING(BOTH_BACK_FALLING),		//# JA+: falling onto the back
+	ENUM2STRING(BOTH_BACK_FALLING_GETUP),		//# JA+: getting up from it
+	ENUM2STRING(BOTH_BACK_FALLING_GETUP_SLOW),		//# JA+: getting up from it, slowly
+	ENUM2STRING(BOTH_JUMP_BACKKICK_SPIN),		//# JA+: jumping spin back kick
+	ENUM2STRING(BOTH_JUMP_BACKFLIP_ATCK),		//# JA+: backflip grab attack
+	ENUM2STRING(BOTH_JUMP_BACKFLIP_ATCKEE),		//# JA+: backflip grab attack: the victim
+	ENUM2STRING(BOTH_JUMP_BACKFLIP_ATCKEE_FALL),		//# JA+: backflip grab attack: the victim falls
+	ENUM2STRING(BOTH_NEW_STABER),		//# JA+: paired stab: stabbing
+	ENUM2STRING(BOTH_NEW_STABEE),		//# JA+: paired stab: being stabbed
+	ENUM2STRING(BOTH_FLIP_STAB),		//# JA+: flipping stab
+	ENUM2STRING(BOTH_JUMP_BACKFLIP_ATCK_MISSED),		//# JA+: backflip grab attack missed (ATCK's start reversed)
 	ENUM2STRING(BOTH_CIN_31),		//# Level specific cinematic
 	// GLX_U: [Anims] BOTH_CIN_32..35 swapped with four custom animations that play without /anim (no other number
 	// moves): in single-player slots non-plugin clients aren't kicked (TaystJK has its own empty BOTH_CIN_1..19 here)

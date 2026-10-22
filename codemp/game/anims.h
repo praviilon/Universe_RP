@@ -1768,28 +1768,30 @@ typedef enum //# animNumber_e
 	BOTH_LEDGE_LEFT,		//# Ledge grab: shimmy left
 	BOTH_LEDGE_RIGHT,		//# Ledge grab: shimmy right
 	BOTH_LEDGE_MERCPULL,		//# Ledge grab: pulling up
-	BOTH_CIN_9,		//# Level specific cinematic 9
-	BOTH_CIN_10,		//# Level specific cinematic 10
-	BOTH_CIN_11,		//# Level specific cinematic 11
-	BOTH_CIN_12,		//# Level specific cinematic 12
-	BOTH_CIN_13,		//# Level specific cinematic 13
-	BOTH_CIN_14,		//# Level specific cinematic 14
-	BOTH_CIN_15,		//# Level specific cinematic 15
-	BOTH_CIN_16,		//# Level specific cinematic 16
-	BOTH_CIN_17,		//# Level specific cinematic 17
-	BOTH_CIN_18,		//# Level specific cinematic 18
-	BOTH_CIN_19,		//# Level specific cinematic 19
-	BOTH_CIN_20,		//# Level specific cinematic 20
-	BOTH_CIN_21,		//# Level specific cinematic 21
-	BOTH_CIN_22,		//# Level specific cinematic 22
-	BOTH_CIN_23,		//# Level specific cinematic 23
-	BOTH_CIN_24,		//# Level specific cinematic 24
-	BOTH_CIN_25,		//# Level specific cinematic 25
-	BOTH_CIN_26,		//# Level specific cinematic
-	BOTH_CIN_27,		//# Level specific cinematic
-	BOTH_CIN_28,		//# Level specific cinematic
-	BOTH_CIN_29,		//# Level specific cinematic
-	BOTH_CIN_30,		//# Level specific cinematic
+	// GLX_U: [JA+ Anims] BOTH_CIN_9..30 renamed in place (no other number moves): JA+'s numbers for its moves, so
+	// TaystJK/JAPro clients render them and vanilla clients aren't kicked; frames from JA+'s GLA (animation.cfg)
+	BOTH_MELEE_BACKKICK,		//# JA+: melee back kick
+	BOTH_MELEE_SPINKICK,		//# JA+: melee spin kick
+	TORSO_MAND_FLAME,		//# JA+: flamethrower pose (torso)
+	BOTH_STAND1TO2_NEW,		//# JA+: stance change
+	BOTH_STAND2TO1_NEW,		//# JA+: stance change back (STAND1TO2_NEW reversed)
+	BOTH_S1_S7_NEW,		//# JA+: stance change
+	BOTH_S7_S1_NEW,		//# JA+: stance change back (S1_S7_NEW reversed)
+	BOTH_S6_S1_LARM,		//# JA+: stance change, left arm
+	BOTH_S1_S6_LARM,		//# JA+: stance change back (S6_S1_LARM reversed)
+	BOTH_S6_S1_2ARMS,		//# JA+: stance change, both arms
+	BOTH_S1_S6_2ARMS,		//# JA+: stance change back (S6_S1_2ARMS reversed)
+	BOTH_BACK_FALLING,		//# JA+: falling onto the back
+	BOTH_BACK_FALLING_GETUP,		//# JA+: getting up from it
+	BOTH_BACK_FALLING_GETUP_SLOW,		//# JA+: getting up from it, slowly
+	BOTH_JUMP_BACKKICK_SPIN,		//# JA+: jumping spin back kick
+	BOTH_JUMP_BACKFLIP_ATCK,		//# JA+: backflip grab attack
+	BOTH_JUMP_BACKFLIP_ATCKEE,		//# JA+: backflip grab attack: the victim
+	BOTH_JUMP_BACKFLIP_ATCKEE_FALL,		//# JA+: backflip grab attack: the victim falls
+	BOTH_NEW_STABER,		//# JA+: paired stab: stabbing
+	BOTH_NEW_STABEE,		//# JA+: paired stab: being stabbed
+	BOTH_FLIP_STAB,		//# JA+: flipping stab
+	BOTH_JUMP_BACKFLIP_ATCK_MISSED,		//# JA+: backflip grab attack missed (ATCK's start reversed)
 	BOTH_CIN_31,		//# Level specific cinematic
 	// GLX_U: [Anims] BOTH_CIN_32..35 swapped with four custom animations that play without /anim (no other number
 	// moves): in single-player slots non-plugin clients aren't kicked (TaystJK has its own empty BOTH_CIN_1..19 here)
