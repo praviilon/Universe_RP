@@ -640,9 +640,10 @@ the model's shape as drawn at those frames (RPX_GlmShape(), on this client's cop
 - its radius, how far from its origin the client still draws it: the server's default, 50, is less than
   many models reach, and they would vanish as soon as their origin left the screen;
 - with Box Fit, its box (mins/maxs) round that shape turned by its angles, unscaled (the server scales it);
-- with On surface, aimoffset raised so its bottom sits on the surface aimed at: models made as player or
-  NPC models reach 24 units below their origin, which /entaddaim puts on the surface. A SOLID one the server
-  raises itself by what the scale took off its box's bottom (SP_misc_model_ghoul), so that part is left out.
+- with On surface, aimoffset raised so its bottom sits on the surface aimed at: by how far the model reaches
+  below what the server places it by. A non-solid one by its origin -- models made as player or NPC models
+  reach 24 units below it; a SOLID one by its collision box (RP_EntGrabSettle(), g_entgrab.c), so only what
+  hangs below that box: nothing with Box Fit, the overhang below the default box's -16 without it.
 None of the three when this client cannot measure the model.
 ==================
 */
@@ -747,10 +748,11 @@ static void RPX_SpawnGlm( qboolean grab ) {
 			boxBottom = (float)lo[2];
 		}
 		if ( RPX_CvarInt( "ui_rpx_g_sit" ) ) {
-			lift = -boxMins[2] * scale;
-			if ( solid && scaled ) {
-				lift -= boxBottom * ( 1.0f - scale );	// what the server raises it by
-			}
+			// GLX_U: [Extras] the server already sets a solid one's box on the surface (and undoes its own
+			// scale raise), so lift only what reaches below the box -- not the whole depth below the origin
+			float bottom = boxMins[2] * scale;	// the model's lowest point, from its origin
+
+			lift = solid ? ( boxBottom * scale - bottom ) : -bottom;
 		}
 	}
 

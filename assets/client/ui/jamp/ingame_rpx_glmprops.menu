@@ -815,7 +815,7 @@
 			textscale           0.7
 			forecolor           1 1 1 1
 			visible             1
-			descText            "Spawned prop: raised so its bottom sits on the surface you aim at, not sunk into it"
+			descText            "Spawned prop: stands on the surface you aim at instead of sinking into it"
 			cvarTest            "ui_rpx_g_tab"
 			showCvar
 			{
