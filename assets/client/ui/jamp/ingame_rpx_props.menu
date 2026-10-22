@@ -659,7 +659,7 @@
 			type                ITEM_TYPE_YESNO
 			text                "Solid:"
 			cvar                "ui_rpx_p_solid"
-			rect                432 100 180 18
+			rect                432 100 72 18
 			textalign           ITEM_ALIGN_LEFT
 			textalignx          0
 			textaligny          -2
@@ -668,6 +668,33 @@
 			forecolor           1 1 1 1
 			visible             1
 			descText            "Spawned prop: players and NPCs cannot walk through it"
+			action
+			{
+				play "sound/interface/button1.wav"
+			}
+		}
+		// GLX_U: [Extras] On surface, on the Solid line (as No AI and Frozen share one in the Spawners menu),
+		// shown while Solid is No: a solid prop already stands on its box (RPX_PropSitLift, cg_rpextras.c)
+		itemDef
+		{
+			name                rpx_psit
+			type                ITEM_TYPE_YESNO
+			text                "On surface:"
+			cvar                "ui_rpx_p_sit"
+			rect                510 100 102 18
+			textalign           ITEM_ALIGN_LEFT
+			textalignx          0
+			textaligny          -2
+			font                2
+			textscale           0.7
+			forecolor           1 1 1 1
+			visible             1
+			cvarTest            "ui_rpx_p_solid"
+			showCvar
+			{
+				"0"
+			}
+			descText            "Non-solid prop: stands on the floor instead of sinking into it (off for wall and ceiling pieces)"
 			action
 			{
 				play "sound/interface/button1.wav"

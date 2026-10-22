@@ -110,6 +110,7 @@ static const char * const rpxSoundChannels[] = {
 	X( "ui_rpx_p_lb",			"255" ) \
 	X( "ui_rpx_p_faceme",		"1" ) \
 	X( "ui_rpx_p_lift",			"0" )		/* Props: units out from the surface aimed at (/entaddaim aimoffset) */ \
+	X( "ui_rpx_p_sit",			"0" )		/* GLX_U: non-solid only: raised so the model stands on the surface aimed at */ \
 	X( "ui_rpx_g_yaw",			"0" )		/* GLX_U: GLM Props: its own, as the ui_rpx_p_* of MD3 Props */ \
 	X( "ui_rpx_g_pitch",		"0" ) \
 	X( "ui_rpx_g_roll",			"0" ) \

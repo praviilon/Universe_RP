@@ -570,10 +570,33 @@ static int RPX_FacingYaw( float extra ) {
 	return (int)( yaw + 0.5f ) % 360;
 }
 
+/*
+GLX_U: [Extras] MD3 Props' On surface (ui_rpx_p_sit), non-solid props only: the server places a non-solid one
+by its origin, 1 unit off the surface aimed at, so a model reaching below its origin sank into it. The lift is
+how far the model's lowest point ends up below that origin: frame 0's bounds, the box the server gives it too
+(RP_ReadModelInfo), scaled and turned -- plus the spawn's scale raise, mins[2] * (1 - scale), which nothing
+undoes for a non-solid prop (SP_misc_model_breakable). A solid one is set on its box (RP_EntGrabSettle): none.
+*/
+static float RPX_PropSitLift( const char *path, float scale, int pitch, int yaw, int roll ) {
+	qhandle_t model = trap->R_RegisterModel( path );
+	vec3_t mins, maxs, angles, tMins, tMaxs;
+	float bottom;
+
+	if ( !model ) {
+		return 0.0f;
+	}
+	trap->R_ModelBounds( model, mins, maxs );
+	VectorSet( angles, pitch, yaw, roll );
+	RPX_TurnedBox( mins, maxs, angles, tMins, tMaxs );
+	bottom = mins[2] * ( 1.0f - scale ) + tMins[2] * scale;
+
+	return ( bottom < 0.0f ) ? -bottom : 0.0f;
+}
+
 static void RPX_SpawnProp( qboolean grab ) {
 	char folder[RPX_NAME_LEN], name[RPX_NAME_LEN], path[MAX_QPATH * 2], cmd[MAX_STRING_CHARS];
-	int pitch, yaw, roll, flags;
-	float scale;
+	int pitch, yaw, roll, flags, offset;
+	float scale, sentScale = 1.0f, lift = 0.0f;
 
 	if ( !RPX_Selected( RPX_MODELS, folder, sizeof( folder ), name, sizeof( name ) ) ) {
 		return;
@@ -596,10 +619,17 @@ static void RPX_SpawnProp( qboolean grab ) {
 	if ( scale < 0.01f ) scale = 0.01f;
 	if ( scale > 10.23f ) scale = 10.23f;
 	if ( fabs( scale - 1.0f ) > 0.001f ) {
-		Q_strcat( cmd, sizeof( cmd ), va( " modelscale \"%.2f\"", scale ) );
+		char sent[16];
+
+		Com_sprintf( sent, sizeof( sent ), "%.2f", scale );
+		Q_strcat( cmd, sizeof( cmd ), va( " modelscale \"%s\"", sent ) );
+		sentScale = atof( sent );	// the scale the server spawns it at
 	}
 
 	flags = ( RPX_CvarInt( "ui_rpx_p_solid" ) ? 1 : 0 ) | ( RPX_CvarInt( "ui_rpx_p_anim" ) ? 2 : 0 );
+	if ( !( flags & 1 ) && RPX_CvarInt( "ui_rpx_p_sit" ) ) {
+		lift = RPX_PropSitLift( path, sentScale, pitch, yaw, roll );	// GLX_U: [Extras] On surface
+	}
 	if ( flags ) {
 		Q_strcat( cmd, sizeof( cmd ), va( " spawnflags \"%d\"", flags ) );
 	}
@@ -625,7 +655,16 @@ static void RPX_SpawnProp( qboolean grab ) {
 		Q_strcat( cmd, sizeof( cmd ), va( " light \"%d\" color \"%.2f %.2f %.2f\"", radius, r, g, b ) );
 	}
 
-	RPX_AddOffset( cmd, sizeof( cmd ), "ui_rpx_p_lift" );
+	// GLX_U: [Extras] the Offset, plus On surface's lift (as RPX_SpawnGlm builds its aimoffset)
+	offset = RPX_CvarInt( "ui_rpx_p_lift" );
+	if ( offset < 0 ) offset = 0;
+	if ( lift > 0.0f ) {
+		offset += (int)ceil( lift );
+	}
+	if ( offset > 512 ) offset = 512;
+	if ( offset > 0 ) {
+		Q_strcat( cmd, sizeof( cmd ), va( " aimoffset \"%d\"", offset ) );
+	}
 	RPX_Queue( cmd );
 }
 
