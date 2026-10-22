@@ -1803,10 +1803,12 @@ typedef enum //# animNumber_e
 	// slots non-plugin clients aren't kicked (TaystJK has its own empty BOTH_CIN_5..6 here)
 	BOTH_DATAPAD,		//# /emote datapad (was 1607)
 	BOTH_DATAPAD2,		//# /emote datapad2 (was 1608)
-	BOTH_CIN_38,		//# Level specific cinematic
-	BOTH_CIN_39,		//# Level specific cinematic
-	BOTH_CIN_40,		//# Level specific cinematic
-	BOTH_CIN_41,		//# Level specific cinematic
+	// GLX_U: [Anims] BOTH_CIN_38..41 swapped with the sit emotes 4-7 (no other number moves): in single-player
+	// slots non-plugin clients aren't kicked (TaystJK has its own empty BOTH_CIN_7..10 here)
+	BOTH_SITARMS,		//# /emote sit4 (was 1612)
+	BOTH_SITCROSS,		//# /emote sit5 (was 1613)
+	BOTH_SITCROSS2,		//# /emote sit6 (was 1614)
+	BOTH_SITLEAN,		//# /emote sit7 (was 1615)
 	BOTH_CIN_42,		//# Level specific cinematic
 	BOTH_CIN_43,		//# Level specific cinematic
 	BOTH_CIN_44,		//# Level specific cinematic
@@ -1886,10 +1888,10 @@ typedef enum //# animNumber_e
 	BOTH_FACEPALM,
 	BOTH_FACEPALM2,
 	BOTH_READ,
-	BOTH_SITARMS,
-	BOTH_SITCROSS,
-	BOTH_SITCROSS2,
-	BOTH_SITLEAN,
+	BOTH_CIN_38,		//# GLX_U: [Anims] empty cinematic slot (BOTH_SITARMS moved to 1530)
+	BOTH_CIN_39,		//# GLX_U: [Anims] empty cinematic slot (BOTH_SITCROSS moved to 1531)
+	BOTH_CIN_40,		//# GLX_U: [Anims] empty cinematic slot (BOTH_SITCROSS2 moved to 1532)
+	BOTH_CIN_41,		//# GLX_U: [Anims] empty cinematic slot (BOTH_SITLEAN moved to 1533)
 	BOTH_SITPALM,
 	BOTH_SITPALM2,
 	BOTH_PUSHUP,

@@ -1798,10 +1798,12 @@ stringID_table_t animTable [MAX_ANIMATIONS+1] =
 	// slots non-plugin clients aren't kicked (TaystJK has its own empty BOTH_CIN_5..6 here)
 	ENUM2STRING(BOTH_DATAPAD),		//# /emote datapad (was 1607)
 	ENUM2STRING(BOTH_DATAPAD2),		//# /emote datapad2 (was 1608)
-	ENUM2STRING(BOTH_CIN_38),		//# Level specific cinematic
-	ENUM2STRING(BOTH_CIN_39),		//# Level specific cinematic
-	ENUM2STRING(BOTH_CIN_40),		//# Level specific cinematic
-	ENUM2STRING(BOTH_CIN_41),		//# Level specific cinematic
+	// GLX_U: [Anims] BOTH_CIN_38..41 swapped with the sit emotes 4-7 (no other number moves): in single-player
+	// slots non-plugin clients aren't kicked (TaystJK has its own empty BOTH_CIN_7..10 here)
+	ENUM2STRING(BOTH_SITARMS),		//# /emote sit4 (was 1612)
+	ENUM2STRING(BOTH_SITCROSS),		//# /emote sit5 (was 1613)
+	ENUM2STRING(BOTH_SITCROSS2),		//# /emote sit6 (was 1614)
+	ENUM2STRING(BOTH_SITLEAN),		//# /emote sit7 (was 1615)
 	ENUM2STRING(BOTH_CIN_42),		//# Level specific cinematic
 	ENUM2STRING(BOTH_CIN_43),		//# Level specific cinematic
 	ENUM2STRING(BOTH_CIN_44),		//# Level specific cinematic
@@ -1880,10 +1882,10 @@ stringID_table_t animTable [MAX_ANIMATIONS+1] =
 	ENUM2STRING(BOTH_FACEPALM),
 	ENUM2STRING(BOTH_FACEPALM2),
 	ENUM2STRING(BOTH_READ),
-	ENUM2STRING(BOTH_SITARMS),
-	ENUM2STRING(BOTH_SITCROSS),
-	ENUM2STRING(BOTH_SITCROSS2),
-	ENUM2STRING(BOTH_SITLEAN),
+	ENUM2STRING(BOTH_CIN_38),		//# GLX_U: [Anims] empty cinematic slot (BOTH_SITARMS moved to 1530)
+	ENUM2STRING(BOTH_CIN_39),		//# GLX_U: [Anims] empty cinematic slot (BOTH_SITCROSS moved to 1531)
+	ENUM2STRING(BOTH_CIN_40),		//# GLX_U: [Anims] empty cinematic slot (BOTH_SITCROSS2 moved to 1532)
+	ENUM2STRING(BOTH_CIN_41),		//# GLX_U: [Anims] empty cinematic slot (BOTH_SITLEAN moved to 1533)
 	ENUM2STRING(BOTH_SITPALM),
 	ENUM2STRING(BOTH_SITPALM2),
 	ENUM2STRING(BOTH_PUSHUP),
