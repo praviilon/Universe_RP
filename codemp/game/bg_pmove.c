@@ -12161,6 +12161,12 @@ void PmoveSingle (pmove_t *pmove) {
 	}
 #endif
 
+	if ( pm->ps->forceHandExtend == HANDEXTEND_DODGE && BG_InCoupleEmote( pm->ps->forceDodgeAnim ) )
+	{// GLX_U: [Couple Emotes] in a /wehug or /wekiss: the view is kept level, so looking up or down doesn't bend the pose
+		pm->ps->viewangles[PITCH] = 0;
+		PM_SetPMViewAngle(pm->ps, pm->ps->viewangles, &pm->cmd);
+	}
+
 	PM_SetSpecialMoveValues();
 
 	// update the viewangles

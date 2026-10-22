@@ -1720,6 +1720,15 @@ struct gclient_s {
 	int			drainGrabTicks;			// ticks so far, for the choke sound
 	int			drainGrabNextAllowed;	// no new grab before this
 
+	// GLX_U: [Couple Emotes] in a /wehug or /wekiss (RP_PairEmote*, g_cmds.c); zeroed on spawn
+	int			pairPartner;			// the other player's client number + 1, 0: none
+	int			pairKind;				// RP_PAIR_HUG or RP_PAIR_KISS
+	int			pairAnim;				// held now (forceDodgeAnim, under HANDEXTEND_DODGE)
+	int			pairNextAnim;			// the hug's release, 0: none
+	int			pairStageEnd;			// pairAnim ends
+	int			pairSlapAt;				// the kissee's backhand swings across
+	qboolean	pairLinked;				// still in the hug or kiss itself (not slapping or flinching)
+
 	int			solidHack;
 
 	int			noLightningTime;
@@ -2396,6 +2405,14 @@ void update_saber_colors(gentity_t *ent);
 // the same reason). On Linux/GCC this was only a warning; Clang rejects it as a hard error on
 // macOS (-Wimplicit-function-declaration).
 int ClientNumberFromString( gentity_t *to, const char *s, qboolean allowconnecting );
+// GLX_U: [Couple Emotes] /wehug and /wekiss: run every frame (g_main.c), ended for both by damage (g_combat.c),
+// a push or grip (w_force.c), going down (g_cmds.c) or a disconnect (g_client.c); the Force Push key
+// slaps out of a kiss (ForceThrow)
+void RP_PairEmoteThink( gentity_t *ent );
+void RP_PairEmoteEnd( gentity_t *ent );
+qboolean RP_PairEmotePush( gentity_t *ent );
+void Cmd_WeHug_f( gentity_t *ent );
+void Cmd_WeKiss_f( gentity_t *ent );
 
 //
 // g_items.c

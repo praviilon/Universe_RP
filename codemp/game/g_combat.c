@@ -5940,6 +5940,7 @@ void G_Damage( gentity_t *targ, gentity_t *inflictor, gentity_t *attacker, vec3_
 	if ( client && ( take > 0 || asave > 0 ) )
 	{
 		RP_LedgeLetGo( targ );
+		RP_PairEmoteEnd( targ );	// GLX_U: [Couple Emotes] and a hug or kiss ends, for both
 	}
 
 	// add to the damage inflicted on a player this frame

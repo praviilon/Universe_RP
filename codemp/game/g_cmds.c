@@ -1201,6 +1201,355 @@ void Cmd_Emote_f( gentity_t *ent )
 }
 
 /*
+=============================================================================
+GLX_U: [Couple Emotes] /wehug and /wekiss, after JA++'s /amhug and /amkiss. The player in your crosshair
+within 55 units is turned to face you and set box to box in front of you, and both play a paired animation,
+rooted (HANDEXTEND_DODGE, which every client predicts): single player's cinematic hug and its release (about
+1.9 s), or JA+'s kiss (3.6 s). No consent, as in JA++. The kissed player's Force Push key slaps: a backhand,
+and at its swing the kisser flinches (no damage). Either player hit (G_Damage), knocked down, pushed, gripped,
+off the ground, dead, downed or gone ends the hug or kiss for both. In a private duel, only with the opponent.
+RP_PairEmoteThink() runs every frame.
+=============================================================================
+*/
+#define RP_PAIR_HUG			1
+#define RP_PAIR_KISS		2
+#define RP_PAIR_REACH		55		// crosshair reach
+#define RP_PAIR_DIST		31		// origins: box to box (30), and a unit apart or they'd be stuck in each other
+#define RP_PAIR_STEP		18		// how far up or down the floor in front may be (STEPSIZE)
+#define RP_PAIR_SLAP_SWING	750		// the backhand's swing across the face, into BOTH_FORCEGRIP3THROW
+
+static const int rpPairHugAnims[] = { BOTH_HUGGER1, BOTH_HUGGERSTOP1, BOTH_HUGGEE1, BOTH_HUGGEESTOP1 };
+static const int rpPairKissAnims[] = { BOTH_KISSER, BOTH_KISSEE, BOTH_FORCEGRIP3THROW, BOTH_PAIN4 };
+
+// the partner, while he is still paired with ent
+static gentity_t *RP_PairPartner( gentity_t *ent )
+{
+	gentity_t *other;
+
+	if ( !ent->client->pairPartner )
+	{
+		return NULL;
+	}
+	other = &g_entities[ent->client->pairPartner - 1];
+	if ( !other->inuse || !other->client || other->client->pers.connected != CON_CONNECTED
+		|| other->client->pairPartner != ent->s.number + 1 )
+	{
+		return NULL;
+	}
+	return other;
+}
+
+// held in a paired animation: rooted and whole body, until RP_PairEmoteThink() moves on or lets go
+static void RP_PairHold( gentity_t *ent, int anim )
+{
+	gclient_t *cl = ent->client;
+
+	cl->pairAnim = anim;
+	cl->pairStageEnd = level.time + BG_AnimLength( ent->localAnimIndex, (animNumber_t)anim );
+	cl->ps.forceHandExtend = HANDEXTEND_DODGE;
+	cl->ps.forceDodgeAnim = anim;
+	cl->ps.forceHandExtendTime = level.time + 1000;	// kept up every frame by RP_PairEmoteThink()
+}
+
+// lets one player go (and out of our animation, unless something else already took him out of it)
+static void RP_PairFree( gentity_t *ent )
+{
+	gclient_t *cl = ent->client;
+
+	if ( cl->ps.forceHandExtend == HANDEXTEND_DODGE && cl->ps.forceDodgeAnim == cl->pairAnim )
+	{
+		cl->ps.forceHandExtend = HANDEXTEND_WEAPONREADY;
+		cl->ps.forceHandExtendTime = level.time;
+		cl->ps.forceDodgeAnim = 0;
+	}
+	cl->pairPartner = 0;
+	cl->pairKind = 0;
+	cl->pairAnim = 0;
+	cl->pairNextAnim = 0;
+	cl->pairStageEnd = 0;
+	cl->pairSlapAt = 0;
+	cl->pairLinked = qfalse;
+}
+
+// interrupted (hit, knocked down, dead, gone...): during the hug or kiss itself it ends for both; after a slap
+// each finishes on his own
+void RP_PairEmoteEnd( gentity_t *ent )
+{
+	gentity_t *other;
+
+	if ( !ent || !ent->client || !ent->client->pairPartner )
+	{
+		return;
+	}
+	other = RP_PairPartner( ent );
+	if ( ent->client->pairLinked && other && other->client->pairLinked )
+	{
+		RP_PairFree( other );
+	}
+	RP_PairFree( ent );
+}
+
+// every frame, for every client
+void RP_PairEmoteThink( gentity_t *ent )
+{
+	gclient_t *cl = ent->client;
+	gentity_t *other;
+
+	if ( !cl || !cl->pairPartner )
+	{
+		return;
+	}
+	other = RP_PairPartner( ent );
+
+	if ( cl->ps.forceHandExtend != HANDEXTEND_DODGE || cl->ps.forceDodgeAnim != cl->pairAnim
+		|| ent->health <= 0 || (cl->ps.eFlags & EF_DEAD) || G_PlayerIsDowned( ent )
+		|| cl->sess.sessionTeam == TEAM_SPECTATOR || cl->ps.groundEntityNum == ENTITYNUM_NONE
+		|| ( cl->pairLinked && !other ) )
+	{//knocked down, pushed or gripped out of it, dead, downed, gone, off the ground -- or the partner was
+		RP_PairEmoteEnd( ent );
+		return;
+	}
+
+	if ( cl->pairSlapAt && level.time >= cl->pairSlapAt )
+	{//the kissee's backhand swings across: the kisser flinches, if he is still kissing
+		cl->pairSlapAt = 0;
+		if ( other && other->client->pairLinked && other->client->pairAnim == BOTH_KISSER )
+		{
+			G_Sound( other, CHAN_AUTO, G_SoundIndex( "sound/weapons/melee/punch2" ) );
+			other->client->pairLinked = qfalse;
+			other->client->pairNextAnim = 0;
+			RP_PairHold( other, BOTH_PAIN4 );
+		}
+	}
+
+	if ( level.time >= cl->pairStageEnd )
+	{
+		if ( cl->pairNextAnim )
+		{//the hug's release
+			int next = cl->pairNextAnim;
+
+			cl->pairNextAnim = 0;
+			RP_PairHold( ent, next );
+		}
+		else
+		{//done; the partner, if still at it, finishes on his own
+			if ( other )
+			{
+				other->client->pairLinked = qfalse;
+			}
+			RP_PairFree( ent );
+			return;
+		}
+	}
+
+	cl->ps.forceHandExtendTime = level.time + 1000;
+}
+
+// the Force Push key (ForceThrow) while in a hug or kiss: the kissee's slaps; qtrue: no push (there would be
+// none anyway, in a hand extend)
+qboolean RP_PairEmotePush( gentity_t *ent )
+{
+	gclient_t *cl = ent->client;
+
+	if ( !cl || !cl->pairPartner )
+	{
+		return qfalse;
+	}
+	if ( cl->pairKind == RP_PAIR_KISS && cl->pairLinked && cl->pairAnim == BOTH_KISSEE && RP_PairPartner( ent ) )
+	{
+		cl->pairLinked = qfalse;
+		cl->pairNextAnim = 0;
+		RP_PairHold( ent, BOTH_FORCEGRIP3THROW );
+		cl->pairSlapAt = level.time + RP_PAIR_SLAP_SWING;
+	}
+	return qtrue;
+}
+
+// why this player can't be put in a hug or kiss now (NULL: he can)
+static const char *RP_PairCantStart( gentity_t *e, int kind )
+{
+	gclient_t *cl = e->client;
+	const int *anims = ( kind == RP_PAIR_HUG ) ? rpPairHugAnims : rpPairKissAnims;
+	int i;
+
+	if ( e->health <= 0 || (cl->ps.eFlags & EF_DEAD) )
+		return "dead";
+	if ( cl->sess.sessionTeam == TEAM_SPECTATOR || (cl->ps.pm_flags & PMF_FOLLOW) )
+		return "spectating";
+	if ( G_PlayerIsDowned( e ) )
+		return "downed";
+	if ( cl->pairPartner )
+		return "already in a hug or kiss";
+	if ( cl->ps.pm_type != PM_NORMAL )
+		return "unable to move";
+	if ( cl->ps.groundEntityNum == ENTITYNUM_NONE )
+		return "not standing on the ground";
+	if ( cl->ps.m_iVehicleNum )
+		return "in a vehicle";
+	if ( RP_LedgeHanging( e ) || cl->grappleState || cl->drainGrabActive
+		|| BG_InGrappleMove( cl->ps.torsoAnim ) || BG_InGrappleMove( cl->ps.legsAnim ) )
+		return "grappling or hanging";
+	if ( cl->ps.forceHandExtend != HANDEXTEND_NONE )
+		return "busy (knocked down, pushed, gripped, AFK or in an emote)";
+	if ( cl->ps.weaponTime > 0 || cl->ps.saberMove > LS_READY || cl->ps.saberInFlight || BG_KickingAnim( cl->ps.legsAnim ) )
+		return "attacking";
+	for ( i = 0; i < 4; i++ )
+	{
+		if ( !BG_HasAnimation( e->localAnimIndex, anims[i] ) )
+			return "the model has no such animation";
+	}
+	return NULL;
+}
+
+static void RP_PairSaberOff( gentity_t *ent )
+{
+	gclient_t *cl = ent->client;
+
+	if ( cl->ps.weapon == WP_SABER && cl->ps.saberHolstered < 2 )
+	{
+		cl->ps.saberMove = LS_NONE;
+		cl->ps.saberBlocked = 0;
+		cl->ps.saberBlocking = 0;
+		cl->ps.saberHolstered = 2;
+		if ( cl->saber[0].soundOff )
+		{
+			G_Sound( ent, CHAN_AUTO, cl->saber[0].soundOff );
+		}
+		if ( cl->saber[1].model[0] && cl->saber[1].soundOff )
+		{
+			G_Sound( ent, CHAN_AUTO, cl->saber[1].soundOff );
+		}
+	}
+}
+
+static void RP_PairStart( gentity_t *ent, gentity_t *other, int kind, int anim, int nextAnim )
+{
+	gclient_t *cl = ent->client;
+
+	RP_PairSaberOff( ent );
+	VectorClear( cl->ps.velocity );
+	cl->pers.player_statuses &= ~(1 << PLAYER_STATUS_EMOTE);	// or the emote keep-alive would hold it on
+	cl->pairPartner = other->s.number + 1;
+	cl->pairKind = kind;
+	cl->pairNextAnim = nextAnim;
+	cl->pairSlapAt = 0;
+	cl->pairLinked = qtrue;
+	RP_PairHold( ent, anim );
+}
+
+static void Cmd_PairEmote( gentity_t *ent, int kind )
+{
+	const char *verb = ( kind == RP_PAIR_HUG ) ? "hug" : "kiss";
+	const char *why;
+	vec3_t start, fwd, end, yawAng, spot, ang;
+	trace_t tr;
+	gentity_t *other;
+
+	if ( rp_allow_emotes.integer < 1 )
+	{
+		trap->SendServerCommand( ent-g_entities, "print \"Cannot use emotes in this server\n\"" );
+		return;
+	}
+	if ( level.gametype == GT_SIEGE )
+	{
+		trap->SendServerCommand( ent-g_entities, "print \"Cannot use emotes in Siege gametype\n\"" );
+		return;
+	}
+	if ( rp_allow_emotes.integer != 1 && ent->client->ps.duelInProgress )
+	{
+		trap->SendServerCommand( ent-g_entities, "print \"Cannot use emotes in private duel\n\"" );
+		return;
+	}
+	why = RP_PairCantStart( ent, kind );
+	if ( why )
+	{
+		trap->SendServerCommand( ent-g_entities, va( "print \"You can't %s now: %s.\n\"", verb, why ) );
+		return;
+	}
+
+	//the player in the crosshair
+	VectorCopy( ent->client->ps.origin, start );
+	start[2] += ent->client->ps.viewheight;
+	AngleVectors( ent->client->ps.viewangles, fwd, NULL, NULL );
+	VectorMA( start, RP_PAIR_REACH, fwd, end );
+	trap->Trace( &tr, start, NULL, NULL, end, ent->s.number, MASK_PLAYERSOLID, qfalse, 0, 0 );
+	if ( tr.fraction >= 1.0f || tr.entityNum >= MAX_CLIENTS || tr.entityNum == ent->s.number
+		|| !g_entities[tr.entityNum].inuse || !g_entities[tr.entityNum].client )
+	{
+		trap->SendServerCommand( ent-g_entities, va( "print \"Look at a player right in front of you to %s them.\n\"", verb ) );
+		return;
+	}
+	other = &g_entities[tr.entityNum];
+	if ( ent->client->ps.duelInProgress && ent->client->ps.duelIndex != other->s.number )
+	{//a private duel keeps to the two duelists, as grapples do
+		trap->SendServerCommand( ent-g_entities, va( "print \"In a private duel you can only %s your opponent.\n\"", verb ) );
+		return;
+	}
+	why = RP_PairCantStart( other, kind );
+	if ( !why && other->client->ps.duelInProgress
+		&& ( rp_allow_emotes.integer != 1 || other->client->ps.duelIndex != ent->s.number ) )
+	{
+		why = "in a private duel";
+	}
+	if ( why )
+	{
+		trap->SendServerCommand( ent-g_entities, va( "print \"%s^7 can't be %sed now: %s.\n\"",
+			other->client->pers.netname, ( kind == RP_PAIR_HUG ) ? "hugg" : "kiss", why ) );
+		return;
+	}
+
+	//box to box in front of us, on the floor there (a step up or down at most), if he fits there and no wall is
+	//in between; else he stays where he is
+	VectorSet( yawAng, 0, ent->client->ps.viewangles[YAW], 0 );
+	AngleVectors( yawAng, fwd, NULL, NULL );
+	VectorMA( ent->client->ps.origin, RP_PAIR_DIST, fwd, spot );
+	VectorCopy( spot, start );
+	start[2] = other->client->ps.origin[2] + RP_PAIR_STEP;
+	VectorCopy( spot, end );
+	end[2] = other->client->ps.origin[2] - RP_PAIR_STEP;
+	trap->Trace( &tr, start, other->r.mins, other->r.maxs, end, other->s.number, other->clipmask, qfalse, 0, 0 );
+	if ( !tr.startsolid && !tr.allsolid && tr.fraction < 1.0f )
+	{
+		VectorCopy( tr.endpos, spot );
+		trap->Trace( &tr, other->client->ps.origin, NULL, NULL, spot, other->s.number, MASK_PLAYERSOLID & ~CONTENTS_BODY, qfalse, 0, 0 );
+		if ( tr.fraction >= 1.0f && !tr.startsolid )
+		{
+			G_SetOrigin( other, spot );
+			VectorCopy( spot, other->client->ps.origin );
+			trap->LinkEntity( (sharedEntity_t *)other );
+		}
+	}
+
+	//face each other
+	VectorSubtract( other->client->ps.origin, ent->client->ps.origin, fwd );
+	VectorSet( ang, 0, vectoyaw( fwd ), 0 );
+	SetClientViewAngle( ent, ang );
+	VectorSet( ang, 0, ang[YAW] + 180, 0 );
+	SetClientViewAngle( other, ang );
+
+	if ( kind == RP_PAIR_HUG )
+	{
+		RP_PairStart( ent, other, kind, BOTH_HUGGER1, BOTH_HUGGERSTOP1 );
+		RP_PairStart( other, ent, kind, BOTH_HUGGEE1, BOTH_HUGGEESTOP1 );
+	}
+	else
+	{
+		RP_PairStart( ent, other, kind, BOTH_KISSER, 0 );
+		RP_PairStart( other, ent, kind, BOTH_KISSEE, 0 );
+	}
+}
+
+void Cmd_WeHug_f( gentity_t *ent )
+{
+	Cmd_PairEmote( ent, RP_PAIR_HUG );
+}
+
+void Cmd_WeKiss_f( gentity_t *ent )
+{
+	Cmd_PairEmote( ent, RP_PAIR_KISS );
+}
+
+/*
 ==================
 Cmd_Give_f
 
@@ -2120,6 +2469,7 @@ static void RP_EnterDownedState( gentity_t *ent, int downedSeconds, qboolean adm
 		Weapon_HookFree( ent->client->hook );
 	}
 	RP_LedgeLetGo( ent );	// GLX_U: [Ledge] and of any ledge
+	RP_PairEmoteEnd( ent );	// GLX_U: [Couple Emotes] and out of a hug or kiss
 
 	// GalaxyRP fix: [Cloak Item] a live player's first lethal hit lands them here (paralyzed/"downed"),
 	// not in player_die() -- that only fires on an actual final kill, which this "New Death System" can
@@ -13018,6 +13368,9 @@ void Cmd_ListAccount_f( gentity_t *ent ) {
 ^3/ignore <player name or id>: ^7Enable/disable ignoring a player. Covers every written chat type; voice commands still play.\n\
 ^3/ignorelist: ^7Lists ignored players.\n\
 ^3/jetpack: ^7Gives or removes jetpack from the player.\n\"");
+				// GLX_U: [Couple Emotes] next to /emote, in a message of their own (the block above is near the 1022 limit)
+				trap->SendServerCommand(ent - g_entities, "print \"^3/wehug: ^7Hugs the player you are looking at.\n\
+^3/wekiss: ^7Kisses the player you are looking at. The kissed player can slap out of it with Force Push.\n\"");
 				// GalaxyRP fix: [Commands] split off into its own SendServerCommand call -- the Misc
 				// section above is already close to SV_SendServerCommand's hard 1022-char limit
 				// (sv_main.cpp's SV_SendServerCommand silently drops the entire message if the formatted
@@ -25630,6 +25983,8 @@ command_t commands[] = {
 	// (see Cmd_VehicleCloak_f's own doc comment for why that was unreachable). No CMD_ALIVE, matching
 	// the original generic_cmd switch, which never gated on aliveness either.
 	{ "vehicle_cloak",		Cmd_VehicleCloak_f,			CMD_NOINTERMISSION|CMD_ALIVE }, // CMD_ALIVE: a following spectator inherits the followed player's ps, vehicle and cloak state -- see Cmd_VehicleCloak_f
+	{ "wehug",				Cmd_WeHug_f,				CMD_ALIVE|CMD_NOINTERMISSION }, // GLX_U: [Couple Emotes]
+	{ "wekiss",				Cmd_WeKiss_f,				CMD_ALIVE|CMD_NOINTERMISSION },
 	{ "where",				Cmd_Where_f,				CMD_NOINTERMISSION },
 	// GalaxyRP fix: no CMD_ALIVE -- Cmd_GalaxyRpUi_f's supdateloggedin push is meant to reach the
 	// client unconditionally (see its own comment above the send), including while spectating, so a

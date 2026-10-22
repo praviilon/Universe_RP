@@ -4842,6 +4842,9 @@ void ClientDisconnect( int clientNum ) {
 	// a cut entity goes back where it was (g_entgrab.c)
 	RP_EntGrabCancel( ent, qfalse );
 
+	// GLX_U: [Couple Emotes] a hug or kiss he is in ends, for the partner too
+	RP_PairEmoteEnd( ent );
+
 	// GalaxyRP: [Account] this is the server-side handler for every kind of disconnect -- a
 	// voluntary /quit or /disconnect, a /reconnect (which drops and reconnects to the same server,
 	// running through this exact same path), a connection timeout, or a kick/ban -- and it never

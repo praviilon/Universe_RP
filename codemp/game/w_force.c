@@ -4233,6 +4233,11 @@ void ForceThrow( gentity_t *self, qboolean pull )
 
 	visionArc = 0;
 
+	if ( !pull && RP_PairEmotePush( self ) )
+	{// GLX_U: [Couple Emotes] in a hug or kiss the push key slaps out of a kiss (the kissee's), and pushes no one
+		return;
+	}
+
 	if (self->client->ps.forceHandExtend != HANDEXTEND_NONE && (self->client->ps.forceHandExtend != HANDEXTEND_KNOCKDOWN || !G_InGetUpAnim(&self->client->ps)))
 	{
 		return;
@@ -4691,6 +4696,7 @@ void ForceThrow( gentity_t *self, qboolean pull )
 					otherPushPower = 0;
 					RP_LedgeLetGo( push_list[x] );
 				}
+				RP_PairEmoteEnd( push_list[x] );	// GLX_U: [Couple Emotes] pushed or pulled out of a hug or kiss
 
 				if ( g_debugMelee.integer )
 				{
@@ -5376,6 +5382,7 @@ void DoGripAction(gentity_t *self, forcePowers_t forcePower)
 
 	Jetpack_Off(gripEnt); //make sure the guy being gripped has his jetpack off.
 	RP_LedgeLetGo(gripEnt); // GLX_U: [Ledge] and off any ledge he hangs from
+	RP_PairEmoteEnd(gripEnt); // GLX_U: [Couple Emotes] and out of a hug or kiss
 
 	if (gripLevel == FORCE_LEVEL_1)
 	{

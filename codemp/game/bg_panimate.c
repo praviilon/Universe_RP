@@ -785,6 +785,26 @@ qboolean BG_InLedgeMove( int anim )
 	return qfalse;
 }
 
+// GLX_U: [Couple Emotes] the animations of /wehug and /wekiss (the hug, the kiss, the slap and the flinch);
+// the backhand and the flinch only count under HANDEXTEND_DODGE, which the caller checks
+qboolean BG_InCoupleEmote( int anim )
+{
+	switch ( anim )
+	{
+	case BOTH_HUGGER1:
+	case BOTH_HUGGERSTOP1:
+	case BOTH_HUGGEE1:
+	case BOTH_HUGGEESTOP1:
+	case BOTH_KISSER:
+	case BOTH_KISSEE:
+	case BOTH_KISSER1STOP:
+	case BOTH_FORCEGRIP3THROW:
+	case BOTH_PAIN4:
+		return qtrue;
+	}
+	return qfalse;
+}
+
 int BG_BrokenParryForAttack( int move )
 {
 	//Our attack was knocked away by a knockaway parry
