@@ -1799,8 +1799,10 @@ typedef enum //# animNumber_e
 	BOTH_HELPUP,		//# /helpup: helping up (was 1620)
 	BOTH_OBJECT,		//# Holo Communicator prop's readyAnim (was 1587)
 	BOTH_QUICKDRAW2,		//# Comlink prop's readyAnim (was 1596)
-	BOTH_CIN_36,		//# Level specific cinematic
-	BOTH_CIN_37,		//# Level specific cinematic
+	// GLX_U: [Anims] BOTH_CIN_36..37 swapped with the two datapad emotes (no other number moves): in single-player
+	// slots non-plugin clients aren't kicked (TaystJK has its own empty BOTH_CIN_5..6 here)
+	BOTH_DATAPAD,		//# /emote datapad (was 1607)
+	BOTH_DATAPAD2,		//# /emote datapad2 (was 1608)
 	BOTH_CIN_38,		//# Level specific cinematic
 	BOTH_CIN_39,		//# Level specific cinematic
 	BOTH_CIN_40,		//# Level specific cinematic
@@ -1879,8 +1881,8 @@ typedef enum //# animNumber_e
 	BOTH_SORESU2,
 	BOTH_SABERSTANCE2,
 	BOTH_SABERSTANCE3,
-	BOTH_DATAPAD,
-	BOTH_DATAPAD2,
+	BOTH_CIN_36,		//# GLX_U: [Anims] empty cinematic slot (BOTH_DATAPAD moved to 1528)
+	BOTH_CIN_37,		//# GLX_U: [Anims] empty cinematic slot (BOTH_DATAPAD2 moved to 1529)
 	BOTH_FACEPALM,
 	BOTH_FACEPALM2,
 	BOTH_READ,

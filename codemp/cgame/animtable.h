@@ -1794,8 +1794,10 @@ stringID_table_t animTable [MAX_ANIMATIONS+1] =
 	ENUM2STRING(BOTH_HELPUP),		//# /helpup: helping up (was 1620)
 	ENUM2STRING(BOTH_OBJECT),		//# Holo Communicator prop's readyAnim (was 1587)
 	ENUM2STRING(BOTH_QUICKDRAW2),		//# Comlink prop's readyAnim (was 1596)
-	ENUM2STRING(BOTH_CIN_36),		//# Level specific cinematic
-	ENUM2STRING(BOTH_CIN_37),		//# Level specific cinematic
+	// GLX_U: [Anims] BOTH_CIN_36..37 swapped with the two datapad emotes (no other number moves): in single-player
+	// slots non-plugin clients aren't kicked (TaystJK has its own empty BOTH_CIN_5..6 here)
+	ENUM2STRING(BOTH_DATAPAD),		//# /emote datapad (was 1607)
+	ENUM2STRING(BOTH_DATAPAD2),		//# /emote datapad2 (was 1608)
 	ENUM2STRING(BOTH_CIN_38),		//# Level specific cinematic
 	ENUM2STRING(BOTH_CIN_39),		//# Level specific cinematic
 	ENUM2STRING(BOTH_CIN_40),		//# Level specific cinematic
@@ -1873,8 +1875,8 @@ stringID_table_t animTable [MAX_ANIMATIONS+1] =
 	ENUM2STRING(BOTH_SORESU2),
 	ENUM2STRING(BOTH_SABERSTANCE2),
 	ENUM2STRING(BOTH_SABERSTANCE3),
-	ENUM2STRING(BOTH_DATAPAD),
-	ENUM2STRING(BOTH_DATAPAD2),
+	ENUM2STRING(BOTH_CIN_36),		//# GLX_U: [Anims] empty cinematic slot (BOTH_DATAPAD moved to 1528)
+	ENUM2STRING(BOTH_CIN_37),		//# GLX_U: [Anims] empty cinematic slot (BOTH_DATAPAD2 moved to 1529)
 	ENUM2STRING(BOTH_FACEPALM),
 	ENUM2STRING(BOTH_FACEPALM2),
 	ENUM2STRING(BOTH_READ),
