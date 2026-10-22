@@ -28,7 +28,7 @@
 - The top-right HUD no longer keeps an empty gap where the removed leader/duel info used to be, so the team score line and powerup icons sit at the top again. Jedi Master still shows its "Get Saber!" hint.
 - Melee grapples (the punch, the knee throw and the head lock) no longer hit shields first: their damage goes straight to health, as kicks and punches already do.
 - Melee grapples: the punch grapple's last hit now always knocks the opponent down (after a get-up, dodge, taunt or emote it could turn into a get-up instead). The knee throw's victim now lands face down and gets up through his own animation, instead of popping back up halfway through it.
-- Players on other clients (vanilla, TaystJK, JAPro) are no longer kicked ("Bad animation number") when someone near them uses `/helpup`, holds the Holo Communicator or Comlink prop, or plays the datapad emotes: those animations now use numbers every client knows. They play at new `/anim` numbers (1524–1529).
+- Players on other clients are no longer kicked ("Bad animation number") when someone near them uses `/helpup`, or uses some of the mod's custom animations.
 
 ## [3.8.5]
 
