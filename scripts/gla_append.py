@@ -14,6 +14,9 @@
 #   [Couple Emotes] JA+'s kiss (BOTH_KISSEE/KISSER/KISSER1STOP), from TaystJK's assets/japro GLA (JA++ ships
 #   the identical file):
 #       gla_append.py _humanoid.gla <JA+ _humanoid.gla> 21376 144 out.gla 22737     -> frames 22737-22880
+#   [JA+ Anims] JA+'s moves 1501-1522 (melee kicks, stance changes, back falls, backflip attack, stabs), from the
+#   same file:
+#       gla_append.py _humanoid.gla <JA+ _humanoid.gla> 21593 781 out.gla 22881     -> frames 22881-23661
 #
 # GLA (mdxa version 6) layout: a 100-byte header (ident, version, name[64], fScale, numFrames,
 # ofsFrames, numBones, ofsCompBonePool, ofsSkel, ofsEnd), the skeleton, then per frame and bone a
