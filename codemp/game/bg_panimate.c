@@ -770,6 +770,21 @@ int BG_InGrappleMove(int anim)
 	return 0;
 }
 
+// GLX_U: [Ledge] hanging from a ledge (OJP Enhanced's ledge grab)
+qboolean BG_InLedgeMove( int anim )
+{
+	switch ( anim )
+	{
+	case BOTH_LEDGE_GRAB:
+	case BOTH_LEDGE_HOLD:
+	case BOTH_LEDGE_LEFT:
+	case BOTH_LEDGE_RIGHT:
+	case BOTH_LEDGE_MERCPULL:
+		return qtrue;
+	}
+	return qfalse;
+}
+
 int BG_BrokenParryForAttack( int move )
 {
 	//Our attack was knocked away by a knockaway parry
@@ -2282,12 +2297,14 @@ void BG_SetAnimFinal(playerState_t *ps, animation_t *animations,
 	if (setAnimParts & SETANIM_TORSO)
 	{
 		// Don't reset if it's already running the anim
-		if( !(setAnimFlags & SETANIM_FLAG_RESTART) && (ps->torsoAnim) == anim )
+		// GLX_U: [Ledge] (OJP) ...unless it's paced (SETANIM_FLAG_PACE): then replay it once its timer runs out
+		if( !(setAnimFlags & (SETANIM_FLAG_RESTART|SETANIM_FLAG_PACE)) && (ps->torsoAnim) == anim )
 		{
 			goto setAnimLegs;
 		}
-		// or if a more important anim is running
-		if( !(setAnimFlags & SETANIM_FLAG_OVERRIDE) && ((ps->torsoTimer > 0)||(ps->torsoTimer == -1)) )
+		// or if a more important anim is running (or the paced one is still playing)
+		if( ((ps->torsoTimer > 0)||(ps->torsoTimer == -1)) &&
+			( !(setAnimFlags & SETANIM_FLAG_OVERRIDE) || ((setAnimFlags & SETANIM_FLAG_PACE) && (ps->torsoAnim) == anim) ) )
 		{
 			goto setAnimLegs;
 		}
@@ -2330,12 +2347,14 @@ setAnimLegs:
 	if (setAnimParts & SETANIM_LEGS)
 	{
 		// Don't reset if it's already running the anim
-		if( !(setAnimFlags & SETANIM_FLAG_RESTART) && (ps->legsAnim) == anim )
+		// GLX_U: [Ledge] (OJP) ...unless it's paced, as the torso above
+		if( !(setAnimFlags & (SETANIM_FLAG_RESTART|SETANIM_FLAG_PACE)) && (ps->legsAnim) == anim )
 		{
 			goto setAnimDone;
 		}
-		// or if a more important anim is running
-		if( !(setAnimFlags & SETANIM_FLAG_OVERRIDE) && ((ps->legsTimer > 0)||(ps->legsTimer == -1)) )
+		// or if a more important anim is running (or the paced one is still playing)
+		if( ((ps->legsTimer > 0)||(ps->legsTimer == -1)) &&
+			( !(setAnimFlags & SETANIM_FLAG_OVERRIDE) || ((setAnimFlags & SETANIM_FLAG_PACE) && (ps->legsAnim) == anim) ) )
 		{
 			goto setAnimDone;
 		}
@@ -2429,6 +2448,39 @@ qboolean BG_HasAnimation(int animIndex, int animation)
 
 	//Has the sequence
 	return qtrue;
+}
+
+// GLX_U: [Ledge] (OJP) how much of the legs anim is left, 1.0 at its start down to 0.0 at its end. Assumes the
+// timer was set to the anim's length (SETANIM_FLAG_HOLDLESS), as the ledge moves do.
+float BG_GetLegsAnimPoint( playerState_t *ps, int animIndex )
+{
+	animation_t *anim;
+	float animSpeed = 1.0f;
+	float length = 0.0f;
+
+	if ( animIndex < 0 || animIndex >= bgNumAllAnims || ps->legsAnim < 0 || ps->legsAnim >= MAX_ANIMATIONS )
+	{
+		return 0.0f;
+	}
+	anim = &bgAllAnims[animIndex].anims[ps->legsAnim];
+
+	BG_SaberStartTransAnim( ps->clientNum, ps->fd.saberAnimLevel, ps->weapon, ps->legsAnim, &animSpeed, ps->brokenLimbs );
+	if ( animSpeed > 0.0f )
+	{
+		if ( anim->numFrames < 2 )
+		{//a single frame lasts one frame
+			length = fabs( (float)anim->frameLerp ) / animSpeed;
+		}
+		else
+		{
+			length = ( anim->numFrames - 1 ) * fabs( (float)anim->frameLerp ) / animSpeed;
+		}
+		if ( length > 1.0f )
+		{//the timer is set one less, so it runs out on the anim's last frame
+			length--;
+		}
+	}
+	return ( length > 0.0f ) ? ps->legsTimer / length : 0.0f;
 }
 
 int BG_PickAnim( int animIndex, int minAnim, int maxAnim )

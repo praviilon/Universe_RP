@@ -1710,6 +1710,7 @@ typedef struct cgs_s {
 	int				debugMelee;
 	int				stepSlideFix;
 	int				noSpecMove;
+	int				ledgeGrab;		// GLX_U: [Ledge] rp_ledgeGrab, for predicting the ledge grab
 	// GalaxyRP: [Grapple Hook] the server's g_allowGrapple / g_hookStrength / g_hookStrength1 /
 	// g_hookStrength2, all CVAR_SERVERINFO, read in CG_ParseServerinfo(). The shared pull code in
 	// bg_pmove.c reads these on the client where the server reads the cvars, so prediction runs the

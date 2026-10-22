@@ -548,6 +548,9 @@ XCVAR_DEF( rp_loginRequired,					"0",	NULL,					CVAR_ARCHIVE | CVAR_SERVERINFO,	
 // GLX_U: [Cosmetics] 1 = hats and capes are drawn, 0 = nobody sees them (they stay saved). Serverinfo so
 // /cosmetics can say so -- see RP_CVU_allowCosmetics (g_cvar.c) and G_RpRepublishCosmetics (g_client.c).
 XCVAR_DEF( rp_allow_cosmetics,				"1",	RP_CVU_allowCosmetics,	CVAR_ARCHIVE | CVAR_NORESTART | CVAR_SERVERINFO,	qtrue )
+// GLX_U: [Ledge] 1 = players running our client grab ledges (OJP's ledge grab, bg_pmove.c). Serverinfo, as the
+// client predicts it from the same value (cgs.ledgeGrab).
+XCVAR_DEF( rp_ledgeGrab,					"1",	NULL,					CVAR_ARCHIVE | CVAR_SERVERINFO,					qtrue )
 // GalaxyRP: [Account] 0 (default) -- /login, /new, /char new, /char use and /logout always force a
 // respawn, the behaviour this mod has always had. 1 -- they apply in place and only force the
 // respawn when the player is in a private duel or a live Duel Tournament match, which is the same

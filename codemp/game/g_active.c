@@ -4476,6 +4476,9 @@ void ClientThink_real( gentity_t *ent ) {
 	pmove.stepSlideFix = g_stepSlideFix.integer;
 
 	pmove.noSpecMove = g_noSpecMove.integer;
+	// GLX_U: [Ledge] only players whose client (ours) predicts it; never bots or NPCs
+	pmove.ledgeGrab = ( rp_ledgeGrab.integer && ent->s.number < MAX_CLIENTS && !(ent->r.svFlags & SVF_BOT)
+		&& client->pers.clientPlugin ) ? 1 : 0;
 
 	pmove.nonHumanoid = (ent->localAnimIndex > 0);
 

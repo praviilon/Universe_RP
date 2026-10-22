@@ -1330,6 +1330,7 @@ static void CG_RpPredictPlayerState( void ) {
 
 		cg_pmove.debugMelee = cgs.debugMelee;
 		cg_pmove.stepSlideFix = cgs.stepSlideFix;
+		cg_pmove.ledgeGrab = cgs.ledgeGrab;	// GLX_U: [Ledge] (the server also requires our client: this is it)
 		cg_pmove.noSpecMove = cgs.noSpecMove;
 
 		cg_pmove.nonHumanoid = (pEnt->localAnimIndex > 0);

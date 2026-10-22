@@ -1745,6 +1745,11 @@ static float BG_ForceWallJumpStrength( void )
 
 qboolean PM_AdjustAngleForWallJump( playerState_t *ps, usercmd_t *ucmd, qboolean doMove )
 {
+	if ( BG_InLedgeMove( ps->legsAnim ) )
+	{// GLX_U: [Ledge] hanging from a ledge: PM_AdjustAngleForWallGrap() handles it (or this would drop the hold)
+		return qfalse;
+	}
+
 	if ( ( ( BG_InReboundJump( ps->legsAnim ) || BG_InReboundHold( ps->legsAnim ) )
 			&& ( BG_InReboundJump( ps->torsoAnim ) || BG_InReboundHold( ps->torsoAnim ) ) )
 		|| (pm->ps->pm_flags&PMF_STUCK_TO_WALL) )
@@ -1919,6 +1924,401 @@ void PM_GrabWallForJump( int anim )
 	PM_SetAnim( SETANIM_BOTH, anim, SETANIM_FLAG_RESTART|SETANIM_FLAG_OVERRIDE|SETANIM_FLAG_HOLD );
 	PM_AddEvent( EV_JUMP );//make sound for grab
 	pm->ps->pm_flags |= PMF_STUCK_TO_WALL;
+}
+
+/*
+=============================================================================
+GLX_U: [Ledge] ledge grab, ported from OJP Enhanced (GPL-2; JA+ shipped the same animations). In the air near
+a ledge whose top is 40-70 above the origin, a player grabs it by himself (PM_CheckGrab, from PM_AirMove) and
+hangs from it (PMF_STUCK_TO_WALL, no gravity, BOTH_LEDGE_* anims). Hanging (PM_AdjustAngleForWallGrap):
+forward or jump pulls up, back or crouch lets go, strafe shimmies along the ledge. Only where pm->ledgeGrab
+(rp_ledgeGrab, clients running our cgame, which predicts it).
+=============================================================================
+*/
+#define LEDGEGRABMAXHEIGHT		70		// the ledge top's height range above the origin
+#define LEDGEGRABMINHEIGHT		40
+#define LEDGEGRABHEIGHT			52.4f	// where the anims hold the ledge, above the origin
+#define LEDGEVERTOFFSET			LEDGEGRABHEIGHT
+#define LEDGEGRABDISTANCE		40		// how far ahead a ledge is looked for
+#define LEDGEHOROFFSET			22.3f	// the origin's distance from the wall while hanging
+
+static const int ledgeAnims[] = { BOTH_LEDGE_GRAB, BOTH_LEDGE_HOLD, BOTH_LEDGE_LEFT, BOTH_LEDGE_RIGHT, BOTH_LEDGE_MERCPULL };
+
+// lets go of a ledge
+void BG_LetGoofLedge( playerState_t *ps )
+{
+	ps->pm_flags &= ~PMF_STUCK_TO_WALL;
+	ps->torsoTimer = 0;
+	ps->legsTimer = 0;
+}
+
+// can this entity be held onto: anything solid but players, NPCs and pickups
+static qboolean PM_LedgeGrabableEntity( int entityNum )
+{
+	bgEntity_t *ent = PM_BGEntForNum( entityNum );
+
+	if ( !ent )
+	{
+		return qfalse;
+	}
+	switch ( ent->s.eType )
+	{
+	case ET_PLAYER:
+	case ET_ITEM:
+	case ET_MISSILE:
+	case ET_SPECIAL:
+	case ET_HOLOCRON:
+	case ET_NPC:
+		return qfalse;
+	default:
+		return qtrue;
+	}
+}
+
+// the wall right in front, at hand height (just under the ledge top): fraction 1 when there's none
+static void PM_LedgeWallTrace( playerState_t *ps, const vec3_t start, trace_t *trace )
+{
+	vec3_t fwd, fwdAngles, traceFrom, traceTo;
+
+	VectorSet( fwdAngles, 0, ps->viewangles[YAW], 0 );
+	AngleVectors( fwdAngles, fwd, NULL, NULL );
+	VectorCopy( start, traceFrom );
+	traceFrom[2] += LEDGEGRABHEIGHT - 1;
+	VectorMA( traceFrom, LEDGEGRABDISTANCE, fwd, traceTo );
+	pm->trace( trace, traceFrom, NULL, NULL, traceTo, ps->clientNum, pm->tracemask );
+}
+
+// scan for a ledge in the given direction; gives the move up and forward to the hang point and the yaw to face
+static qboolean PM_LedgeTrace( trace_t *trace, vec3_t dir, float *lerpup, float *lerpfwd, float *lerpyaw )
+{
+	vec3_t traceTo, traceFrom, wallangles;
+
+	VectorMA( pm->ps->origin, LEDGEGRABDISTANCE, dir, traceTo );
+	VectorCopy( pm->ps->origin, traceFrom );
+	traceFrom[2] += LEDGEGRABMINHEIGHT;
+	traceTo[2] += LEDGEGRABMINHEIGHT;
+
+	pm->trace( trace, traceFrom, NULL, NULL, traceTo, pm->ps->clientNum, pm->tracemask );
+	if ( trace->fraction >= 1.0f || !PM_LedgeGrabableEntity( trace->entityNum ) )
+	{//no wall
+		return qfalse;
+	}
+
+	//hit a wall: pop half a unit into it and trace down to find its top
+	VectorMA( trace->endpos, 0.5f, dir, traceTo );
+	VectorCopy( traceTo, traceFrom );
+	traceFrom[2] += ( LEDGEGRABMAXHEIGHT - LEDGEGRABMINHEIGHT );
+	pm->trace( trace, traceFrom, NULL, NULL, traceTo, pm->ps->clientNum, pm->tracemask );
+	if ( trace->fraction >= 1.0f || trace->startsolid || !PM_LedgeGrabableEntity( trace->entityNum ) )
+	{//no top in reach
+		return qfalse;
+	}
+
+	vectoangles( trace->plane.normal, wallangles );
+	if ( wallangles[PITCH] > -45 )
+	{//the top is too steep
+		return qfalse;
+	}
+	VectorCopy( trace->endpos, traceTo );
+	*lerpup = trace->endpos[2] - pm->ps->origin[2] - LEDGEVERTOFFSET;
+
+	//now the wall under it
+	VectorCopy( pm->ps->origin, traceFrom );
+	traceTo[2] -= 1;
+	traceFrom[2] = traceTo[2];
+	pm->trace( trace, traceFrom, NULL, NULL, traceTo, pm->ps->clientNum, pm->tracemask );
+	vectoangles( trace->plane.normal, wallangles );
+	if ( trace->fraction >= 1.0f || fabs( AngleNormalize180( wallangles[PITCH] ) ) > 20
+		|| !PM_LedgeGrabableEntity( trace->entityNum ) )
+	{//no wall, or not upright enough
+		return qfalse;
+	}
+
+	*lerpfwd = Distance( trace->endpos, traceFrom ) - LEDGEHOROFFSET;
+	*lerpyaw = vectoyaw( trace->plane.normal ) + 180;
+	return qtrue;
+}
+
+// may this player grab a ledge now (also tells whether one already hanging must let go)
+static qboolean PM_LedgeAllowed( playerState_t *ps )
+{
+	int i;
+
+	if ( !pm->ledgeGrab || ps->clientNum >= MAX_CLIENTS || pm->nonHumanoid || ps->pm_type != PM_NORMAL )
+	{
+		return qfalse;
+	}
+	if ( ps->m_iVehicleNum || ps->heldByClient || ps->forceHandExtend != HANDEXTEND_NONE
+		|| (ps->pm_flags & PMF_TIME_KNOCKBACK) || ps->fd.forceGripBeingGripped > pm->cmd.serverTime )
+	{//riding, carried, knocked down/pushed/gripped/emoting, thrown back
+		return qfalse;
+	}
+	for ( i = 0; i < (int)ARRAY_LEN( ledgeAnims ); i++ )
+	{
+		if ( !BG_HasAnimation( pm_entSelf->localAnimIndex, ledgeAnims[i] ) )
+		{
+			return qfalse;
+		}
+	}
+	return qtrue;
+}
+
+// is there room for a standing box on top of the ledge: straight up, then over it
+static qboolean PM_LedgeRoomToClimb( playerState_t *ps )
+{
+	vec3_t fwd, fwdAngles, up, over;
+	trace_t trace;
+
+	VectorSet( fwdAngles, 0, ps->viewangles[YAW], 0 );
+	AngleVectors( fwdAngles, fwd, NULL, NULL );
+	VectorCopy( ps->origin, up );
+	up[2] += LEDGEGRABHEIGHT - pm->mins[2] + 1;
+	pm->trace( &trace, ps->origin, pm->mins, pm->maxs, up, ps->clientNum, pm->tracemask );
+	if ( trace.fraction < 1.0f || trace.startsolid || trace.allsolid )
+	{
+		return qfalse;
+	}
+	VectorMA( up, LEDGEHOROFFSET + pm->maxs[0] + 1, fwd, over );
+	pm->trace( &trace, up, pm->mins, pm->maxs, over, ps->clientNum, pm->tracemask );
+	return ( trace.fraction >= 1.0f && !trace.startsolid && !trace.allsolid ) ? qtrue : qfalse;
+}
+
+// does the ledge go on beyond our side (right > 0: to the right): a wall at hand height and a flat top above it
+static qboolean PM_LedgeContinues( playerState_t *ps, int right )
+{
+	vec3_t fwd, rt, fwdAngles, start, top, bottom;
+	trace_t trace;
+
+	VectorSet( fwdAngles, 0, ps->viewangles[YAW], 0 );
+	AngleVectors( fwdAngles, fwd, rt, NULL );
+	VectorMA( ps->origin, ( right > 0 ? 1 : -1 ) * ( pm->maxs[0] + 1 ), rt, start );
+	PM_LedgeWallTrace( ps, start, &trace );
+	if ( trace.fraction >= 1.0f || trace.startsolid || !PM_LedgeGrabableEntity( trace.entityNum ) )
+	{
+		return qfalse;
+	}
+	VectorMA( trace.endpos, 0.5f, fwd, bottom );
+	VectorCopy( bottom, top );
+	top[2] += 8;
+	pm->trace( &trace, top, NULL, NULL, bottom, ps->clientNum, pm->tracemask );
+	return ( trace.fraction < 1.0f && !trace.startsolid && trace.plane.normal[2] >= 0.7f
+		&& PM_LedgeGrabableEntity( trace.entityNum ) ) ? qtrue : qfalse;
+}
+
+// check for ledge grab, every frame in the air (OJP: automatic, no key needed)
+static void PM_CheckGrab( void )
+{
+	vec3_t checkDir, traceTo, fwdAngles;
+	trace_t trace;
+	float lerpup = 0, lerpfwd = 0, lerpyaw = 0;
+	qboolean moving = ( pm->ps->velocity[0] || pm->ps->velocity[1] ) ? qtrue : qfalse;
+	qboolean found = qfalse;
+
+	if ( pm->ps->groundEntityNum != ENTITYNUM_NONE || pm->waterlevel >= 2 || !PM_LedgeAllowed( pm->ps )
+		|| (pm->ps->pm_flags & PMF_STUCK_TO_WALL) || BG_InLedgeMove( pm->ps->legsAnim )
+		|| BG_InGrappleMove( pm->ps->torsoAnim ) || BG_InGrappleMove( pm->ps->legsAnim )
+		|| BG_InSpecialJump( pm->ps->legsAnim ) || BG_FlippingAnim( pm->ps->legsAnim )
+		|| BG_InRoll( pm->ps, pm->ps->legsAnim ) || BG_KickingAnim( pm->ps->legsAnim ) )
+	{//on the ground, swimming, not allowed, already holding on, grappling, in a special jump, flip, roll or kick
+		return;
+	}
+	if ( !moving && !pm->cmd.forwardmove && !pm->cmd.rightmove )
+	{//straight up or down, and not trying to go anywhere (OJP tested world X velocity only)
+		return;
+	}
+
+	//try in front of us first
+	VectorSet( fwdAngles, 0, pm->ps->viewangles[YAW], 0 );
+	if ( moving || pm->cmd.forwardmove > 0 )
+	{
+		AngleVectors( fwdAngles, checkDir, NULL, NULL );
+		found = PM_LedgeTrace( &trace, checkDir, &lerpup, &lerpfwd, &lerpyaw );
+	}
+	if ( !found )
+	{//then where the player is trying to go
+		if ( pm->cmd.rightmove )
+		{
+			AngleVectors( fwdAngles, NULL, checkDir, NULL );
+			if ( pm->cmd.rightmove < 0 )
+			{
+				VectorScale( checkDir, -1, checkDir );
+			}
+		}
+		else if ( pm->cmd.forwardmove < 0 )
+		{
+			AngleVectors( fwdAngles, checkDir, NULL, NULL );
+			VectorScale( checkDir, -1, checkDir );
+		}
+		else
+		{//forward was tried already
+			return;
+		}
+		if ( !PM_LedgeTrace( &trace, checkDir, &lerpup, &lerpfwd, &lerpyaw ) )
+		{
+			return;
+		}
+	}
+
+	//can we actually get to the hang point
+	VectorMA( pm->ps->origin, lerpfwd, checkDir, traceTo );
+	traceTo[2] += lerpup;
+	pm->trace( &trace, pm->ps->origin, pm->mins, pm->maxs, traceTo, pm->ps->clientNum, MASK_PLAYERSOLID );
+	if ( trace.fraction < 1.0f || trace.startsolid || trace.allsolid )
+	{
+		return;
+	}
+
+	//face the wall
+	pm->ps->viewangles[YAW] = lerpyaw;
+	PM_SetPMViewAngle( pm->ps, pm->ps->viewangles, &pm->cmd );
+	pm->cmd.angles[YAW] = ANGLE2SHORT( pm->ps->viewangles[YAW] ) - pm->ps->delta_angles[YAW];
+
+	//OJP's LedgeGrabFix: an air attack is cancelled, so it doesn't lock the hold
+	pm->ps->weaponTime = 0;
+	pm->ps->saberMove = LS_NONE;
+	pm->cmd.forwardmove = pm->cmd.rightmove = pm->cmd.upmove = 0;	//no air control into the wall this frame
+
+	//latch on
+	pm->ps->saberHolstered = 2;
+	pm->ps->fd.forcePowersActive &= ~(1 << FP_LEVITATION);	//the jump is over: no Force drained while hanging
+	VectorCopy( trace.endpos, pm->ps->origin );
+	VectorClear( pm->ps->velocity );
+	PM_GrabWallForJump( BOTH_LEDGE_GRAB );
+	pm->ps->weaponTime = pm->ps->legsTimer;	//no attacks while holding on
+}
+
+// the velocity each ledge move makes. OJP's pull-up speeds are halved: its anim plays here at 20 fps (2 s, as JA+),
+// not OJP's 40, and the speeds are keyed to how much of it is left, so the path stays OJP's
+static void PM_SetVelocityforLedgeMove( playerState_t *ps, int anim )
+{
+	vec3_t fwdAngles, moveDir;
+	float animationpoint = BG_GetLegsAnimPoint( ps, pm_entSelf->localAnimIndex );
+
+	VectorSet( fwdAngles, 0, ps->viewangles[YAW], 0 );
+	switch ( anim )
+	{
+	case BOTH_LEDGE_LEFT:
+	case BOTH_LEDGE_RIGHT:
+		if ( animationpoint > .333f && animationpoint < .666f )
+		{
+			AngleVectors( fwdAngles, NULL, moveDir, NULL );
+			VectorScale( moveDir, ( anim == BOTH_LEDGE_LEFT ) ? -30 : 30, ps->velocity );
+		}
+		else
+		{
+			VectorClear( ps->velocity );
+		}
+		break;
+	case BOTH_LEDGE_MERCPULL:
+		VectorClear( ps->velocity );
+		if ( animationpoint > .8f && animationpoint < .925f )
+		{
+			ps->velocity[2] = 77;
+		}
+		else if ( animationpoint > .7f && animationpoint < .75f )
+		{
+			ps->velocity[2] = 13;
+		}
+		else if ( animationpoint > .375f && animationpoint < .7f )
+		{
+			ps->velocity[2] = 70;
+		}
+		else if ( animationpoint < .375f )
+		{//over the top
+			AngleVectors( fwdAngles, moveDir, NULL, NULL );
+			VectorScale( moveDir, 70, ps->velocity );
+		}
+		break;
+	default:
+		VectorClear( ps->velocity );
+		break;
+	}
+}
+
+//switch to this animation and keep repeating it, while updating its timers
+#define	AFLAG_PACE (SETANIM_FLAG_OVERRIDE|SETANIM_FLAG_HOLD|SETANIM_FLAG_HOLDLESS|SETANIM_FLAG_PACE)
+
+// hanging from a ledge: keeps facing the wall, reads the keys, moves along the anims
+static void PM_AdjustAngleForWallGrap( playerState_t *ps, usercmd_t *ucmd )
+{
+	trace_t trace;
+	qboolean keepJump = qfalse;
+
+	if ( !(ps->pm_flags & PMF_STUCK_TO_WALL) || !BG_InLedgeMove( ps->legsAnim ) )
+	{
+		return;
+	}
+
+	if ( !PM_LedgeAllowed( ps )
+		|| ( ps->groundEntityNum != ENTITYNUM_NONE && ps->legsAnim != BOTH_LEDGE_MERCPULL ) )
+	{//knocked down, pushed, gripped, hit back, switched off, or standing on something: let go
+		BG_LetGoofLedge( ps );
+		return;
+	}
+
+	if ( ps->legsAnim != BOTH_LEDGE_MERCPULL )
+	{//still holding onto the ledge: stick our view to the wall
+		PM_LedgeWallTrace( ps, ps->origin, &trace );
+		if ( trace.fraction >= 1.0f || !PM_LedgeGrabableEntity( trace.entityNum ) )
+		{//lost the ledge (it moved or went away): let go
+			BG_LetGoofLedge( ps );
+			return;
+		}
+		ps->viewangles[YAW] = vectoyaw( trace.plane.normal ) + 180;
+	}
+	PM_SetPMViewAngle( ps, ps->viewangles, ucmd );
+	ucmd->angles[YAW] = ANGLE2SHORT( ps->viewangles[YAW] ) - ps->delta_angles[YAW];
+
+	if ( ps->legsTimer <= 50 )
+	{//an anim is done
+		if ( ps->legsAnim == BOTH_LEDGE_MERCPULL )
+		{//pulled up: done
+			ps->pm_flags &= ~PMF_STUCK_TO_WALL;
+			if ( ucmd->upmove > 0 )
+			{//a jump still held from the pull-up doesn't jump again on top (and the held key keeps the flag set)
+				ps->pm_flags |= PMF_JUMP_HELD;
+				keepJump = qtrue;
+			}
+		}
+		else
+		{//back to holding on
+			PM_SetAnim( SETANIM_BOTH, BOTH_LEDGE_HOLD, SETANIM_FLAG_OVERRIDE );
+			ps->torsoTimer = ps->legsTimer = 500;
+			ps->weaponTime = ps->legsTimer;	//no attacks while holding on
+		}
+	}
+	else if ( ps->legsAnim == BOTH_LEDGE_HOLD )
+	{
+		if ( ( ucmd->forwardmove > 0 || ucmd->upmove > 0 ) && PM_LedgeRoomToClimb( ps ) )
+		{//pull up (forward, or jump)
+			PM_SetAnim( SETANIM_BOTH, BOTH_LEDGE_MERCPULL, SETANIM_FLAG_OVERRIDE|SETANIM_FLAG_HOLD|SETANIM_FLAG_HOLDLESS );
+			ps->weaponTime = ps->legsTimer;
+		}
+		else if ( ucmd->forwardmove < 0 || ucmd->upmove < 0 )
+		{//let go (back, or crouch)
+			BG_LetGoofLedge( ps );
+		}
+		else if ( ucmd->rightmove && ucmd->forwardmove <= 0 && ucmd->upmove <= 0
+			&& PM_LedgeContinues( ps, ucmd->rightmove ) )
+		{//shimmy, as long as the ledge goes on
+			PM_SetAnim( SETANIM_BOTH, ( ucmd->rightmove < 0 ) ? BOTH_LEDGE_LEFT : BOTH_LEDGE_RIGHT, AFLAG_PACE );
+			ps->weaponTime = ps->legsTimer;
+		}
+		else
+		{//keep holding on
+			ps->torsoTimer = ps->legsTimer = 500;
+			ps->weaponTime = ps->legsTimer;
+		}
+	}
+
+	PM_SetVelocityforLedgeMove( ps, ps->legsAnim );
+
+	//no moving or jumping of our own
+	ucmd->forwardmove = ucmd->rightmove = 0;
+	if ( !keepJump )
+	{
+		ucmd->upmove = 0;
+	}
 }
 
 /*
@@ -3405,6 +3805,7 @@ static void PM_AirMove( void ) {
 			PM_CheckJump();
 		}
 #endif
+		PM_CheckGrab();	// GLX_U: [Ledge] a ledge in reach is grabbed by itself (OJP)
 	}
 	PM_Friction();
 
@@ -9856,7 +10257,7 @@ void BG_UpdateLookAngles( int lookingDebounceTime, vec3_t lastHeadAngles, int ti
 }
 
 //for setting visual look (headturn) angles
-static void BG_G2ClientNeckAngles( void *ghoul2, int time, const vec3_t lookAngles, vec3_t headAngles, vec3_t neckAngles, vec3_t thoracicAngles, vec3_t headClampMinAngles, vec3_t headClampMaxAngles )
+static void BG_G2ClientNeckAngles( void *ghoul2, int time, const vec3_t lookAngles, vec3_t headAngles, vec3_t neckAngles, vec3_t thoracicAngles, vec3_t headClampMinAngles, vec3_t headClampMaxAngles, int legsAnim )
 {
 	vec3_t	lA;
 	VectorCopy( lookAngles, lA );
@@ -9889,7 +10290,11 @@ static void BG_G2ClientNeckAngles( void *ghoul2, int time, const vec3_t lookAngl
 	}
 
 	//split it up between the neck and cranium
-	if ( thoracicAngles[PITCH] )
+	if ( BG_InLedgeMove( legsAnim ) )
+	{// GLX_U: [Ledge] (OJP) hanging: the arms' parent bone keeps the anim's pitch
+		thoracicAngles[PITCH] = 0;
+	}
+	else if ( thoracicAngles[PITCH] )
 	{//already been set above, blend them
 		thoracicAngles[PITCH] = (thoracicAngles[PITCH] + (lA[PITCH] * 0.4)) * 0.5f;
 	}
@@ -9914,13 +10319,21 @@ static void BG_G2ClientNeckAngles( void *ghoul2, int time, const vec3_t lookAngl
 		thoracicAngles[ROLL] = lA[ROLL] * 0.1;
 	}
 
-	neckAngles[PITCH] = lA[PITCH] * 0.2f;
-	neckAngles[YAW] = lA[YAW] * 0.3f;
-	neckAngles[ROLL] = lA[ROLL] * 0.3f;
+	if ( BG_InLedgeMove( legsAnim ) )
+	{// GLX_U: [Ledge] (OJP) hanging: head and neck follow the anim, or the head turns oddly
+		VectorClear( neckAngles );
+		VectorClear( headAngles );
+	}
+	else
+	{
+		neckAngles[PITCH] = lA[PITCH] * 0.2f;
+		neckAngles[YAW] = lA[YAW] * 0.3f;
+		neckAngles[ROLL] = lA[ROLL] * 0.3f;
 
-	headAngles[PITCH] = lA[PITCH] * 0.4;
-	headAngles[YAW] = lA[YAW] * 0.6;
-	headAngles[ROLL] = lA[ROLL] * 0.6;
+		headAngles[PITCH] = lA[PITCH] * 0.4;
+		headAngles[YAW] = lA[YAW] * 0.6;
+		headAngles[ROLL] = lA[ROLL] * 0.6;
+	}
 
 	/* //non-applicable SP code
 	if ( G_RidingVehicle( cent->gent ) )// && type == VH_SPEEDER ?
@@ -10045,9 +10458,16 @@ static void BG_G2ClientSpineAngles( void *ghoul2, int motionBolt, vec3_t cent_le
 
 	//distribute the angles differently up the spine
 	//NOTE: each of these distributions must add up to 1.0f
-	thoracicAngles[PITCH] = viewAngles[PITCH]*0.20f;
-	llAngles[PITCH] = viewAngles[PITCH]*0.40f;
-	ulAngles[PITCH] = viewAngles[PITCH]*0.40f;
+	if ( BG_InLedgeMove( cent->legsAnim ) )
+	{// GLX_U: [Ledge] (OJP) hanging: the spine keeps the anim's pitch
+		thoracicAngles[PITCH] = llAngles[PITCH] = ulAngles[PITCH] = 0;
+	}
+	else
+	{
+		thoracicAngles[PITCH] = viewAngles[PITCH]*0.20f;
+		llAngles[PITCH] = viewAngles[PITCH]*0.40f;
+		ulAngles[PITCH] = viewAngles[PITCH]*0.40f;
+	}
 
 	thoracicAngles[YAW] = viewAngles[YAW]*0.20f;
 	ulAngles[YAW] = viewAngles[YAW]*0.35f;
@@ -10500,7 +10920,7 @@ void BG_G2PlayerAngles(void *ghoul2, int motionBolt, entityState_t *cent, int ti
 
 	BG_UpdateLookAngles(lookTime, lastHeadAngles, time, lookAngles, lookSpeed, -50.0f, 50.0f, -70.0f, 70.0f, -30.0f, 30.0f);
 
-	BG_G2ClientNeckAngles(ghoul2, time, lookAngles, headAngles, neckAngles, thoracicAngles, headClampMinAngles, headClampMaxAngles);
+	BG_G2ClientNeckAngles(ghoul2, time, lookAngles, headAngles, neckAngles, thoracicAngles, headClampMinAngles, headClampMaxAngles, cent->legsAnim);
 
 #ifdef BONE_BASED_LEG_ANGLES
 	{
@@ -11723,6 +12143,7 @@ void PmoveSingle (pmove_t *pmove) {
 	PM_AdjustAngleForWallJump( pm->ps, &pm->cmd, qtrue );
 	PM_AdjustAngleForWallRunUp( pm->ps, &pm->cmd, qtrue );
 	PM_AdjustAngleForWallRun( pm->ps, &pm->cmd, qtrue );
+	PM_AdjustAngleForWallGrap( pm->ps, &pm->cmd );	// GLX_U: [Ledge] hanging from a ledge
 
 	if (pm->ps->saberMove == LS_A_JUMP_T__B_ || pm->ps->saberMove == LS_A_LUNGE ||
 		pm->ps->saberMove == LS_A_BACK_CR || pm->ps->saberMove == LS_A_BACK ||

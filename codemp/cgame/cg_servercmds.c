@@ -147,6 +147,7 @@ void CG_ParseServerinfo( void ) {
 
 	cgs.debugMelee = atoi( Info_ValueForKey( info, "g_debugMelee" ) ); //trap->Cvar_GetHiddenVarValue("g_iknowkungfu");
 	cgs.stepSlideFix = atoi( Info_ValueForKey( info, "g_stepSlideFix" ) );
+	cgs.ledgeGrab = atoi( Info_ValueForKey( info, "rp_ledgeGrab" ) );	// GLX_U: [Ledge] missing (older server) = off
 
 	// GalaxyRP: [Grapple Hook] the mode and the three pull numbers, published by the server for
 	// exactly this read (g_xcvar.h). A missing key is the cvar's own default, not zero -- a zero

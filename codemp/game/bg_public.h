@@ -513,6 +513,7 @@ typedef struct pmove_s {
 	int			debugMelee;
 	int			stepSlideFix;
 	int			noSpecMove;
+	int			ledgeGrab;		// GLX_U: [Ledge] may grab ledges (rp_ledgeGrab, plugin clients only)
 
 	animation_t	*animations;
 
@@ -551,6 +552,7 @@ extern	pmove_t		*pm;
 #define SETANIM_FLAG_HOLD		2//Set the new timer
 #define SETANIM_FLAG_RESTART	4//Allow restarting the anim if playing the same one (weapon fires)
 #define SETANIM_FLAG_HOLDLESS	8//Set the new timer
+#define SETANIM_FLAG_PACE		16// GLX_U: [Ledge] (OJP) with OVERRIDE: switch to this anim, but replay it only once its timer has run out
 
 
 // if a full pmove isn't done on the client, you can just update the angles
@@ -1873,6 +1875,8 @@ qboolean BG_SaberInKata( int saberMove );
 qboolean BG_InKataAnim(int anim);
 qboolean BG_KickingAnim( int anim );
 int BG_InGrappleMove(int anim);
+qboolean BG_InLedgeMove( int anim );	// GLX_U: [Ledge]
+float BG_GetLegsAnimPoint( playerState_t *ps, int animIndex );
 int BG_BrokenParryForAttack( int move );
 int BG_BrokenParryForParry( int move );
 int BG_KnockawayForParry( int move );
