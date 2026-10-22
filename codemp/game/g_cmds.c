@@ -13352,25 +13352,26 @@ void Cmd_ListAccount_f( gentity_t *ent ) {
 				// documented anywhere before -- the saber duel has no commands[] row at all (it arrives as
 				// GENCMD_ENGAGE_DUEL from a bound key), so a player had no way to learn either one
 				// existed. Put in this half of Misc rather than the block above it: that one ran at
-				// 402 of SV_SendServerCommand's hard 1022 characters and this one at 607 (937 now, with
-				// the longer /playsound line -- a longer addition goes in a message of its own), and the
-				// whole message is dropped rather than truncated once a block passes it.
+				// 402 of SV_SendServerCommand's hard 1022 characters, and the whole message is dropped
+				// rather than truncated once a block passes it.
 				// DAJ_RP: the first by its real name, /engage_duel -- the engine's own command
 				// (cl_input.cpp); there is no /duel, and it was listed as one. And the second is a
 				// "Force duel": it gives the opponent's Force only, not the full Force other mods' do.
+				// GLX_U: [Couple Emotes] /wehug and /wekiss under /anim; this half of Misc was at 964, so it is
+				// split after them (about 560 and 570 now).
 				trap->SendServerCommand(ent - g_entities, "print \"\
 ^3/engage_duel: ^7Challenges the player you are looking at to a private saber duel. Most Force powers are disabled for both of you.\n\
 ^3/engage_fullforceduel: ^7Challenges the player you are looking at to a private saber duel with Force powers allowed.\n\
 ^3/anim ^7or ^3/emote <id/name/list>: ^7Plays an animation by id or name. ^3List ^7and ^3list 2 ^7are for listing all the available animations.\n\
+^3/wehug: ^7Hugs the player you are looking at.\n\
+^3/wekiss: ^7Kisses the player you are looking at. The kissed player can slap out of it with Force Push.\n\"");
+				trap->SendServerCommand(ent - g_entities, "print \"\
 ^3/playsound <channel (optional)> <file path>: ^7Plays a sound, once every 15 seconds. With no arguments, lists the channels; ^3/list sounds ^7lists the files.\n\
 ^3/datetime: ^7Shows current server date and time.\n\
 ^3/drop: ^7Drops the current weapon of the player. If current weapon is melee, drops the selected Holdable Item from inventory.\n\
 ^3/ignore <player name or id>: ^7Enable/disable ignoring a player. Covers every written chat type; voice commands still play.\n\
 ^3/ignorelist: ^7Lists ignored players.\n\
 ^3/jetpack: ^7Gives or removes jetpack from the player.\n\"");
-				// GLX_U: [Couple Emotes] next to /emote, in a message of their own (the block above is near the 1022 limit)
-				trap->SendServerCommand(ent - g_entities, "print \"^3/wehug: ^7Hugs the player you are looking at.\n\
-^3/wekiss: ^7Kisses the player you are looking at. The kissed player can slap out of it with Force Push.\n\"");
 				// GalaxyRP fix: [Commands] split off into its own SendServerCommand call -- the Misc
 				// section above is already close to SV_SendServerCommand's hard 1022-char limit
 				// (sv_main.cpp's SV_SendServerCommand silently drops the entire message if the formatted
