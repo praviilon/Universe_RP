@@ -92,16 +92,11 @@ read -r option
 # Launch (detached, so this script/terminal returns immediately -- matches the Windows client
 # script's "start ""). fs_portable 1 + an absolute fs_homepath keep every file the client writes
 # (settings, saved profiles, screenshots) inside this folder instead of the user's home directory.
-# GalaxyRP fix: [TaystJK] the TaystJK client (unlike the dedicated server) defaults fs_forcegame
-# to "taystjk", which unconditionally overwrites fs_gamedir back to "taystjk" at the end of
-# FS_Startup -- after fs_game GalaxyRP has already added GalaxyRP to the search path, but before
-# the engine decides where to actually WRITE files. Game content still loads fine from GalaxyRP
-# (it's on the search path), but screenshots, saved configs, and demos would silently land in
-# <fs_homepath>/taystjk/ instead of GalaxyRP/. Setting fs_forcegame explicitly to GalaxyRP here
-# neutralizes that override (fs_forcegame ends up equal to fs_gamedir, so the override no-ops)
-# and makes GalaxyRP the actual write target too.
+# GLX_U: [TaystJK] fs_forcegame "" -- no forced folder. The TaystJK client's default (taystjk) would
+# send every write to taystjk/. Empty, the mod folder (fs_game) is read and written alone, with its own
+# taystjk.cfg, and another server's mod gets its own folder without ours layered under it.
 if [ -z "$option" ]; then
-	nohup "./$jk_executable" +set fs_portable 1 +set fs_homepath "$ENGINE_DIR" +set fs_game "$jk_mod_folder" +set fs_forcegame "$jk_mod_folder" >/dev/null 2>&1 &
+	nohup "./$jk_executable" +set fs_portable 1 +set fs_homepath "$ENGINE_DIR" +set fs_game "$jk_mod_folder" +set fs_forcegame "" >/dev/null 2>&1 &
 else
-	nohup "./$jk_executable" +set fs_portable 1 +set fs_homepath "$ENGINE_DIR" +set fs_game "$jk_mod_folder" +set fs_forcegame "$jk_mod_folder" +connect "$option" >/dev/null 2>&1 &
+	nohup "./$jk_executable" +set fs_portable 1 +set fs_homepath "$ENGINE_DIR" +set fs_game "$jk_mod_folder" +set fs_forcegame "" +connect "$option" >/dev/null 2>&1 &
 fi

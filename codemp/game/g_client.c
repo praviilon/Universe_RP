@@ -3389,7 +3389,7 @@ void ClientBegin( int clientNum, qboolean allowTeamReset ) {
 			// TaystJK's dll loader tries the fs_game folder first, before taystjk/ and base/. With no
 			// rpmod_client the player is running TaystJK's own fallback client, usually because our
 			// client files are not in the GalaxyRP folder. fs_forcegame only decides where the client
-			// writes (config, screenshots, demos), which is why the launch script still sets it.
+			// writes (config, screenshots, demos), which is why the launch script sets it (empty).
 			trap->SendServerCommand(clientNum, va("print \"^3You do not have the required client plugin installed. The server requires ^5%s^7.\n^3If you already have it installed, your game started with the wrong engine folder override - close the game and relaunch using the script file shipped with the client.\n\"", JK_VERSION));
 			G_LogPrintf("ClientPlugin: Player does not have any plugin\n");
 		}

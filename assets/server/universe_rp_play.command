@@ -82,16 +82,11 @@ read -r option
 # saved profiles, screenshots) inside this folder instead of ~/Library/Application Support -- an
 # absolute path is used here (rather than ".") because "open" does not guarantee the launched app
 # inherits this script's working directory.
-# GalaxyRP fix: [TaystJK] the TaystJK client (unlike the dedicated server) defaults fs_forcegame
-# to "taystjk", which unconditionally overwrites fs_gamedir back to "taystjk" at the end of
-# FS_Startup -- after fs_game GalaxyRP has already added GalaxyRP to the search path, but before
-# the engine decides where to actually WRITE files. Game content still loads fine from GalaxyRP
-# (it's on the search path), but screenshots, saved configs, and demos would silently land in
-# <fs_homepath>/taystjk/ instead of GalaxyRP/. Setting fs_forcegame explicitly to GalaxyRP here
-# neutralizes that override (fs_forcegame ends up equal to fs_gamedir, so the override no-ops)
-# and makes GalaxyRP the actual write target too.
+# GLX_U: [TaystJK] fs_forcegame "" -- no forced folder. The TaystJK client's default (taystjk) would
+# send every write to taystjk/. Empty, the mod folder (fs_game) is read and written alone, with its own
+# taystjk.cfg, and another server's mod gets its own folder without ours layered under it.
 if [ -z "$option" ]; then
-	open "$jk_executable" --args +set fs_portable 1 +set fs_homepath "$ENGINE_DIR" +set fs_game "$jk_mod_folder" +set fs_forcegame "$jk_mod_folder"
+	open "$jk_executable" --args +set fs_portable 1 +set fs_homepath "$ENGINE_DIR" +set fs_game "$jk_mod_folder" +set fs_forcegame ""
 else
-	open "$jk_executable" --args +set fs_portable 1 +set fs_homepath "$ENGINE_DIR" +set fs_game "$jk_mod_folder" +set fs_forcegame "$jk_mod_folder" +connect "$option"
+	open "$jk_executable" --args +set fs_portable 1 +set fs_homepath "$ENGINE_DIR" +set fs_game "$jk_mod_folder" +set fs_forcegame "" +connect "$option"
 fi

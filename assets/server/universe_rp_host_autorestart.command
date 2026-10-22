@@ -142,7 +142,8 @@ while : ; do
 	# Launch. fs_portable 1 + an absolute fs_homepath keep every file the server writes (config
 	# changes, the accounts database, logs) inside this server folder instead of
 	# ~/Library/Application Support.
-	"./$jk_executable" +set dedicated "$jk_dedicated" +set net_port "$jk_net_port" "$@" +set fs_portable 1 +set fs_homepath "$ENGINE_DIR" +set fs_game "$jk_mod_folder" +exec "$jk_config"
+	# GLX_U: [TaystJK] fs_forcegame "" (a dedicated build's default already): everything the server writes stays in the mod folder.
+	"./$jk_executable" +set dedicated "$jk_dedicated" +set net_port "$jk_net_port" "$@" +set fs_portable 1 +set fs_homepath "$ENGINE_DIR" +set fs_game "$jk_mod_folder" +set fs_forcegame "" +exec "$jk_config"
 	jk_status=$?
 
 	jk_ended="$(date +%s 2>/dev/null)" || jk_ended="$jk_started"

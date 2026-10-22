@@ -2627,7 +2627,7 @@ Ghoul2 Insert End
 
 	// GLX_U: [TaystJK] the client modules leave fs_forcegame alone. The TaystJK client defaults it
 	// to "taystjk", so a plain launch writes its config, screenshots and demos to taystjk/; the
-	// launch scripts pass "+set fs_forcegame GalaxyRP" to write to the mod folder instead. Changing
+	// launch scripts pass +set fs_forcegame "", which leaves the mod folder as the only one. Changing
 	// it from here (as 3.8.5 did) moved the write folder at the next map without the engine loading
 	// GalaxyRP/taystjk.cfg, so the next config save wrote the TaystJK settings over it. The real
 	// fix belongs in the engine (proposed to TaystJK: a mod folder that opts out of fs_forcegame).
