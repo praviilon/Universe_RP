@@ -1754,11 +1754,13 @@ stringID_table_t animTable [MAX_ANIMATIONS+1] =
 	ENUM2STRING(BOTH_CIN_1),		//# Level specific cinematic 1
 	ENUM2STRING(BOTH_CIN_2),		//# Level specific cinematic 2
 	ENUM2STRING(BOTH_CIN_3),		//# Level specific cinematic 3
-	ENUM2STRING(BOTH_CIN_4),		//# Level specific cinematic 4
-	ENUM2STRING(BOTH_CIN_5),		//# Level specific cinematic 5
-	ENUM2STRING(BOTH_CIN_6),		//# Level specific cinematic 6
-	ENUM2STRING(BOTH_CIN_7),		//# Level specific cinematic 7
-	ENUM2STRING(BOTH_CIN_8),		//# Level specific cinematic 8
+	// GLX_U: [Ledge] BOTH_CIN_4..8 renamed in place (no other number moves): these are JA+'s ledge-grab numbers,
+	// so TaystJK/JAPro clients render them and vanilla clients aren't kicked; animations from OJP Enhanced
+	ENUM2STRING(BOTH_LEDGE_GRAB),		//# Ledge grab: grabbing the ledge
+	ENUM2STRING(BOTH_LEDGE_HOLD),		//# Ledge grab: hanging
+	ENUM2STRING(BOTH_LEDGE_LEFT),		//# Ledge grab: shimmy left
+	ENUM2STRING(BOTH_LEDGE_RIGHT),		//# Ledge grab: shimmy right
+	ENUM2STRING(BOTH_LEDGE_MERCPULL),		//# Ledge grab: pulling up
 	ENUM2STRING(BOTH_CIN_9),		//# Level specific cinematic 9
 	ENUM2STRING(BOTH_CIN_10),		//# Level specific cinematic 10
 	ENUM2STRING(BOTH_CIN_11),		//# Level specific cinematic 11

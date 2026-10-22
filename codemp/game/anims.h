@@ -1759,11 +1759,13 @@ typedef enum //# animNumber_e
 	BOTH_CIN_1,		//# Level specific cinematic 1
 	BOTH_CIN_2,		//# Level specific cinematic 2
 	BOTH_CIN_3,		//# Level specific cinematic 3
-	BOTH_CIN_4,		//# Level specific cinematic 4
-	BOTH_CIN_5,		//# Level specific cinematic 5
-	BOTH_CIN_6,		//# Level specific cinematic 6
-	BOTH_CIN_7,		//# Level specific cinematic 7
-	BOTH_CIN_8,		//# Level specific cinematic 8
+	// GLX_U: [Ledge] BOTH_CIN_4..8 renamed in place (no other number moves): these are JA+'s ledge-grab numbers,
+	// so TaystJK/JAPro clients render them and vanilla clients aren't kicked; animations from OJP Enhanced
+	BOTH_LEDGE_GRAB,		//# Ledge grab: grabbing the ledge
+	BOTH_LEDGE_HOLD,		//# Ledge grab: hanging
+	BOTH_LEDGE_LEFT,		//# Ledge grab: shimmy left
+	BOTH_LEDGE_RIGHT,		//# Ledge grab: shimmy right
+	BOTH_LEDGE_MERCPULL,		//# Ledge grab: pulling up
 	BOTH_CIN_9,		//# Level specific cinematic 9
 	BOTH_CIN_10,		//# Level specific cinematic 10
 	BOTH_CIN_11,		//# Level specific cinematic 11
