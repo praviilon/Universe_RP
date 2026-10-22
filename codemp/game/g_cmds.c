@@ -1172,12 +1172,6 @@ void Cmd_Emote_f( gentity_t *ent )
 
 	if (end_ptr != anim_id && *end_ptr == '\0')
 	{
-		if (anim_id_int >= BOTH_LEDGE_GRAB && anim_id_int <= BOTH_LEDGE_MERCPULL)
-		{// GLX_U: [Ledge] the ledge grab's anims belong to the ledge grab
-			trap->SendServerCommand( ent-g_entities, "print \"That animation is only for ledge grabbing.\n\"" );
-			return;
-		}
-
 		if (anim_id_int >= 0 && anim_id_int < MAX_ANIMATIONS)
 		{
 			play_animation(ent, (int)anim_id_int, 1000);
