@@ -9006,7 +9006,25 @@ static void PM_Weapon( void )
 				if (!BG_KickingAnim(pm->ps->torsoAnim) &&
 					!BG_KickingAnim(pm->ps->legsAnim))
 				{
-					int kickMove = PM_KickMoveForConditions();
+					int kickMove;
+
+					// GLX_U: [Melee Kicks] JA+'s turn-around kicks, on the ground: forward and right for the back kick,
+					// forward and left for the spin kick (JA++'s StfNewAnim moves). An animation only, as every melee
+					// kick here: ps.saberMove is not touched. In the air these stay the side air kicks below.
+					if ( pm->ps->groundEntityNum != ENTITYNUM_NONE && pm->cmd.forwardmove > 0 && pm->cmd.rightmove )
+					{
+						int turnKick = ( pm->cmd.rightmove > 0 ) ? BOTH_MELEE_BACKKICK : BOTH_MELEE_SPINKICK;
+
+						PM_SetAnim(SETANIM_BOTH, turnKick, SETANIM_FLAG_OVERRIDE|SETANIM_FLAG_HOLD);
+						if (pm->ps->legsAnim == turnKick)
+						{
+							pm->cmd.forwardmove = pm->cmd.rightmove = 0;
+							pm->ps->weaponTime = pm->ps->legsTimer;
+							return;
+						}
+					}
+
+					kickMove = PM_KickMoveForConditions();
 					if (kickMove == LS_HILT_BASH)
 					{ //yeah.. no hilt to bash with!
 						kickMove = LS_KICK_F;

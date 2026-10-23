@@ -733,6 +733,8 @@ qboolean BG_KickingAnim( int anim )
 	case BOTH_A7_KICK_R_AIR:
 	case BOTH_A7_KICK_L_AIR:
 	case BOTH_A7_HILT:
+	case BOTH_MELEE_BACKKICK:	// GLX_U: [Melee Kicks] JA+'s turn-around kicks
+	case BOTH_MELEE_SPINKICK:
 	//NOT kicks, but do kick traces anyway
 	case BOTH_GETUP_BROLL_B:
 	case BOTH_GETUP_BROLL_F:

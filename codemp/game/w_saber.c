@@ -7817,6 +7817,14 @@ static gentity_t *G_KickTrace( gentity_t *ent, vec3_t kickDir, float kickDist, v
 	return (hitEnt);
 }
 
+// GLX_U: [Melee Kicks] the legs or torso animation is a pose from /anim or /emote (HANDEXTEND_TAUNT, or DODGE for the
+// rooted ones, /wehug and /wekiss), not a move: the kick and grab traces below, which go by the animation alone,
+// skip it. A real kick or grab never runs under a hand extend.
+static qboolean RP_AnimIsPose( const gentity_t *ent )
+{
+	return ( ent->client->ps.forceHandExtend == HANDEXTEND_TAUNT || ent->client->ps.forceHandExtend == HANDEXTEND_DODGE ) ? qtrue : qfalse;
+}
+
 static void G_KickSomeMofos(gentity_t *ent)
 {
 	vec3_t	kickDir, kickEnd, fwdAngs;
@@ -7836,6 +7844,11 @@ static void G_KickSomeMofos(gentity_t *ent)
 
 	// GalaxyRP fix: [Dead Code] removed the Monk (rpg_class==4) kick-damage boost here;
 	// pers.rpg_class is permanently 0, so this never applied.
+
+	if ( RP_AnimIsPose( ent ) )
+	{ // GLX_U: [Melee Kicks] a kick animation played by /anim or /emote hits nobody
+		return;
+	}
 
 	//HMM... or maybe trace from origin to footRBolt/footLBolt?  Which one?  G2 trace?  Will do hitLoc, if so...
 	if ( ent->client->ps.torsoAnim == BOTH_A7_HILT )
@@ -7971,6 +7984,41 @@ static void G_KickSomeMofos(gentity_t *ent)
 				{//guess
 					AngleVectors( fwdAngs, NULL, kickDir, NULL );
 					VectorScale( kickDir, -1, kickDir );
+				}
+			}
+			break;
+		// GLX_U: [Melee Kicks] JA+'s turn-around kicks, while the kicking foot is out (measured in the animations)
+		case BOTH_MELEE_BACKKICK:
+			if ( elapsedTime >= 375 && elapsedTime <= 625 )
+			{//right foot, high, front left after the turn
+				doKick = qtrue;
+				if ( ri->footRBolt != -1 )
+				{//actually trace to a bolt
+					G_GetBoltPosition( ent, ri->footRBolt, kickEnd, 0 );
+					VectorSubtract( kickEnd, ent->r.currentOrigin, kickDir );
+					kickDir[2] = 0;//ah, flatten it, I guess...
+					VectorNormalize( kickDir );
+				}
+				else
+				{//guess
+					AngleVectors( fwdAngs, kickDir, NULL, NULL );
+				}
+			}
+			break;
+		case BOTH_MELEE_SPINKICK:
+			if ( elapsedTime >= 300 && elapsedTime <= 550 )
+			{//left foot, high, ahead after the spin
+				doKick = qtrue;
+				if ( ri->footLBolt != -1 )
+				{//actually trace to a bolt
+					G_GetBoltPosition( ent, ri->footLBolt, kickEnd, 0 );
+					VectorSubtract( kickEnd, ent->r.currentOrigin, kickDir );
+					kickDir[2] = 0;//ah, flatten it, I guess...
+					VectorNormalize( kickDir );
+				}
+				else
+				{//guess
+					AngleVectors( fwdAngs, kickDir, NULL, NULL );
 				}
 			}
 			break;
@@ -8157,6 +8205,11 @@ static void G_GrabSomeMofos(gentity_t *self)
 
 	if (!self->ghoul2 || ri->handRBolt == -1)
 	{ //no good
+		return;
+	}
+
+	if ( RP_AnimIsPose( self ) )
+	{ // GLX_U: [Melee Kicks] the grab animation played by /anim grabs nobody
 		return;
 	}
 
