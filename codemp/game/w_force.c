@@ -7055,6 +7055,10 @@ void WP_ForcePowersUpdate( gentity_t *self, usercmd_t *ucmd )
 		}
 		else
 		{
+			if (self->client->ps.forceHandExtend == HANDEXTEND_TAUNT)
+			{ // GLX_U: [Emote] an /anim pose run out: the torso with the legs, not held in the pose (g_active.c)
+				RP_PoseLetGo(self, self->client->ps.forceDodgeAnim);
+			}
 			self->client->ps.forceHandExtend = HANDEXTEND_WEAPONREADY;
 		}
 	}

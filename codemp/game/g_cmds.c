@@ -1272,6 +1272,7 @@ static void RP_EmoteFree( gentity_t *ent )
 
 	if ( cl->ps.forceHandExtend == cl->emoteHandExtend && cl->ps.forceDodgeAnim == cl->emoteAnim )
 	{
+		RP_PoseLetGo( ent, cl->emoteAnim );	// the torso with the legs, not held in the pose (g_active.c)
 		cl->ps.forceHandExtend = HANDEXTEND_WEAPONREADY;
 		cl->ps.forceHandExtendTime = level.time;
 		cl->ps.forceDodgeAnim = 0;
@@ -1549,6 +1550,7 @@ static void RP_PairFree( gentity_t *ent )
 
 	if ( cl->ps.forceHandExtend == HANDEXTEND_DODGE && cl->ps.forceDodgeAnim == cl->pairAnim )
 	{
+		RP_PoseLetGo( ent, cl->pairAnim );	// the torso with the legs, not held in the pose (g_active.c)
 		cl->ps.forceHandExtend = HANDEXTEND_WEAPONREADY;
 		cl->ps.forceHandExtendTime = level.time;
 		cl->ps.forceDodgeAnim = 0;

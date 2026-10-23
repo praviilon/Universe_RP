@@ -877,6 +877,39 @@ void RP_PhaseTrackNpc( gentity_t *npc )
 
 /*
 =================
+RP_PoseLetGo
+
+GLX_U: [Emote] a full-body pose -- /anim, /emote, /wehug, /wekiss -- is being let go. Every hand extend ends
+through HANDEXTEND_WEAPONREADY, which starts a 250 ms weapon raise; with a saber or melee nothing touches the
+torso until it is over, so the legs went back to standing while the upper body held the pose's last frame
+(the hugged player leaning back, the kissed one's head turned). Legs still in the pose stand, and a torso still
+in it follows the legs (standing, or the run); the raise and the weapon stance then go on from a matching body.
+=================
+*/
+void RP_PoseLetGo( gentity_t *ent, int anim )
+{
+	playerState_t *ps;
+
+	if ( !ent || !ent->client || anim <= 0 )
+	{
+		return;
+	}
+	ps = &ent->client->ps;
+
+	if ( ps->legsAnim == anim )
+	{
+		ps->legsAnim = BOTH_STAND1;
+		ps->legsTimer = 0;
+	}
+	if ( ps->torsoAnim == anim )
+	{
+		ps->torsoAnim = ps->legsAnim;
+		ps->torsoTimer = 0;
+	}
+}
+
+/*
+=================
 RP_StartOverlapRelease
 
 GalaxyRP fix: [Telefrag] let a player or NPC that has just arrived inside another live body walk out of
