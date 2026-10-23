@@ -1217,9 +1217,10 @@ void Cmd_Anim_f( gentity_t *ent )
 GLX_U: [Emote] /emote: JA++'s emotes (its /am* commands), a whole set each -- a first animation and its own
 ending. STATIC ones root the player (HANDEXTEND_DODGE; the movement code also holds jump and crouch, so the
 ending plays standing), the others play under HANDEXTEND_TAUNT like /anim; HOLD ones last until the player
-jumps, crouches or presses Use, the rest play once; HOLSTER ones switch the saber off. A knockdown, push, grip,
-/anim, death or going down ends one at once, without its ending; a hit doesn't (as JA++). A new /emote
-replaces a running one or an /anim pose. RP_EmoteThink() runs every frame.
+jumps, crouches or presses an action key (the ones that end an /anim pose, G_ActionButtonPressed()), the rest
+play once; HOLSTER ones switch the saber off. A knockdown, push, grip, /anim, death or going down ends one at
+once, without its ending; a hit doesn't (as JA++). A new /emote replaces a running one or an /anim pose.
+RP_EmoteThink() runs every frame.
 =============================================================================
 */
 #define RP_EMF_STATIC	1
@@ -1240,7 +1241,7 @@ static const rp_emote_t rpEmotes[] = {
 	{ "die",		BOTH_HIT1,				BOTH_FORCE_GETUP_F2,	RP_EMF_STATIC|RP_EMF_HOLD },					// amdie
 	{ "die2",		BOTH_DEATH15,			BOTH_FORCE_GETUP_F2,	RP_EMF_STATIC|RP_EMF_HOLD },					// amdie2
 	{ "heal",		BOTH_FORCEHEAL_START,	BOTH_FORCEHEAL_STOP,	RP_EMF_STATIC|RP_EMF_HOLD|RP_EMF_HOLSTER },		// amheal
-	{ "hips",		BOTH_STAND5TOSTAND8,	BOTH_STAND8TOSTAND5,	RP_EMF_STATIC|RP_EMF_HOLD|RP_EMF_HOLSTER },		// amhips
+	{ "heroic",		BOTH_STAND5TOSTAND8,	BOTH_STAND8TOSTAND5,	RP_EMF_STATIC|RP_EMF_HOLD|RP_EMF_HOLSTER },		// amhips (as /anim heroic)
 	{ "kneel",		BOTH_CROUCH3,			BOTH_UNCROUCH3,			RP_EMF_STATIC|RP_EMF_HOLD|RP_EMF_HOLSTER },		// amkneel
 	{ "kneel2",		BOTH_ROSH_PAIN,			BOTH_UNCROUCH3,			RP_EMF_STATIC|RP_EMF_HOLD|RP_EMF_HOLSTER },		// amkneel2
 	{ "fear",		BOTH_SONICPAIN_HOLD,	BOTH_SONICPAIN_END,		RP_EMF_HOLD },									// amnoisy
@@ -1304,8 +1305,8 @@ void RP_EmoteThink( gentity_t *ent )
 	}
 
 	if ( cl->emoteHold )
-	{//held until the player leaves: jump, crouch or Use
-		stageDone = ( cl->pers.cmd.upmove != 0 || (cl->pers.cmd.buttons & BUTTON_USE) ) ? qtrue : qfalse;
+	{//held until the player leaves: jump, crouch or an action key, as /anim (Attack, Use, ...)
+		stageDone = ( cl->pers.cmd.upmove != 0 || G_ActionButtonPressed( cl->pers.cmd.buttons ) ) ? qtrue : qfalse;
 	}
 	else
 	{
@@ -1444,7 +1445,7 @@ void Cmd_Emote_f( gentity_t *ent )
 			print_row( ent, rpEmotes[i].name );
 		}
 		print_table_horizontal_line( ent );
-		trap->SendServerCommand( ent-g_entities, "print \"^3Jump, crouch or Use to stop an emote. For single animations, use /anim.\n\"" );
+		trap->SendServerCommand( ent-g_entities, "print \"^3For single animations, use /anim.\n\"" );
 		return;
 	}
 
@@ -13646,12 +13647,12 @@ void Cmd_ListAccount_f( gentity_t *ent ) {
 				// (cl_input.cpp); there is no /duel, and it was listed as one. And the second is a
 				// "Force duel": it gives the opponent's Force only, not the full Force other mods' do.
 				// GLX_U: [Couple Emotes] /wehug and /wekiss under /anim; this half of Misc was at 964, so it is
-				// split after them (about 560 and 570 then). GLX_U: [Emote] /emote under /anim: this one is at 678.
+				// split after them (about 560 and 570 then). GLX_U: [Emote] /emote under /anim: this one is at 669.
 				trap->SendServerCommand(ent - g_entities, "print \"\
 ^3/engage_duel: ^7Challenges the player you are looking at to a private saber duel. Most Force powers are disabled for both of you.\n\
 ^3/engage_fullforceduel: ^7Challenges the player you are looking at to a private saber duel with Force powers allowed.\n\
-^3/anim <id/name/list>: ^7Plays one animation by number or name; it stays until you press an action key. ^3List ^7and ^3list 2 ^7list the names.\n\
-^3/emote <name/list>: ^7Plays a full emote with its own ending. Jump, crouch or Use to stop. ^3/emote list ^7lists them.\n\
+^3/anim <id/name/list>: ^7Plays one animation by number or name. Use or Attack to stop. ^3List ^7and ^3list 2 ^7list the names.\n\
+^3/emote <name/list>: ^7Plays a full emote with its own ending. Jump, crouch, Use or Attack to stop. ^3/emote list ^7lists them.\n\
 ^3/wehug: ^7Hugs the player you are looking at.\n\
 ^3/wekiss: ^7Kisses the player you are looking at. The kissed player can slap out of it with Force Push.\n\"");
 				trap->SendServerCommand(ent - g_entities, "print \"\

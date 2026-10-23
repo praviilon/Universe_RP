@@ -2422,6 +2422,7 @@ void Cmd_WeHug_f( gentity_t *ent );
 void Cmd_WeKiss_f( gentity_t *ent );
 // GLX_U: [Emote] /emote, JA++-style emotes with their own ending: run every frame (g_main.c)
 void RP_EmoteThink( gentity_t *ent );
+qboolean G_ActionButtonPressed( int buttons );	// g_active.c: the action keys that end an /anim pose, and a held /emote
 
 //
 // g_items.c
