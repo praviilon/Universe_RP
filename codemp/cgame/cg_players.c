@@ -10014,13 +10014,19 @@ void CG_RpSetCvarCosmetic( const char *cvarName, const char *cosmetic ) {
 
 int CG_RpCosmeticForColor( int kind, const char *colorValue ) {
 	const char *name = colorValue;
-	int i;
 
-	if ( kind < 0 || kind > 1 || !name )
+	if ( !name )
 		return 0;
 	while ( *name >= '0' && *name <= '9' )
 		name++;
-	if ( !*name )
+	return CG_RpCosmeticForName( kind, name );
+}
+
+// GLX_U: [Cosmetics] the hat or cape of that name this client has, index + 1, or 0
+int CG_RpCosmeticForName( int kind, const char *name ) {
+	int i;
+
+	if ( kind < 0 || kind > 1 || !name || !*name )
 		return 0;
 
 	for ( i = 0; i < cgs.rpNumCosmetics[kind]; i++ ) {
@@ -10690,6 +10696,18 @@ void CG_Player( centity_t *cent ) {
 		}
 
 		assert(cent->npcClient);
+
+		// GLX_U: [NPC Cosmetics] the hat and cape the server put in its frame (RP_NpcPublishCosmetics()), by id from
+		// the shared lists to this client's own models; one it does not have is none, as for a player. Drawn by
+		// CG_RpPlaceCosmetics(), which skips a model without the bolt.
+		if (cent->npcClient->rpNpcCosmeticFrame != cent->currentState.frame)
+		{
+			const int frame = cent->currentState.frame;
+
+			cent->npcClient->rpNpcCosmeticFrame = frame;
+			cent->npcClient->rpCosmetic[RP_COSMETIC_HAT] = CG_RpCosmeticForName( RP_COSMETIC_HAT, BG_RpCosmeticName( RP_COSMETIC_HAT, RP_NPC_HAT( frame ) ) );
+			cent->npcClient->rpCosmetic[RP_COSMETIC_CAPE] = CG_RpCosmeticForName( RP_COSMETIC_CAPE, BG_RpCosmeticName( RP_COSMETIC_CAPE, RP_NPC_CAPE( frame ) ) );
+		}
 
 		if (cent->npcClient->ghoul2Model != cent->ghoul2 && cent->ghoul2)
 		{

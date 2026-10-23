@@ -5489,9 +5489,9 @@ void update_current_character_name_and_model(gentity_t* ent, sqlite3* db, char* 
 	// an id above the colour's 32 bits -- see RP_STORED_PACK (g_local.h). A name not on the saved list
 	// is stored as 0, none.
 	sqlite3_bind_int64(stmt, 6, RP_STORED_PACK(SABER_STORED_PACK(ent->client->pers.saberColorMode[0], ent->client->pers.saberRGB[0]),
-		G_RpCosmeticId(RP_COSMETIC_HAT, ent->client->pers.cosmetic[RP_COSMETIC_HAT])));
+		BG_RpCosmeticId(RP_COSMETIC_HAT, ent->client->pers.cosmetic[RP_COSMETIC_HAT])));
 	sqlite3_bind_int64(stmt, 7, RP_STORED_PACK(SABER_STORED_PACK(ent->client->pers.saberColorMode[1], ent->client->pers.saberRGB[1]),
-		G_RpCosmeticId(RP_COSMETIC_CAPE, ent->client->pers.cosmetic[RP_COSMETIC_CAPE])));
+		BG_RpCosmeticId(RP_COSMETIC_CAPE, ent->client->pers.cosmetic[RP_COSMETIC_CAPE])));
 	sqlite3_bind_int(stmt, 8, ent->client->pers.CharID);
 	rc = sqlite3_step(stmt);
 	if (rc != SQLITE_DONE)
@@ -5691,8 +5691,8 @@ qboolean select_player_character(gentity_t* ent, char *character_name, sqlite3* 
 		ent->client->pers.saberColorMode[1] = G_ValidateSaberColorMode( SABER_STORED_MODE(saber2Color) );
 		// GLX_U: [Cosmetics] and this character's hat and cape, for the same reason: the save that
 		// update_saber() can trigger writes them back to this row. An id not on the list gives none.
-		Q_strncpyz( ent->client->pers.cosmetic[RP_COSMETIC_HAT], G_RpCosmeticName( RP_COSMETIC_HAT, RP_STORED_COSMETIC(stored1) ), sizeof( ent->client->pers.cosmetic[0] ) );
-		Q_strncpyz( ent->client->pers.cosmetic[RP_COSMETIC_CAPE], G_RpCosmeticName( RP_COSMETIC_CAPE, RP_STORED_COSMETIC(stored2) ), sizeof( ent->client->pers.cosmetic[0] ) );
+		Q_strncpyz( ent->client->pers.cosmetic[RP_COSMETIC_HAT], BG_RpCosmeticName( RP_COSMETIC_HAT, RP_STORED_COSMETIC(stored1) ), sizeof( ent->client->pers.cosmetic[0] ) );
+		Q_strncpyz( ent->client->pers.cosmetic[RP_COSMETIC_CAPE], BG_RpCosmeticName( RP_COSMETIC_CAPE, RP_STORED_COSMETIC(stored2) ), sizeof( ent->client->pers.cosmetic[0] ) );
 
 		// GalaxyRP fix: [Saber RGB] patch the server's cached userinfo (cp_sbRGB1/cp_sbRGB2/color1/
 		// color2) to match this character's just-loaded colours *before* update_saber() below runs.
@@ -6276,8 +6276,8 @@ void select_account_and_default_character_data(gentity_t* ent, char username[32]
 		ent->client->pers.saberColorMode[1] = G_ValidateSaberColorMode( SABER_STORED_MODE(saber2Color) );
 		// GLX_U: [Cosmetics] and this character's hat and cape, for the same reason: the save that
 		// update_saber() can trigger writes them back to this row. An id not on the list gives none.
-		Q_strncpyz( ent->client->pers.cosmetic[RP_COSMETIC_HAT], G_RpCosmeticName( RP_COSMETIC_HAT, RP_STORED_COSMETIC(stored1) ), sizeof( ent->client->pers.cosmetic[0] ) );
-		Q_strncpyz( ent->client->pers.cosmetic[RP_COSMETIC_CAPE], G_RpCosmeticName( RP_COSMETIC_CAPE, RP_STORED_COSMETIC(stored2) ), sizeof( ent->client->pers.cosmetic[0] ) );
+		Q_strncpyz( ent->client->pers.cosmetic[RP_COSMETIC_HAT], BG_RpCosmeticName( RP_COSMETIC_HAT, RP_STORED_COSMETIC(stored1) ), sizeof( ent->client->pers.cosmetic[0] ) );
+		Q_strncpyz( ent->client->pers.cosmetic[RP_COSMETIC_CAPE], BG_RpCosmeticName( RP_COSMETIC_CAPE, RP_STORED_COSMETIC(stored2) ), sizeof( ent->client->pers.cosmetic[0] ) );
 
 		// GalaxyRP fix: [Saber RGB] same reason as select_player_character()'s matching call above --
 		// sync the cached userinfo to this character's just-loaded colours before update_saber() below
@@ -16669,6 +16669,40 @@ static const char *zyk_spawner_scale_problem( const char *value )
 	return NULL;
 }
 
+// GLX_U: [NPC Cosmetics] what is wrong with an "npchat" or "npccape" value on an NPC or vehicle spawner, or NULL: a
+// name from its list (BG_RpCosmeticName(), bg_misc.c) or "none", and neither key on a vehicle spawner. An empty value
+// is none and always fine. A type on a skeleton of its own cannot be told before it spawns: it ignores the key then
+// (NPC_Spawn_Do()). Used by /entadd and /entedit.
+static const char *zyk_spawner_cosmetic_problem( qboolean vehicle, const char *key, const char *value )
+{
+	static char problem[1024];
+	const int slot = !Q_stricmp( key, "npccape" ) ? RP_COSMETIC_CAPE : RP_COSMETIC_HAT;
+	int id;
+
+	if ( !value || !value[0] )
+	{
+		return NULL;
+	}
+
+	if ( vehicle )
+	{
+		return "Vehicles wear no hat or cape: ^3npchat^7 and ^3npccape^7 are for an ^3npc_spawner^7.";
+	}
+
+	if ( !Q_stricmp( value, "none" ) || BG_RpCosmeticId( slot, value ) )
+	{
+		return NULL;
+	}
+
+	Com_sprintf( problem, sizeof( problem ), "^3%s %s^7: use ^3none^7 or one of:^3", key, zyk_shown_name( value ) );
+	for ( id = 1; BG_RpCosmeticName( slot, id )[0]; id++ )
+	{
+		Q_strcat( problem, sizeof( problem ), va( "%s %s", id > 1 ? "," : "", BG_RpCosmeticName( slot, id ) ) );
+	}
+	Q_strcat( problem, sizeof( problem ), "^7." );
+	return problem;
+}
+
 // DAJ_RP: [NPC Scale] the value /entadd or /entedit stores for a key of an entity of this class: an NPC or vehicle
 // spawner's "npcscale" as the size it makes (zyk_spawner_scale_problem() above has let only whole numbers through), so
 // /entsave and /entinfo show what is used; every other value as typed. value is a buffer of size bytes, changed in place.
@@ -16699,11 +16733,13 @@ static const char *zyk_entadd_spawner_problem( const char *classname, int number
 	char key[MAX_STRING_CHARS], value[MAX_STRING_CHARS];
 	char targetname[MAX_STRING_CHARS], npc_type[MAX_STRING_CHARS], effect[MAX_STRING_CHARS], team[MAX_STRING_CHARS];
 	char reward_credits[MAX_STRING_CHARS], reward_xp[MAX_STRING_CHARS], freeze[MAX_STRING_CHARS], scale[MAX_STRING_CHARS];
+	char hat[MAX_STRING_CHARS], cape[MAX_STRING_CHARS];
 	qboolean has_type = qfalse;
 	qboolean vehicle = !Q_stricmp( classname, "npc_vehicle" ) ? qtrue : qfalse;
 	int i;
 
 	targetname[0] = npc_type[0] = effect[0] = team[0] = reward_credits[0] = reward_xp[0] = freeze[0] = scale[0] = '\0';
+	hat[0] = cape[0] = '\0';
 	for ( i = 2; i + 1 < number_of_args; i += 2 )
 	{
 		trap->Argv( i, key, sizeof( key ) );
@@ -16740,6 +16776,14 @@ static const char *zyk_entadd_spawner_problem( const char *classname, int number
 		else if ( !Q_stricmp( key, "npcscale" ) )
 		{
 			Q_strncpyz( scale, value, sizeof( scale ) );
+		}
+		else if ( !Q_stricmp( key, "npchat" ) )
+		{
+			Q_strncpyz( hat, value, sizeof( hat ) );
+		}
+		else if ( !Q_stricmp( key, "npccape" ) )
+		{
+			Q_strncpyz( cape, value, sizeof( cape ) );
 		}
 	}
 
@@ -16800,6 +16844,22 @@ static const char *zyk_entadd_spawner_problem( const char *classname, int number
 		if ( problem_scale )
 		{
 			return problem_scale;
+		}
+	}
+
+	// GLX_U: [NPC Cosmetics] "npchat" and "npccape" -- see RP_SpawnerCosmeticKeys() (NPC_spawn.c)
+	if ( hat[0] || cape[0] )
+	{
+		const char *problem_cosmetic = zyk_spawner_cosmetic_problem( vehicle, "npchat", hat );
+
+		if ( !problem_cosmetic )
+		{
+			problem_cosmetic = zyk_spawner_cosmetic_problem( vehicle, "npccape", cape );
+		}
+
+		if ( problem_cosmetic )
+		{
+			return problem_cosmetic;
 		}
 	}
 
@@ -17652,6 +17712,17 @@ void Cmd_EntEdit_f( gentity_t *ent ) {
 						return;
 					}
 				}
+				// GLX_U: [NPC Cosmetics] "npchat" and "npccape" -- removing them is always fine
+				if ((Q_stricmp(key, "npchat") == 0 || Q_stricmp(key, "npccape") == 0) && Q_stricmp(arg2, "zykremovekey") != 0)
+				{
+					const char *problem_cosmetic = zyk_spawner_cosmetic_problem(!Q_stricmp(this_ent->classname, "npc_vehicle") ? qtrue : qfalse, key, arg2);
+
+					if (problem_cosmetic)
+					{
+						trap->SendServerCommand( ent-g_entities, va("print \"%s\n\"", problem_cosmetic) );
+						return;
+					}
+				}
 			}
 		}
 
@@ -18009,6 +18080,7 @@ static const char *zyk_entsave_effect_word(int mode)
 //    solid -- or, not started up yet, as the flag says. Never DROPTOFLOOR / a Jedi's ambush 16, SHY 2048, the
 //    internal 65536, or zyk's old custom-credits 32768, which nothing honours any more.
 //  - npccredits, npcxp: what its killer is paid (gentity_t::rpRewardCredits/rpRewardXP), when it pays anything.
+//  - npchat, npccape: the hat and cape it wears (gentity_t::rpNpcCosmetic), even while rp_allow_cosmetics hides them.
 //  - npceffect: its /npc effect mode now; a release in progress is no mode.
 //  - npcfreeze: 1 while it is under /npc freeze (RP_NpcFreeze(), NPC_spawn.c), so it comes back frozen. A map
 //    script's own freeze is not ours to save.
@@ -18036,6 +18108,10 @@ static const char *zyk_entsave_npc_line(gentity_t *ent, const char *escaped_type
 	if (ent->rpRewardCredits > 0 && !zyk_entsave_add("npccredits", va("%d", ent->rpRewardCredits)))
 		return NULL;
 	if (ent->rpRewardXP > 0 && !zyk_entsave_add("npcxp", va("%d", ent->rpRewardXP)))
+		return NULL;
+	if (ent->rpNpcCosmetic[RP_COSMETIC_HAT] && !zyk_entsave_add("npchat", BG_RpCosmeticName(RP_COSMETIC_HAT, ent->rpNpcCosmetic[RP_COSMETIC_HAT])))
+		return NULL;
+	if (ent->rpNpcCosmetic[RP_COSMETIC_CAPE] && !zyk_entsave_add("npccape", BG_RpCosmeticName(RP_COSMETIC_CAPE, ent->rpNpcCosmetic[RP_COSMETIC_CAPE])))
 		return NULL;
 	if (effect && !zyk_entsave_add("npceffect", effect))
 		return NULL;
@@ -21510,7 +21586,7 @@ void Cmd_EntitiesAndRemaps_f( gentity_t *ent ) {
 	lines[n++] = "^3/entaddaim <classname> <key> <value>...: ^7Like /entadd, but puts the entity on the surface you aim at (through players and NPCs); ^3aimoffset <units>^7 puts it that far out from the surface.\n";
 	lines[n++] = "^3/entorigin: ^7Sets your position as origin for new entities. Use again to unset.\n";
 	lines[n++] = "^3/entundo: ^7Removes last added entity; a spawner takes the NPCs it made with it. Only works once.\n";
-	lines[n++] = "^7NPC spawners: ^3npc_spawner^7 and ^3NPC_Vehicle^7 (npc_type) need a ^3targetname^7, the name they are fired by; ^3spawnnow 1^7 also spawns one at once, ^3respawn 1^7 fires it again when one it made dies, ^3count -1^7 is no limit; ^3npceffect holo^7, ^3ghost^7 or ^3walkthrough^7 spawns NPCs with that ^3/npc effect^7; ^3npcteam player^7, ^3enemy^7, ^3neutral^7 or ^3free^7 sets their side, as ^3/npc team^7 does; ^3npcfreeze 1^7 spawns them frozen, as ^3/npc freeze^7 leaves them; ^3npcscale <20-500>^7 sets their size in percent (^3100^7 is normal).\n";
+	lines[n++] = "^7NPC spawners: ^3npc_spawner^7 and ^3NPC_Vehicle^7 (npc_type) need a ^3targetname^7, the name they are fired by; ^3spawnnow 1^7 also spawns one at once, ^3respawn 1^7 fires it again when one it made dies, ^3count -1^7 is no limit; ^3npceffect holo^7, ^3ghost^7 or ^3walkthrough^7 spawns NPCs with that ^3/npc effect^7; ^3npcteam player^7, ^3enemy^7, ^3neutral^7 or ^3free^7 sets their side, as ^3/npc team^7 does; ^3npcfreeze 1^7 spawns them frozen, as ^3/npc freeze^7 leaves them; ^3npcscale <20-500>^7 sets their size in percent (^3100^7 is normal); ^3npchat <hat>^7 and ^3npccape <cape>^7 dress humanoid NPCs (names: ^3/enthelp npc npchat^7).\n";
 	lines[n++] = "^7NPC kill rewards: on an ^3npc_spawner^7, ^3npccredits <0-100000>^7 and ^3npcxp <0-100>^7 are paid to the logged-in player who kills one of its NPCs. Vehicles pay nothing.\n";
 
 	lines[n++] = "^5Finding and changing\n";

@@ -1908,6 +1908,21 @@ gentity_t *NPC_Spawn_Do( gentity_t *ent )
 		VectorSet( newent->modelScale, scale, scale, scale );
 	}
 
+	// GLX_U: [NPC Cosmetics] the spawner's "npchat" and "npccape" (RP_SpawnerCosmeticKeys()), after NPC_ParseParms()
+	// has loaded the model: only on the humanoid skeleton (localAnimIndex 0 _humanoid, 1 rockettrooper -- see
+	// SetupGameGhoul2Model()), never on a vehicle. Droids, creatures and other skeletons of their own ignore them.
+	// The client still skips a model without the *head_top or *back bolt (CG_RpPlaceCosmetics()).
+	if ( newent->client->NPC_class != CLASS_VEHICLE && ( newent->localAnimIndex == 0 || newent->localAnimIndex == 1 ) )
+	{
+		newent->rpNpcCosmetic[RP_COSMETIC_HAT] = ent->rpNpcCosmetic[RP_COSMETIC_HAT];
+		newent->rpNpcCosmetic[RP_COSMETIC_CAPE] = ent->rpNpcCosmetic[RP_COSMETIC_CAPE];
+	}
+	else
+	{
+		newent->rpNpcCosmetic[RP_COSMETIC_HAT] = newent->rpNpcCosmetic[RP_COSMETIC_CAPE] = 0;
+	}
+	RP_NpcPublishCosmetics( newent );
+
 	// DAJ_RP: [NPC Rewards] the spawner's "npccredits" and "npcxp": what this NPC's killer is paid. (The old
 	// spawnflags 32768 + genericvalue7 credits are not honoured any more -- nothing ever paid them.)
 	if ( newent->client->NPC_class != CLASS_VEHICLE )
@@ -2661,6 +2676,43 @@ static void RP_SpawnerScaleKey( gentity_t *self )
 	self->rpNpcScale = RP_NpcScaleValue( text, qfalse );
 }
 
+/*
+==================
+RP_SpawnerCosmeticKeys / RP_NpcPublishCosmetics
+
+GLX_U: [NPC Cosmetics] an npc_spawner's "npchat" and "npccape": the hat and cape each NPC it makes wears, by name
+from the shared lists (BG_RpCosmeticName(), bg_misc.c). An unknown name, "none" or no key is none -- /entadd and
+/entedit refuse an unknown name, an entity file or a map may not have been through them. Read every time, like
+npcscale. Not read by SP_NPC_Vehicle(), and ignored at spawn by an NPC on a skeleton of its own (NPC_Spawn_Do()).
+
+RP_NpcPublishCosmetics() puts an NPC's ids in its entityState_t::frame for the clients (RP_NPC_COSMETICS,
+bg_public.h), none while rp_allow_cosmetics is 0. G_RpRepublishCosmetics() calls it again when that changes.
+==================
+*/
+static void RP_SpawnerCosmeticKeys( gentity_t *self )
+{
+	char *text = NULL;
+
+	G_SpawnString( "npchat", "", &text );
+	self->rpNpcCosmetic[RP_COSMETIC_HAT] = BG_RpCosmeticId( RP_COSMETIC_HAT, text );
+
+	text = NULL;
+	G_SpawnString( "npccape", "", &text );
+	self->rpNpcCosmetic[RP_COSMETIC_CAPE] = BG_RpCosmeticId( RP_COSMETIC_CAPE, text );
+}
+
+void RP_NpcPublishCosmetics( gentity_t *ent )
+{
+	if ( !ent || !ent->client || ent->s.eType != ET_NPC )
+	{
+		return;
+	}
+
+	ent->s.frame = rp_allow_cosmetics.integer
+		? RP_NPC_COSMETICS( ent->rpNpcCosmetic[RP_COSMETIC_HAT], ent->rpNpcCosmetic[RP_COSMETIC_CAPE] )
+		: 0;
+}
+
 /*QUAKED NPC_spawner (1 0 0) (-16 -16 -24) (16 16 40) x x x x DROPTOFLOOR CINEMATIC NOTSOLID STARTINSOLID SHY
 
 DROPTOFLOOR - NPC can be in air, but will spawn on the closest floor surface below it
@@ -2880,6 +2932,9 @@ void SP_NPC_spawner( gentity_t *self)
 
 	// DAJ_RP: [NPC Scale] "npcscale" -- see RP_SpawnerScaleKey()
 	RP_SpawnerScaleKey( self );
+
+	// GLX_U: [NPC Cosmetics] "npchat" and "npccape" -- see RP_SpawnerCosmeticKeys()
+	RP_SpawnerCosmeticKeys( self );
 
 	// DAJ_RP: [NPC System] "npcfreeze" -- see RP_NpcFreezeFromValue(). Read every time, like npceffect.
 	{

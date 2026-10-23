@@ -3359,3 +3359,58 @@ int BG_GetGametypeForString( const char *gametype )
 	else if ( !Q_stricmp( gametype, "cty" ) )			return GT_CTY;
 	else												return -1;
 }
+
+/*
+=====================================================================
+GLX_U: [Cosmetics] the hats and capes that can be saved with a character, by id (index + 1). They
+are TaystJK's own (assets/japro/models/cosmetics), shipped in our client pk3 at the same paths.
+The order is FROZEN: an id is what the database holds, so a new item goes at the end of its list
+and an item is never removed or moved, or saved characters would come back wearing another one.
+At most RP_STORED_COSMETIC_MASK (255) per list. Shared with the cgame: an NPC's hat and cape travel
+as these ids too (RP_NPC_COSMETICS, bg_public.h), so the same rule keeps saved NPCs right.
+=====================================================================
+*/
+static const char *rpCosmeticHats[] = {
+	"afro", "beard", "bucket", "cap", "cringe", "crown", "fedora", "fedora2", "fedora3", "fedora4",
+	"glasses", "gradcap", "headcrab", "horns", "mario", "mask", "metalhelm", "plaguemask",
+	"predatorhelm", "pumpkin", "santahat", "sombrero", "supersaiyan", "tophat"
+};
+static const char *rpCosmeticCapes[] = {
+	"ak47", "crowbar", "goose", "grogucape", "royalcape", "rpg", "vadercape", "yodacape"
+};
+
+static const char **BG_RpCosmeticList( int slot, int *count ) {
+	if ( slot == RP_COSMETIC_HAT ) {
+		*count = (int)ARRAY_LEN( rpCosmeticHats );
+		return rpCosmeticHats;
+	}
+	if ( slot == RP_COSMETIC_CAPE ) {
+		*count = (int)ARRAY_LEN( rpCosmeticCapes );
+		return rpCosmeticCapes;
+	}
+	*count = 0;
+	return NULL;
+}
+
+int BG_RpCosmeticId( int slot, const char *name ) {
+	int count, i;
+	const char **list = BG_RpCosmeticList( slot, &count );
+
+	if ( !name || !name[0] )
+		return 0;
+
+	for ( i = 0; i < count; i++ ) {
+		if ( !Q_stricmp( list[i], name ) )
+			return i + 1;
+	}
+	return 0;
+}
+
+const char *BG_RpCosmeticName( int slot, int id ) {
+	int count;
+	const char **list = BG_RpCosmeticList( slot, &count );
+
+	if ( id < 1 || id > count )
+		return "";
+	return list[id - 1];
+}

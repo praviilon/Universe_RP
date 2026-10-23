@@ -775,6 +775,20 @@ typedef enum {
 // server says who has one. The last of the ten bits the engine sends; JA++ uses it for its grapple.
 #define	EF2_RP_SABER_CARRIED	(1<<9)
 
+// GLX_U: [Cosmetics] a hat or cape name: up to 13 characters and the NUL, TaystJK's own
+// MAX_COSMETIC_LENGTH, so a name either side accepts is accepted by the other.
+#define RP_COSMETIC_NAME_SIZE	14
+#define RP_COSMETIC_HAT			0	// a player's rides on color1, drawn at *head_top
+#define RP_COSMETIC_CAPE		1	// a player's rides on color2, drawn at *back
+
+// GLX_U: [NPC Cosmetics] an NPC's hat and cape ids (BG_RpCosmeticName(), 0 for none) in its entityState_t::frame,
+// 16 bits on the wire in every engine: the hat in the low 8, the cape in the high 8. Nothing else uses frame on
+// an NPC: BG_PlayerStateToEntityState() does not write it, ICARUS's frame setters refuse an entity with a client,
+// and no cgame (ours, TaystJK's, OpenJK's) reads it for ET_NPC, so other clients just draw the NPC bare.
+#define RP_NPC_COSMETICS(hat, cape)	( ( (hat) & 0xFF ) | ( ( (cape) & 0xFF ) << 8 ) )
+#define RP_NPC_HAT(frame)			( (frame) & 0xFF )
+#define RP_NPC_CAPE(frame)			( ( (frame) >> 8 ) & 0xFF )
+
 #include "../../galaxyrp/game/rp_public.h" // Tr!Force: [GameGeneral] Public header
 
 typedef enum {
@@ -1878,6 +1892,8 @@ int BG_InGrappleMove(int anim);
 qboolean BG_InLedgeMove( int anim );	// GLX_U: [Ledge]
 qboolean BG_InCoupleEmote( int anim );	// GLX_U: [Couple Emotes]
 qboolean BG_InStaticEmote( int anim );	// GLX_U: [Emote]
+int BG_RpCosmeticId( int slot, const char *name );		// GLX_U: [Cosmetics] 0 for none or not on the list
+const char *BG_RpCosmeticName( int slot, int id );		// GLX_U: [Cosmetics] "" for 0 or an id not on the list
 void BG_LetGoofLedge( playerState_t *ps );
 float BG_GetLegsAnimPoint( playerState_t *ps, int animIndex );
 int BG_BrokenParryForAttack( int move );

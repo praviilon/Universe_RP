@@ -2403,6 +2403,12 @@ void G_RpRepublishCosmetics( void ) {
 		Info_SetValueForKey( cs, "c2", color );
 		trap->SetConfigstring( CS_PLAYERS + i, cs );
 	}
+
+	// GLX_U: [NPC Cosmetics] and every NPC's hat and cape, which ride in its entity state
+	for ( i = MAX_CLIENTS; i < level.num_entities; i++ ) {
+		if ( g_entities[i].inuse && g_entities[i].client && g_entities[i].s.eType == ET_NPC )
+			RP_NpcPublishCosmetics( &g_entities[i] );
+	}
 }
 
 extern void update_current_character_name_and_model(gentity_t* ent, sqlite3* db, char* zErrMsg, int rc, sqlite3_stmt* stmt);

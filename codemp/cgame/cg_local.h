@@ -199,11 +199,8 @@ typedef struct playerEntity_s {
 
 // GLX_U: [Cosmetics] TaystJK's hats and capes. A name is the model's file name, at most 13
 // characters (TaystJK's MAX_COSMETIC_LENGTH is 14 with the NUL) and not starting with a digit,
-// since it follows the saber number in color1/color2.
-#define RP_COSMETIC_NAME_SIZE	14
+// since it follows the saber number in color1/color2. RP_COSMETIC_NAME_SIZE, _HAT and _CAPE are in bg_public.h.
 #define RP_COSMETICS_MAX		256		// per kind, as TaystJK lists them
-#define RP_COSMETIC_HAT			0
-#define RP_COSMETIC_CAPE		1
 typedef struct rpCosmetic_s {
 	char		name[RP_COSMETIC_NAME_SIZE];
 	qhandle_t	model;
@@ -320,6 +317,9 @@ typedef struct clientInfo_s {
 	// GLX_U: [Cosmetics] the hat (0) and cape (1) this player wears: an index + 1 into cgs.rpCosmetics,
 	// 0 for none -- read off the name after the saber number in "c1"/"c2", as TaystJK sends it
 	int				rpCosmetic[2];
+	// GLX_U: [NPC Cosmetics] on an NPC's clientinfo: the entityState_t::frame rpCosmetic[] was last read off
+	// (RP_NPC_COSMETICS, bg_public.h). 0 with rpCosmetic[] 0 when zeroed, so a fresh one is already right.
+	int				rpNpcCosmeticFrame;
 
 	sfxHandle_t		sounds[MAX_CUSTOM_SOUNDS];
 	sfxHandle_t		combatSounds[MAX_CUSTOM_COMBAT_SOUNDS];
@@ -2001,6 +2001,7 @@ void CG_DestroyNPCClient(clientInfo_t **ci);
 void CG_Player( centity_t *cent );
 void CG_RpLoadCosmetics( void );	// GLX_U: [Cosmetics] cg_players.c
 int CG_RpCosmeticForColor( int kind, const char *colorValue );	// GLX_U: [Cosmetics] index + 1, 0 for none
+int CG_RpCosmeticForName( int kind, const char *name );	// GLX_U: [Cosmetics] index + 1, 0 for none
 qboolean CG_RpCosmeticNameValid( const char *name );	// GLX_U: [Cosmetics]
 void CG_RpColorCvarCosmetic( const char *cvarName, char *out, int outSize );	// GLX_U: [Cosmetics]
 void CG_RpSetColorCvar( const char *cvarName, int saberColor, const char *cosmetic );	// GLX_U: [Cosmetics]

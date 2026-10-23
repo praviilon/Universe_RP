@@ -733,6 +733,11 @@ struct gentity_s {
 	// percent, RP_NPC_SCALE_MIN..RP_NPC_SCALE_MAX, 0 for none (RP_SpawnerScaleKey(), NPC_spawn.c). Copied onto each one
 	// by NPC_Spawn_Do(), which scales it with it; on the NPC, the size its spawner gave it, so /entsave can write it.
 	int			rpNpcScale;
+
+	// GLX_U: [NPC Cosmetics] on an npc_spawner: its "npchat" and "npccape" keys as ids (BG_RpCosmeticId(), 0 for none;
+	// RP_SpawnerCosmeticKeys(), NPC_spawn.c). On an NPC, what it wears: copied by NPC_Spawn_Do() for a humanoid only, and
+	// kept while rp_allow_cosmetics is 0 (RP_NpcPublishCosmetics() then sends none), so /entsave still writes it.
+	int			rpNpcCosmetic[2];
 };
 
 // DAJ_RP: [NPC Rewards] the most an npc_spawner's "npccredits" and "npcxp" may pay for one kill
@@ -899,12 +904,6 @@ typedef enum {
 	PLAYER_STATUS_DUEL_TOURNAMENT_LOSS,      // has just lost his duel in the Duel Tournament
 	PLAYER_STATUS_AFK                        // GLX_U: [AFK] away: protection bubble and comlink animation, g_active.c
 } playerStatus_t;
-
-// GLX_U: [Cosmetics] a hat or cape name: up to 13 characters and the NUL, TaystJK's own
-// MAX_COSMETIC_LENGTH, so a name either side accepts is accepted by the other.
-#define RP_COSMETIC_NAME_SIZE	14
-#define RP_COSMETIC_HAT			0	// rides on color1, drawn at *head_top
-#define RP_COSMETIC_CAPE		1	// rides on color2, drawn at *back
 
 // client data that stays across multiple respawns, but is cleared
 // on each level change or team change at ClientBegin()
@@ -2634,8 +2633,7 @@ int		G_ValidateSaberColorMode( int decodedMode );
 // otherwise bad name give "".
 void		G_RpCosmeticFromColor( const char *colorValue, char *out, int outSize );
 void		G_RpRepublishCosmetics( void );	// GLX_U: [Cosmetics] rp_allow_cosmetics changed, g_client.c
-int			G_RpCosmeticId( int slot, const char *name );		// 0 for none or not on the list
-const char	*G_RpCosmeticName( int slot, int id );				// "" for 0 or an id not on the list
+void		RP_NpcPublishCosmetics( gentity_t *ent );	// GLX_U: [NPC Cosmetics] NPC_spawn.c
 void	RPMod_StringEscape(char *in, char *out, int outSize);
 int		G_ModelIndex( const char *name );
 int		G_SoundIndex( const char *name );
