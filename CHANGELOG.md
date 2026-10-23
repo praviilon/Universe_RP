@@ -21,6 +21,7 @@
 - `/emote` plays JA++-style emotes, each with its own ending: hiltthrow, cower, die, heal, heroic, kneel, fear, commlink, sleep, surrender, lean and more (`/emote list`). Held ones last until you jump, crouch, press Use or Attack, then play their ending; some keep you in place.
 - Melee spin kicks (from JA+): forward + right + Alt Attack is a turn-around back kick, forward + left + Alt Attack a spin kick.
 - Side flip kicks (as in JA++ and JAPro): with Jump 2 or higher, strafe-jumping toward a player or NPC beside you flips off him and kicks him.
+- `/allyaim`: adds the player you are aiming at (within 256 units) as an ally, or removes him if he already is one.
 
 ### Changed
 - `/admholo` and `/admghost` are renamed to `/holo` and `/ghost`. Any logged-in player can use them on themselves; using them on another player still needs the "Player effects" admin flag. `/admwalkthrough` and `/admhidden` are unchanged.
