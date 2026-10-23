@@ -48,7 +48,8 @@ All changes below are relative to the last stable GalaxyRP release (3.7.2) this 
 - NPC and vehicle spawners: `npc_spawner` and `NPC_Vehicle` keys `spawnnow 1` (spawn one at once, not counted) and `respawn 1` (fire again when one it made dies). `/entundo` of a spawner also removes the NPCs and vehicles it made.
 - Native TaystJK engine support: builds and runs directly on TaystJK (EternalJK's modern successor) instead of OpenJK, with the old EternalJK/JAPro detection and "switch to OpenJK" warning removed.
 - Multi-platform CI and build support: Windows (x86/x86_64), Linux (x86/x86_64/arm64), and macOS (x86_64/Apple Silicon), including a missing arm64 branch in the platform-detection headers and updated bundled SDL2 (2.0.12 -> 2.32.4).
-- RGB lightsaber colors, persisted per character. Shaders and textures are courtesy of JAPro/TaystJK.
+- RGB lightsaber colors, persisted per character. Shaders and textures are courtesy of JAPro/TaystJK. Updated saber menu: pick your hilts, a preset colour or any colour with RGB sliders, and a blade design.
+- Console commands: `/sabercolor` sets an RGB value or a preset colour, `/saberblade` picks a blade design (classic, flame or electric).
 - `rp_loginRequired` cvar: optionally forces any player who isn't logged into an account to stay in Spectator.
 - `/admmap <gametype> <map>` admin command to change map and gametype together, gated by a repurposed admin bit.
 - `/admweather` admin command, gated by a new "Weather" admin bit: sets the weather for everyone on the server, stacking up to 8 effects at once, with `/admweather default` to put back the weather the map was built with and `/admweather clear` to switch it all off. It reuses a fixed block of effect slots instead of spending a new one on every change, so the weather can be changed freely without running the map out of them, and players who were already connected see the same sky as players who join later.
