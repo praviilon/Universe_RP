@@ -1484,7 +1484,8 @@ static void RP_AfkEnter( gentity_t *ent, qboolean announce ) {
 	cl->ps.eFlags |= EF_INVULNERABLE;
 	cl->invulnerableTimer = cl->pers.afkBubbleUntil = level.time + RP_AFK_BUBBLE_MS;
 	// an emote or meditation the player is in stays: the bubble is added to it
-	cl->pers.afkOwnAnim = ( !( cl->pers.player_statuses & ( 1 << PLAYER_STATUS_EMOTE ) ) && cl->ps.forceHandExtend != HANDEXTEND_TAUNT ) ? qtrue : qfalse;
+	cl->pers.afkOwnAnim = ( !( cl->pers.player_statuses & ( 1 << PLAYER_STATUS_EMOTE ) ) && cl->ps.forceHandExtend != HANDEXTEND_TAUNT
+		&& !cl->emoteActive ) ? qtrue : qfalse;	// GLX_U: [Emote] a /emote stays too (the rooted ones aren't TAUNT)
 
 	if ( announce )
 		trap->SendServerCommand( ent - g_entities, "print \"You are AFK. Move, look around or press a key to come back.\n\"" );

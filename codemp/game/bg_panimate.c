@@ -805,6 +805,31 @@ qboolean BG_InCoupleEmote( int anim )
 	return qfalse;
 }
 
+// GLX_U: [Emote] the animations of the rooted (STATIC) /emote emotes, first ones and endings (g_cmds.c rpEmotes[]);
+// under HANDEXTEND_DODGE only, which the caller checks (the saber dodge and the hug and kiss use others)
+qboolean BG_InStaticEmote( int anim )
+{
+	switch ( anim )
+	{
+	case BOTH_HIT1:
+	case BOTH_DEATH15:
+	case BOTH_FORCE_GETUP_F2:
+	case BOTH_FORCEHEAL_START:
+	case BOTH_FORCEHEAL_STOP:
+	case BOTH_STAND5TOSTAND8:
+	case BOTH_STAND8TOSTAND5:
+	case BOTH_CROUCH3:
+	case BOTH_UNCROUCH3:
+	case BOTH_ROSH_PAIN:
+	case BOTH_SLEEP1:
+	case BOTH_SLEEP1GETUP:
+	case BOTH_STAND10:
+	case BOTH_STAND10TOSTAND1:
+		return qtrue;
+	}
+	return qfalse;
+}
+
 int BG_BrokenParryForAttack( int move )
 {
 	//Our attack was knocked away by a knockaway parry

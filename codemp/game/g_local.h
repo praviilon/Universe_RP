@@ -1729,6 +1729,14 @@ struct gclient_s {
 	int			pairSlapAt;				// the kissee's backhand swings across
 	qboolean	pairLinked;				// still in the hug or kiss itself (not slapping or flinching)
 
+	// GLX_U: [Emote] in a /emote (RP_Emote*, g_cmds.c); zeroed on spawn
+	qboolean	emoteActive;
+	int			emoteAnim;				// held now (forceDodgeAnim)
+	int			emoteNext;				// the ending still to play, 0: none
+	int			emoteStageEnd;			// this stage ends, unless held
+	qboolean	emoteHold;				// this stage lasts until the player jumps, crouches or presses Use
+	int			emoteHandExtend;		// HANDEXTEND_DODGE (rooted) or HANDEXTEND_TAUNT
+
 	int			solidHack;
 
 	int			noLightningTime;
@@ -2413,6 +2421,8 @@ void RP_PairEmoteEnd( gentity_t *ent );
 qboolean RP_PairEmotePush( gentity_t *ent );
 void Cmd_WeHug_f( gentity_t *ent );
 void Cmd_WeKiss_f( gentity_t *ent );
+// GLX_U: [Emote] /emote, JA++-style emotes with their own ending: run every frame (g_main.c)
+void RP_EmoteThink( gentity_t *ent );
 
 //
 // g_items.c

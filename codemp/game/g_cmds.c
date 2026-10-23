@@ -1197,6 +1197,282 @@ void Cmd_Anim_f( gentity_t *ent )
 
 /*
 =============================================================================
+GLX_U: [Emote] /emote: JA++'s emotes (its /am* commands), a whole set each -- a first animation and its own
+ending. STATIC ones root the player (HANDEXTEND_DODGE; the movement code also holds jump and crouch, so the
+ending plays standing), the others play under HANDEXTEND_TAUNT like /anim; HOLD ones last until the player
+jumps, crouches or presses Use, the rest play once; HOLSTER ones switch the saber off. A knockdown, push, grip,
+/anim, death or going down ends one at once, without its ending; a hit doesn't (as JA++). A new /emote
+replaces a running one or an /anim pose. RP_EmoteThink() runs every frame.
+=============================================================================
+*/
+#define RP_EMF_STATIC	1
+#define RP_EMF_HOLD		2
+#define RP_EMF_HOLSTER	4
+
+typedef struct {
+	const char	*name;
+	int			anim, leave;	// the first animation and the ending
+	int			flags;
+} rp_emote_t;
+
+// JA++'s values (the /am* command each comes from)
+static const rp_emote_t rpEmotes[] = {
+	{ "hiltthrow",	BOTH_SABERTHROW1START,	BOTH_SABERTHROW1STOP,	0 },											// amhiltthrow1
+	{ "hiltthrow2",	BOTH_SABERTHROW2START,	BOTH_SABERTHROW2STOP,	0 },											// amhiltthrow2
+	{ "cower",		BOTH_COWER1_START,		BOTH_COWER1,			RP_EMF_HOLSTER },								// amcower
+	{ "die",		BOTH_HIT1,				BOTH_FORCE_GETUP_F2,	RP_EMF_STATIC|RP_EMF_HOLD },					// amdie
+	{ "die2",		BOTH_DEATH15,			BOTH_FORCE_GETUP_F2,	RP_EMF_STATIC|RP_EMF_HOLD },					// amdie2
+	{ "heal",		BOTH_FORCEHEAL_START,	BOTH_FORCEHEAL_STOP,	RP_EMF_STATIC|RP_EMF_HOLD|RP_EMF_HOLSTER },		// amheal
+	{ "hips",		BOTH_STAND5TOSTAND8,	BOTH_STAND8TOSTAND5,	RP_EMF_STATIC|RP_EMF_HOLD|RP_EMF_HOLSTER },		// amhips
+	{ "kneel",		BOTH_CROUCH3,			BOTH_UNCROUCH3,			RP_EMF_STATIC|RP_EMF_HOLD|RP_EMF_HOLSTER },		// amkneel
+	{ "kneel2",		BOTH_ROSH_PAIN,			BOTH_UNCROUCH3,			RP_EMF_STATIC|RP_EMF_HOLD|RP_EMF_HOLSTER },		// amkneel2
+	{ "fear",		BOTH_SONICPAIN_HOLD,	BOTH_SONICPAIN_END,		RP_EMF_HOLD },									// amnoisy
+	{ "commlink",	BOTH_TALKCOMM1START,	BOTH_TALKCOMM1STOP,		RP_EMF_HOLD|RP_EMF_HOLSTER },					// amradio
+	{ "sleep",		BOTH_SLEEP1,			BOTH_SLEEP1GETUP,		RP_EMF_STATIC|RP_EMF_HOLD|RP_EMF_HOLSTER },		// amasleep
+	{ "surrender",	TORSO_SURRENDER_START,	TORSO_SURRENDER_STOP,	RP_EMF_HOLD|RP_EMF_HOLSTER },					// amsurrender
+	{ "lean",		BOTH_STAND10,			BOTH_STAND10TOSTAND1,	RP_EMF_STATIC|RP_EMF_HOLD|RP_EMF_HOLSTER },		// amwait
+};
+#define RP_NUM_EMOTES	( (int)ARRAY_LEN( rpEmotes ) )
+
+// one stage: its animation, held (until the player leaves) or for its length
+static void RP_EmoteStage( gentity_t *ent, int anim, qboolean hold )
+{
+	gclient_t *cl = ent->client;
+
+	cl->emoteAnim = anim;
+	cl->emoteHold = hold;
+	cl->emoteStageEnd = level.time + BG_AnimLength( ent->localAnimIndex, (animNumber_t)anim );
+	cl->ps.forceHandExtend = cl->emoteHandExtend;
+	cl->ps.forceDodgeAnim = anim;
+	cl->ps.forceHandExtendTime = level.time + 1000;	// kept up every frame by RP_EmoteThink()
+}
+
+// done: out of the emote's animation (unless something else already took the player out of it)
+static void RP_EmoteFree( gentity_t *ent )
+{
+	gclient_t *cl = ent->client;
+
+	if ( cl->ps.forceHandExtend == cl->emoteHandExtend && cl->ps.forceDodgeAnim == cl->emoteAnim )
+	{
+		cl->ps.forceHandExtend = HANDEXTEND_WEAPONREADY;
+		cl->ps.forceHandExtendTime = level.time;
+		cl->ps.forceDodgeAnim = 0;
+	}
+	cl->emoteActive = qfalse;
+	cl->emoteAnim = 0;
+	cl->emoteNext = 0;
+	cl->emoteHold = qfalse;
+	cl->emoteStageEnd = 0;
+	cl->emoteHandExtend = 0;
+}
+
+// every frame, for every client
+void RP_EmoteThink( gentity_t *ent )
+{
+	gclient_t *cl = ent->client;
+	qboolean stageDone;
+
+	if ( !cl || !cl->emoteActive )
+	{
+		return;
+	}
+
+	if ( cl->ps.forceHandExtend != cl->emoteHandExtend || cl->ps.forceDodgeAnim != cl->emoteAnim
+		|| ent->health <= 0 || (cl->ps.eFlags & EF_DEAD) || G_PlayerIsDowned( ent )
+		|| cl->sess.sessionTeam == TEAM_SPECTATOR
+		|| ( cl->emoteHandExtend == HANDEXTEND_DODGE && cl->ps.groundEntityNum == ENTITYNUM_NONE ) )
+	{//knocked down, pushed, gripped, /anim, dead, downed, gone, off the ground: over, without the ending
+		RP_EmoteFree( ent );
+		return;
+	}
+
+	if ( cl->emoteHold )
+	{//held until the player leaves: jump, crouch or Use
+		stageDone = ( cl->pers.cmd.upmove != 0 || (cl->pers.cmd.buttons & BUTTON_USE) ) ? qtrue : qfalse;
+	}
+	else
+	{
+		stageDone = ( level.time >= cl->emoteStageEnd ) ? qtrue : qfalse;
+	}
+
+	if ( stageDone )
+	{
+		if ( cl->emoteNext )
+		{//the ending
+			int next = cl->emoteNext;
+
+			cl->emoteNext = 0;
+			RP_EmoteStage( ent, next, qfalse );
+		}
+		else
+		{
+			RP_EmoteFree( ent );
+			return;
+		}
+	}
+
+	cl->ps.forceHandExtendTime = level.time + 1000;
+}
+
+// why this player can't start an emote now (NULL: he can)
+static const char *RP_EmoteCantStart( gentity_t *ent, const rp_emote_t *emote )
+{
+	gclient_t *cl = ent->client;
+	const int he = cl->ps.forceHandExtend;
+	// what a new emote replaces: an /anim pose or a running /emote
+	const qboolean replaces = ( ( (cl->pers.player_statuses & (1 << PLAYER_STATUS_EMOTE)) && he == HANDEXTEND_TAUNT )
+		|| ( cl->emoteActive && he == cl->emoteHandExtend ) ) ? qtrue : qfalse;
+
+	if ( ent->health <= 0 || (cl->ps.eFlags & EF_DEAD) )
+		return "you are dead";
+	if ( cl->sess.sessionTeam == TEAM_SPECTATOR || (cl->ps.pm_flags & PMF_FOLLOW) )
+		return "you are spectating";
+	if ( G_PlayerIsDowned( ent ) )
+		return "you are downed";
+	if ( cl->ps.pm_type != PM_NORMAL )
+		return "you are unable to move";
+	if ( cl->ps.groundEntityNum == ENTITYNUM_NONE )
+		return "you are not standing on the ground";
+	if ( cl->ps.m_iVehicleNum )
+		return "you are in a vehicle";
+	if ( RP_LedgeHanging( ent ) || cl->grappleState || cl->drainGrabActive || cl->pairPartner
+		|| BG_InGrappleMove( cl->ps.torsoAnim ) || BG_InGrappleMove( cl->ps.legsAnim ) )
+		return "you are grappling, hanging, hugging or kissing";
+	if ( he != HANDEXTEND_NONE && he != HANDEXTEND_WEAPONREADY && !replaces )
+		return "you are busy (knocked down, pushed, gripped or AFK)";
+	if ( cl->ps.weaponTime > 0 || cl->ps.saberMove > LS_READY || cl->ps.saberInFlight || BG_KickingAnim( cl->ps.legsAnim ) )
+		return "you are attacking";
+	if ( cl->ps.fd.forcePowersActive )
+		return "you are using a Force power";
+	if ( BG_InRoll( &cl->ps, cl->ps.legsAnim ) )
+		return "you are rolling";
+	if ( !BG_HasAnimation( ent->localAnimIndex, emote->anim ) || !BG_HasAnimation( ent->localAnimIndex, emote->leave ) )
+		return "your model has no such animation";
+	return NULL;
+}
+
+static void RP_EmoteStart( gentity_t *ent, const rp_emote_t *emote )
+{
+	gclient_t *cl = ent->client;
+
+	// an /anim pose it replaces stops being kept up (g_active.c), a running /emote is simply overwritten
+	cl->pers.player_statuses &= ~(1 << PLAYER_STATUS_EMOTE);
+
+	if ( (emote->flags & RP_EMF_HOLSTER) && cl->ps.weapon == WP_SABER && cl->ps.saberHolstered < 2 )
+	{
+		cl->ps.saberMove = LS_NONE;
+		cl->ps.saberBlocked = 0;
+		cl->ps.saberBlocking = 0;
+		cl->ps.saberHolstered = 2;
+		if ( cl->saber[0].soundOff )
+		{
+			G_Sound( ent, CHAN_AUTO, cl->saber[0].soundOff );
+		}
+		if ( cl->saber[1].model[0] && cl->saber[1].soundOff )
+		{
+			G_Sound( ent, CHAN_AUTO, cl->saber[1].soundOff );
+		}
+	}
+
+	if ( emote->flags & RP_EMF_STATIC )
+	{
+		VectorClear( cl->ps.velocity );
+		cl->emoteHandExtend = HANDEXTEND_DODGE;
+	}
+	else
+	{
+		cl->emoteHandExtend = HANDEXTEND_TAUNT;
+	}
+	cl->emoteActive = qtrue;
+	cl->emoteNext = emote->leave;
+	RP_EmoteStage( ent, emote->anim, ( emote->flags & RP_EMF_HOLD ) ? qtrue : qfalse );
+}
+
+void Cmd_Emote_f( gentity_t *ent )
+{
+	char arg[MAX_TOKEN_CHARS];
+	const char *why;
+	int i;
+
+	if ( rp_allow_emotes.integer < 1 )
+	{
+		trap->SendServerCommand( ent-g_entities, "print \"Cannot use emotes in this server\n\"" );
+		return;
+	}
+	if ( level.gametype == GT_SIEGE )
+	{
+		trap->SendServerCommand( ent-g_entities, "print \"Cannot use emotes in Siege gametype\n\"" );
+		return;
+	}
+	if ( rp_allow_emotes.integer != 1 && ent->client->ps.duelInProgress )
+	{
+		trap->SendServerCommand( ent-g_entities, "print \"Cannot use emotes in private duel\n\"" );
+		return;
+	}
+	if ( trap->Argc() < 2 )
+	{
+		trap->SendServerCommand( ent-g_entities, "print \"Usage: /emote <name or list>\n\"" );
+		return;
+	}
+
+	trap->Argv( 1, arg, sizeof( arg ) );
+
+	if ( !Q_stricmp( arg, "list" ) )
+	{
+		static const char header[MAX_STRING_CHARS] = "Emotes";	// print_header() takes a MAX_STRING_CHARS array
+
+		print_header( ent, header );
+		for ( i = 0; i < RP_NUM_EMOTES; i++ )
+		{
+			print_row( ent, rpEmotes[i].name );
+		}
+		print_table_horizontal_line( ent );
+		trap->SendServerCommand( ent-g_entities, "print \"^3Jump, crouch or Use to stop an emote. For single animations, use /anim.\n\"" );
+		return;
+	}
+
+	for ( i = 0; i < RP_NUM_EMOTES; i++ )
+	{
+		if ( !Q_stricmp( arg, rpEmotes[i].name ) )
+		{
+			break;
+		}
+	}
+	if ( i == RP_NUM_EMOTES )
+	{
+		qboolean animPreset = qfalse;
+		int j;
+
+		for ( j = 0; j < MAX_WORDED_EMOTES; j++ )
+		{
+			if ( animations[j].animation_name && !Q_stricmp( arg, animations[j].animation_name ) )
+			{
+				animPreset = qtrue;
+				break;
+			}
+		}
+		if ( animPreset || ( arg[0] >= '0' && arg[0] <= '9' ) )
+		{//an /anim preset or number
+			trap->SendServerCommand( ent-g_entities, va( "print \"Unknown emote '%s'. Use /emote list; for single animations use /anim %s\n\"", arg, arg ) );
+		}
+		else
+		{
+			trap->SendServerCommand( ent-g_entities, va( "print \"Unknown emote '%s'. Use /emote list to see the emotes.\n\"", arg ) );
+		}
+		return;
+	}
+
+	why = RP_EmoteCantStart( ent, &rpEmotes[i] );
+	if ( why )
+	{
+		trap->SendServerCommand( ent-g_entities, va( "print \"You can't do that now: %s.\n\"", why ) );
+		return;
+	}
+	RP_EmoteStart( ent, &rpEmotes[i] );
+}
+
+/*
+=============================================================================
 GLX_U: [Couple Emotes] /wehug and /wekiss, after JA++'s /amhug and /amkiss. The player in your crosshair
 within 55 units is turned to face you and set box to box in front of you, and both play a paired animation,
 rooted (HANDEXTEND_DODGE, which every client predicts): single player's cinematic hug and its release (about
@@ -13353,11 +13629,12 @@ void Cmd_ListAccount_f( gentity_t *ent ) {
 				// (cl_input.cpp); there is no /duel, and it was listed as one. And the second is a
 				// "Force duel": it gives the opponent's Force only, not the full Force other mods' do.
 				// GLX_U: [Couple Emotes] /wehug and /wekiss under /anim; this half of Misc was at 964, so it is
-				// split after them (about 560 and 570 now).
+				// split after them (about 560 and 570 then). GLX_U: [Emote] /emote under /anim: this one is at 678.
 				trap->SendServerCommand(ent - g_entities, "print \"\
 ^3/engage_duel: ^7Challenges the player you are looking at to a private saber duel. Most Force powers are disabled for both of you.\n\
 ^3/engage_fullforceduel: ^7Challenges the player you are looking at to a private saber duel with Force powers allowed.\n\
-^3/anim <id/name/list>: ^7Plays an animation by id or name. ^3List ^7and ^3list 2 ^7are for listing all the available animations.\n\
+^3/anim <id/name/list>: ^7Plays one animation by number or name; it stays until you press an action key. ^3List ^7and ^3list 2 ^7list the names.\n\
+^3/emote <name/list>: ^7Plays a full emote with its own ending. Jump, crouch or Use to stop. ^3/emote list ^7lists them.\n\
 ^3/wehug: ^7Hugs the player you are looking at.\n\
 ^3/wekiss: ^7Kisses the player you are looking at. The kissed player can slap out of it with Force Push.\n\"");
 				trap->SendServerCommand(ent - g_entities, "print \"\
@@ -25859,7 +26136,7 @@ command_t commands[] = {
 	{ "duelpause",			Cmd_DuelPause_f,			CMD_LOGGEDIN | CMD_NOINTERMISSION },
 	{ "dueltable",			Cmd_DuelTable_f,			CMD_NOINTERMISSION },
 	{ "duelteam",			Cmd_DuelTeam_f,				CMD_NOINTERMISSION },
-	{ "emote",				Cmd_Anim_f,					CMD_ALIVE | CMD_NOINTERMISSION },
+	{ "emote",				Cmd_Emote_f,				CMD_ALIVE | CMD_NOINTERMISSION },	// GLX_U: [Emote] JA++-style; /anim is the single animations
 	{ "engage_fullforceduel",	Cmd_ForceDuel_f,		CMD_ALIVE | CMD_NOINTERMISSION },	// GalaxyRP: [Force Duel] the ordinary duel has no row here -- it arrives as GENCMD_ENGAGE_DUEL
 	{ "entadd",				Cmd_EntAdd_f,				CMD_LOGGEDIN | CMD_NOINTERMISSION },
 	{ "entaddaim",			Cmd_EntAddAim_f,			CMD_LOGGEDIN | CMD_NOINTERMISSION },

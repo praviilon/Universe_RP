@@ -1877,6 +1877,7 @@ qboolean BG_KickingAnim( int anim );
 int BG_InGrappleMove(int anim);
 qboolean BG_InLedgeMove( int anim );	// GLX_U: [Ledge]
 qboolean BG_InCoupleEmote( int anim );	// GLX_U: [Couple Emotes]
+qboolean BG_InStaticEmote( int anim );	// GLX_U: [Emote]
 void BG_LetGoofLedge( playerState_t *ps );
 float BG_GetLegsAnimPoint( playerState_t *ps, int animIndex );
 int BG_BrokenParryForAttack( int move );

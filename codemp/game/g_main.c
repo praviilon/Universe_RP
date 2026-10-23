@@ -9123,6 +9123,7 @@ void G_RunFrame( int levelTime ) {
 
 			// GLX_U: [Couple Emotes] a hug or kiss: its stages, the slap, and anything that ends it
 			RP_PairEmoteThink( ent );
+			RP_EmoteThink( ent );	// GLX_U: [Emote] a /emote: its stages, leaving it, and anything that ends it
 
 			if((!level.intermissiontime)&&!(ent->client->ps.pm_flags&PMF_FOLLOW) && ent->client->sess.sessionTeam != TEAM_SPECTATOR)
 			{

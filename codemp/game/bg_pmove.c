@@ -12179,6 +12179,16 @@ void PmoveSingle (pmove_t *pmove) {
 		pm->ps->pm_flags &= ~PMF_JUMP_HELD;
 	}
 
+	if ( pm->ps->forceHandExtend == HANDEXTEND_DODGE && BG_InStaticEmote( pm->ps->forceDodgeAnim ) )
+	{// GLX_U: [Emote] a rooted /emote: jump or crouch only leaves it (the server reads the key), so the ending plays
+	 // standing; a jump still held after it doesn't fire
+		if ( pm->cmd.upmove > 0 )
+		{
+			pm->ps->pm_flags |= PMF_JUMP_HELD;
+		}
+		pm->cmd.upmove = 0;
+	}
+
 	// decide if backpedaling animations should be used
 	if ( pm->cmd.forwardmove < 0 ) {
 		pm->ps->pm_flags |= PMF_BACKWARDS_RUN;
