@@ -318,29 +318,8 @@ void turretG2_die ( gentity_t *self, gentity_t *inflictor, gentity_t *attacker, 
 			}
 		}
 	}
-	// DAJ_RP fix: [Entity System] a TURBO turret has no damaged model (none exists for it, single player the same), so
-	// it went to ObjectDie() and was freed, and CANRESPAWN -- whose timer is only set above -- never brought it back.
-	// With CANRESPAWN it is kept now, hidden and not solid until turretG2_respawn() brings it back.
-	else if ( ( self->spawnflags & SPF_TURRETG2_TURBO ) && ( self->spawnflags & SPF_TURRETG2_CANRESPAWN ) )
-	{
-		turretG2_set_models( self, qtrue );	// drops its ghoul2 model: turretG2_respawn() builds it again
-		self->s.eFlags |= EF_NODRAW;
-		self->r.svFlags |= SVF_NOCLIENT;
-		self->r.contents = 0;
-		trap->LinkEntity( (sharedEntity_t *)self );
-
-		if ( self->target )
-		{
-			G_UseTargets( self, attacker );
-		}
-
-		if ( !self->genericValue5 )
-		{
-			self->genericValue5 = level.time + self->count;
-		}
-	}
 	else
-	{
+	{	// GLX_U: [Turrets] no damaged model (a TURBO one): freed for good, CANRESPAWN or not, as in base JKA (maps rely on it)
 		ObjectDie( self, inflictor, attacker, damage, meansOfDeath );
 	}
 }
@@ -464,14 +443,6 @@ void turretG2_respawn( gentity_t *self )
 	self->s.weapon = WP_TURRET; // crosshair code uses this to mark crosshair red
 
 	turretG2_set_models( self, qfalse );
-	// DAJ_RP fix: [Entity System] a TURBO one was hidden and not solid while dead (turretG2_die())
-	if ( self->spawnflags & SPF_TURRETG2_TURBO )
-	{
-		self->s.eFlags &= ~EF_NODRAW;
-		self->r.svFlags &= ~SVF_NOCLIENT;
-		self->r.contents = CONTENTS_BODY|CONTENTS_PLAYERCLIP|CONTENTS_MONSTERCLIP|CONTENTS_SHOTCLIP;	// as it spawns
-		trap->LinkEntity( (sharedEntity_t *)self );
-	}
 	self->s.health = self->health = self->genericValue6;
 	if (self->maxHealth) {
 		G_ScaleNetHealth(self);

@@ -1143,8 +1143,8 @@ static const rpEntHelp_t rp_ent_help[] = {
 		"TURBO makes it the big Death Star turbolaser with heavier defaults. Using it (targetname) switches it off and on.",
 		"1|START_OFF|Starts off: using it switches it on.\n"
 		"2|UPSIDE_DOWN|Stands on a floor instead of hanging (placed 22 units lower).\n"
-		"4|CANRESPAWN|Comes back count ms after it is destroyed.\n"
-		"8|TURBO|The big turbolaser: defaults radius 32768, wait 1000, dmg 500, health 2000, splash 200 in 500, shotspeed 20000. It has no damaged model: destroyed, it fires its target and is gone, for good or, with CANRESPAWN, until it comes back.\n"
+		"4|CANRESPAWN|Comes back count ms after it is destroyed. Not with TURBO.\n"
+		"8|TURBO|The big turbolaser: defaults radius 32768, wait 1000, dmg 500, health 2000, splash 200 in 500, shotspeed 20000. It has no damaged model: destroyed, it fires its target and is removed for good, CANRESPAWN or not.\n"
 		"16|LEAD|Aims ahead of moving targets.\n"
 		"32|SHOWRADAR|Shows on the radar.\n"
 		"32768|NO_DROP|With UPSIDE_DOWN: not placed 22 units lower.",
