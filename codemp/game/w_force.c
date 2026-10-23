@@ -3127,10 +3127,11 @@ victim FORCE_DRAIN_GRABBED, both rooted (BG_InGrappleMove). Every 250 ms ForceDr
 victim (Force first, health only through Drain Shield) with a +1 grab bonus, for the ranged drain's
 5 Force per tick. It ends after 10 s, on the existing Drain stop rules (key released, out of Force,
 hand-hold replaced by a knockdown or push), when the two are pulled apart or the caster leaves the
-ground, or when the victim has Absorb at the Drain level or above; then no new grab for 5 s. Every end
-goes through WP_ForcePowerStop(FP_DRAIN) -> RP_DrainGrabRelease().
+ground, or when the victim has Absorb at the Drain level minus 1 or above; then no new grab for 5 s. Every
+end goes through WP_ForcePowerStop(FP_DRAIN) -> RP_DrainGrabRelease().
 */
-#define RP_DRAIN_GRAB_DIST		55.0f	// reach, and how far apart they may get
+#define RP_DRAIN_GRAB_REACH		50.0f	// from the eyes to the victim's box
+#define RP_DRAIN_GRAB_BREAK_DIST	55.0f	// how far apart (origins) they may get while held
 #define RP_DRAIN_GRAB_HOLD_DIST	46.0f	// the victim is held this far in front (SP's LOCK_FORCE_DRAIN)
 #define RP_DRAIN_GRAB_MAX_TIME	10000
 #define RP_DRAIN_GRAB_COOLDOWN	5000
@@ -3163,11 +3164,22 @@ static void RP_DrainGrabSaberOff( gentity_t *ent )
 	}
 }
 
-// Absorb at the caster's Drain level or above frees the victim (and stops a grab from starting)
+// the real Absorb level: a logged-in player's forcePowerLevel stops at 3, and his Absorb 4/5 is only in
+// skill_levels[8] (g_cmds.c caps it, as for Lightning)
+static int RP_AbsorbLevel( gentity_t *ent )
+{
+	int level = ent->client->ps.fd.forcePowerLevel[FP_ABSORB];
+
+	if (ent->s.number < MAX_CLIENTS && ent->client->sess.amrpgmode == 2 && ent->client->pers.skill_levels[8] > level)
+		level = ent->client->pers.skill_levels[8];
+	return level;
+}
+
+// Absorb at the caster's Drain level minus 1 or above frees the victim (and stops a grab from starting)
 static qboolean RP_DrainGrabAbsorbed( gentity_t *self, gentity_t *victim )
 {
 	return ((victim->client->ps.fd.forcePowersActive & (1 << FP_ABSORB)) &&
-		victim->client->ps.fd.forcePowerLevel[FP_ABSORB] >= self->client->ps.fd.forcePowerLevel[FP_DRAIN]) ? qtrue : qfalse;
+		RP_AbsorbLevel(victim) >= self->client->ps.fd.forcePowerLevel[FP_DRAIN] - 1) ? qtrue : qfalse;
 }
 
 // can victim be (still) held by self -- everything but the reach
@@ -3252,7 +3264,7 @@ static gentity_t *RP_DrainGrabFindVictim( gentity_t *self )
 	VectorCopy(self->client->ps.origin, start);
 	start[2] += self->client->ps.viewheight;
 	AngleVectors(self->client->ps.viewangles, fwd, NULL, NULL);
-	VectorMA(start, RP_DRAIN_GRAB_DIST, fwd, end);
+	VectorMA(start, RP_DRAIN_GRAB_REACH, fwd, end);
 	trap->Trace(&tr, start, vec3_origin, vec3_origin, end, self->s.number, MASK_SHOT, qfalse, 0, 0);
 	if (tr.startsolid || tr.allsolid || tr.fraction == 1.0f || tr.entityNum >= ENTITYNUM_WORLD)
 		return NULL;
@@ -3329,7 +3341,7 @@ static void RP_DrainGrabUpdate( gentity_t *self )
 		self->health <= 0 || self->client->ps.groundEntityNum == ENTITYNUM_NONE ||
 		(myAnim != BOTH_FORCE_DRAIN_GRAB_START && myAnim != BOTH_FORCE_DRAIN_GRAB_HOLD) ||	// knocked or pushed out of it
 		!RP_DrainGrabValidVictim(self, victim) ||
-		VectorLength(d) > RP_DRAIN_GRAB_DIST || fabs(d[2]) > 16.0f)	// pulled apart, or lifted
+		VectorLength(d) > RP_DRAIN_GRAB_BREAK_DIST || fabs(d[2]) > 16.0f)	// pulled apart, or lifted
 	{
 		WP_ForcePowerStop(self, FP_DRAIN);	// -> RP_DrainGrabRelease()
 		return;
