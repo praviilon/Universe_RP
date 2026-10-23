@@ -171,6 +171,8 @@ static const char * const rpxSoundChannels[] = {
 	X( "ui_rpx_sp_effect",		"0" )		/* NPCs: npceffect, 1 holo, 2 ghost, 3 walkthrough */ \
 	X( "ui_rpx_sp_team",		"0" )		/* both: npcteam, 1 player, 2 enemy, 3 neutral, 4 free; 0 its type's own */ \
 	X( "ui_rpx_sp_scale",		"0" )		/* both: npcscale, the size in percent, 20 to 500; 0 its type's own */ \
+	X( "ui_rpx_sp_hat",			"0" )		/* NPCs: npchat, an id in the shared list (BG_RpCosmeticName()), 0 none */ \
+	X( "ui_rpx_sp_cape",		"0" )		/* NPCs: npccape, likewise */ \
 	X( "ui_rpx_sp_credits",		"0" )		/* NPCs: npccredits, paid to the logged-in player who kills one, 0 to 100000 */ \
 	X( "ui_rpx_sp_xp",			"0" )		/* NPCs: npcxp, likewise, 0 to 100 */ \
 	X( "ui_rpx_sp_ondeath",		"" )		/* NPCs: NPC_target, fired when it dies */ \

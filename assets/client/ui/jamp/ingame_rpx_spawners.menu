@@ -582,6 +582,98 @@
 			visible             1
 			decoration
 		}
+		// GLX_U: [NPC Cosmetics] npchat and npccape (cg_rpextras.c sends the name for the id). The ids are the
+		// frozen order of rpCosmeticHats/rpCosmeticCapes in bg_misc.c: a new item is appended here too.
+		itemDef
+		{
+			name                rpx_sphat
+			type                ITEM_TYPE_MULTI
+			text                "Hat:"
+			cvar                "ui_rpx_sp_hat"
+			rect                232 318 93 18
+			textalign           ITEM_ALIGN_LEFT
+			textalignx          0
+			textaligny          -2
+			font                2
+			textscale           0.6
+			forecolor           1 1 1 1
+			visible             1
+			cvarTest            "ui_rpx_npcmode"
+			showCvar
+			{
+				"0"
+			}
+			descText            "The hat each NPC wears (Universe RP client); droids and creatures ignore it"
+			cvarFloatList
+			{
+				"none" 0
+				"afro" 1
+				"beard" 2
+				"bucket" 3
+				"cap" 4
+				"cringe" 5
+				"crown" 6
+				"fedora" 7
+				"fedora2" 8
+				"fedora3" 9
+				"fedora4" 10
+				"glasses" 11
+				"gradcap" 12
+				"headcrab" 13
+				"horns" 14
+				"mario" 15
+				"mask" 16
+				"metalhelm" 17
+				"plaguemask" 18
+				"predatorhelm" 19
+				"pumpkin" 20
+				"santahat" 21
+				"sombrero" 22
+				"supersaiyan" 23
+				"tophat" 24
+			}
+			action
+			{
+				play "sound/interface/button1.wav"
+			}
+		}
+		itemDef
+		{
+			name                rpx_spcape
+			type                ITEM_TYPE_MULTI
+			text                "Cape:"
+			cvar                "ui_rpx_sp_cape"
+			rect                329 318 93 18
+			textalign           ITEM_ALIGN_LEFT
+			textalignx          0
+			textaligny          -2
+			font                2
+			textscale           0.6
+			forecolor           1 1 1 1
+			visible             1
+			cvarTest            "ui_rpx_npcmode"
+			showCvar
+			{
+				"0"
+			}
+			descText            "The cape each NPC wears on its back (Universe RP client); droids and creatures ignore it"
+			cvarFloatList
+			{
+				"none" 0
+				"ak47" 1
+				"crowbar" 2
+				"goose" 3
+				"grogucape" 4
+				"royalcape" 5
+				"rpg" 6
+				"vadercape" 7
+				"yodacape" 8
+			}
+			action
+			{
+				play "sound/interface/button1.wav"
+			}
+		}
 		itemDef
 		{
 			name                rpx_undo

@@ -1084,6 +1084,19 @@ static void RPX_SpawnSpawner( qboolean grab ) {
 		if ( RPX_CvarInt( "ui_rpx_sp_frozen" ) ) {
 			Q_strcat( cmd, sizeof( cmd ), " npcfreeze \"1\"" );
 		}
+		// GLX_U: [NPC Cosmetics] the hat and cape each one wears (SP_NPC_spawner()'s npchat and npccape): the menu
+		// gives an id in the shared lists, sent as its name. 0 or an id not on a list is none, so nothing is sent.
+		{
+			const char *hat = BG_RpCosmeticName( RP_COSMETIC_HAT, RPX_CvarInt( "ui_rpx_sp_hat" ) );
+			const char *cape = BG_RpCosmeticName( RP_COSMETIC_CAPE, RPX_CvarInt( "ui_rpx_sp_cape" ) );
+
+			if ( hat[0] ) {
+				Q_strcat( cmd, sizeof( cmd ), va( " npchat \"%s\"", hat ) );
+			}
+			if ( cape[0] ) {
+				Q_strcat( cmd, sizeof( cmd ), va( " npccape \"%s\"", cape ) );
+			}
+		}
 		if ( !RPX_CvarInt( "ui_rpx_sp_solid" ) ) {
 			flags |= 64;	// NOTSOLID
 		}
