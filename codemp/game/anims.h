@@ -1801,14 +1801,14 @@ typedef enum //# animNumber_e
 	BOTH_QUICKDRAW2,		//# Comlink prop's readyAnim (was 1596)
 	// GLX_U: [Anims] BOTH_CIN_36..37 swapped with the two datapad emotes (no other number moves): in single-player
 	// slots non-plugin clients aren't kicked (TaystJK has its own empty BOTH_CIN_5..6 here)
-	BOTH_DATAPAD,		//# /emote datapad (was 1607)
-	BOTH_DATAPAD2,		//# /emote datapad2 (was 1608)
+	BOTH_DATAPAD,		//# /anim datapad (was 1607)
+	BOTH_DATAPAD2,		//# /anim datapad2 (was 1608)
 	// GLX_U: [Anims] BOTH_CIN_38..41 swapped with the sit emotes 4-7 (no other number moves): in single-player
 	// slots non-plugin clients aren't kicked (TaystJK has its own empty BOTH_CIN_7..10 here)
-	BOTH_SITARMS,		//# /emote sit4 (was 1612)
-	BOTH_SITCROSS,		//# /emote sit5 (was 1613)
-	BOTH_SITCROSS2,		//# /emote sit6 (was 1614)
-	BOTH_SITLEAN,		//# /emote sit7 (was 1615)
+	BOTH_SITARMS,		//# /anim sit4 (was 1612)
+	BOTH_SITCROSS,		//# /anim sit5 (was 1613)
+	BOTH_SITCROSS2,		//# /anim sit6 (was 1614)
+	BOTH_SITLEAN,		//# /anim sit7 (was 1615)
 	BOTH_CIN_42,		//# Level specific cinematic
 	BOTH_CIN_43,		//# Level specific cinematic
 	BOTH_CIN_44,		//# Level specific cinematic

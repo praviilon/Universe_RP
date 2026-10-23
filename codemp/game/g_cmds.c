@@ -1069,7 +1069,8 @@ void show_animation_list(gentity_t* ent, int beginning_index, int end_index) {
 }
 
 // alex: plays an animation from anims.h by id OR a word (look for animation_t)
-void Cmd_Emote_f( gentity_t *ent )
+// GLX_U: [Emote] /anim; it used to be /emote too, which becomes the JA++-style emotes
+void Cmd_Anim_f( gentity_t *ent )
 {
 	char arg[MAX_TOKEN_CHARS] = {0};
 	char anim_id[100] = "";
@@ -1093,7 +1094,7 @@ void Cmd_Emote_f( gentity_t *ent )
 	}
 
 	if ( trap->Argc () < 2 ) {
-		trap->SendServerCommand( ent-g_entities, va("print \"Usage: emote <anim id between 0 and %d>\n\"",MAX_ANIMATIONS-1) );
+		trap->SendServerCommand( ent-g_entities, va("print \"Usage: /anim <anim id between 0 and %d, a name, or list>\n\"",MAX_ANIMATIONS-1) );
 		return;
 	}
 
@@ -1149,12 +1150,12 @@ void Cmd_Emote_f( gentity_t *ent )
 				show_animation_list(ent, 3, MAX_EMOTE_CATEGORIES);
 			}
 			else {
-				trap->SendServerCommand(ent - g_entities, "print \"That is not a valid emote category!\n\"");
+				trap->SendServerCommand(ent - g_entities, "print \"That is not a valid page: use /anim list or /anim list 2.\n\"");
 			}
 		}
 		else {
 			show_animation_list(ent, 0, 3);
-			trap->SendServerCommand(ent - g_entities, "print \"^3Page 1/2. To see the rest of the animations, do /emote list 2\n\"");
+			trap->SendServerCommand(ent - g_entities, "print \"^3Page 1/2. To see the rest of the animations, do /anim list 2\n\"");
 		}
 
 		// GalaxyRP fix: [cleanup] both list branches now return here instead of only the
@@ -1181,7 +1182,7 @@ void Cmd_Emote_f( gentity_t *ent )
 			return;
 		}
 
-		trap->SendServerCommand( ent-g_entities, va("print \"Usage: anim ID must be between 0 and %d\n\"",MAX_ANIMATIONS-1) );
+		trap->SendServerCommand( ent-g_entities, va("print \"The anim id must be between 0 and %d. Usage: /anim <id, name or list>\n\"",MAX_ANIMATIONS-1) );
 		return;
 	}
 
@@ -1189,9 +1190,9 @@ void Cmd_Emote_f( gentity_t *ent )
 	// tokenizer does not implement: cmd.cpp copies the backslash through verbatim and treats the
 	// quote right after it as the end of the argument -- its own comment there reads "NOTE TTimo
 	// this doesn't handle \" escaping". So every client printed "Unknown emote \" and dropped the
-	// rest of the line, which is why nobody has ever seen the /emote list hint this message ends
+	// rest of the line, which is why nobody has ever seen the list hint this message ends
 	// with. Single quotes instead, matching every other "not found" message in this file.
-	trap->SendServerCommand( ent-g_entities, va("print \"Unknown emote '%s'. Use /emote list to see available emotes.\n\"", anim_id) );
+	trap->SendServerCommand( ent-g_entities, va("print \"Unknown animation '%s'. Use /anim list to see the named animations.\n\"", anim_id) );
 }
 
 /*
@@ -13356,7 +13357,7 @@ void Cmd_ListAccount_f( gentity_t *ent ) {
 				trap->SendServerCommand(ent - g_entities, "print \"\
 ^3/engage_duel: ^7Challenges the player you are looking at to a private saber duel. Most Force powers are disabled for both of you.\n\
 ^3/engage_fullforceduel: ^7Challenges the player you are looking at to a private saber duel with Force powers allowed.\n\
-^3/anim ^7or ^3/emote <id/name/list>: ^7Plays an animation by id or name. ^3List ^7and ^3list 2 ^7are for listing all the available animations.\n\
+^3/anim <id/name/list>: ^7Plays an animation by id or name. ^3List ^7and ^3list 2 ^7are for listing all the available animations.\n\
 ^3/wehug: ^7Hugs the player you are looking at.\n\
 ^3/wekiss: ^7Kisses the player you are looking at. The kissed player can slap out of it with Force Push.\n\"");
 				trap->SendServerCommand(ent - g_entities, "print \"\
@@ -25840,7 +25841,7 @@ command_t commands[] = {
 	{ "admweather",			Cmd_AdmWeather_f,			CMD_LOGGEDIN | CMD_NOINTERMISSION },
 	{ "admwalkthrough",		Cmd_AdmWalkthrough_f,		CMD_LOGGEDIN | CMD_NOINTERMISSION },
 	{ "admhidden",			Cmd_AdmHidden_f,			CMD_LOGGEDIN | CMD_NOINTERMISSION },
-	{ "anim",				Cmd_Emote_f,				CMD_ALIVE | CMD_NOINTERMISSION },
+	{ "anim",				Cmd_Anim_f,					CMD_ALIVE | CMD_NOINTERMISSION },
 	{ "allyadd",			Cmd_AllyAdd_f,				CMD_NOINTERMISSION },
 	{ "allychat",			Cmd_AllyChat_f,				0 },					// GalaxyRP: [Chat] a say mode, so no flags -- see Cmd_AllyChat_f
 	{ "allylist",			Cmd_AllyList_f,				CMD_NOINTERMISSION },
@@ -25858,7 +25859,7 @@ command_t commands[] = {
 	{ "duelpause",			Cmd_DuelPause_f,			CMD_LOGGEDIN | CMD_NOINTERMISSION },
 	{ "dueltable",			Cmd_DuelTable_f,			CMD_NOINTERMISSION },
 	{ "duelteam",			Cmd_DuelTeam_f,				CMD_NOINTERMISSION },
-	{ "emote",				Cmd_Emote_f,				CMD_ALIVE | CMD_NOINTERMISSION },
+	{ "emote",				Cmd_Anim_f,					CMD_ALIVE | CMD_NOINTERMISSION },
 	{ "engage_fullforceduel",	Cmd_ForceDuel_f,		CMD_ALIVE | CMD_NOINTERMISSION },	// GalaxyRP: [Force Duel] the ordinary duel has no row here -- it arrives as GENCMD_ENGAGE_DUEL
 	{ "entadd",				Cmd_EntAdd_f,				CMD_LOGGEDIN | CMD_NOINTERMISSION },
 	{ "entaddaim",			Cmd_EntAddAim_f,			CMD_LOGGEDIN | CMD_NOINTERMISSION },
@@ -25916,7 +25917,7 @@ command_t commands[] = {
 	{ "meleetable",			Cmd_MeleeTable_f,			CMD_NOINTERMISSION },
 	{ "modversion",			Cmd_ModVersion_f,			CMD_NOINTERMISSION },
 	{ "new",				Cmd_Register_F,				CMD_NOINTERMISSION },
-	{ "register",			Cmd_Register_F,				CMD_NOINTERMISSION },	// DAJ_RP: [Account] an alias of /new, as /anim is of /emote
+	{ "register",			Cmd_Register_F,				CMD_NOINTERMISSION },	// DAJ_RP: [Account] an alias of /new
 	{ "news",				Cmd_News_f,					0 },
 	// GalaxyRP fix: [Admin] both news-writing commands gain CMD_NOINTERMISSION, matching the 121
 	// other rows in this table that carry it -- writing to the news table during intermission served
