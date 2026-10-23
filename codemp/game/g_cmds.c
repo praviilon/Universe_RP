@@ -360,6 +360,7 @@ const worded_animation_t animations[MAX_WORDED_EMOTES] = {
 	{"jarkai2",			BOTH_JARKAIREVERSE,			"Saber"		},
 	{"juyo",			BOTH_JUYO,					"Saber"		},
 	{"kneel",			BOTH_CROUCH3,				"Body"		},
+	{"kneel2",			BOTH_KNEEL_TO_STAND,		"Body"		},	// GLX_U: [Anim] it was spreadlegs
 	{"lean",			BOTH_STAND10,				"Body"		},
 	{"leanback",		BOTH_LEANWALL,				"Body"		},
 	{"leanfront",		BOTH_LEANFRONT,				"Body"		},
@@ -413,7 +414,6 @@ const worded_animation_t animations[MAX_WORDED_EMOTES] = {
 	{"sneak",			BOTH_CROUCH1,				"Movement"	},
 	{"soresu",			BOTH_SORESU,				"Saber"		},
 	{"soresu2",			BOTH_SORESU2,				"Saber"		},
-	{"spreadlegs",		BOTH_KNEEL_TO_STAND,		"Body"		},
 	{"stance",			BOTH_SABERSTANCE,			"Saber"		},
 	{"stance2",			BOTH_SABERSTANCE2,			"Saber"		},
 	{"stance3",			BOTH_SABERSTANCE3,			"Saber"		},
