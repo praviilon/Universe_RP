@@ -13,12 +13,14 @@
 - AFK: after `rp_afk_time` seconds without input (default 120, `0` switches it off), a player gets the protection bubble (no damage from players or NPCs) and a comlink animation, until they move, look around or press a key. `/away` does the same after 20 seconds without input, so it can't be used to dodge a hit. `/players` marks AFK players.
 - Extras: **GLM Props** menu, under existing MD3 Props: browse the server's `.glm` models (starting in `models/players`), preview one, set its animation, scale and other properties and spawn as a `misc_model_ghoul`.
 - HD HUD elements: upscaled weapon, item, ammo and powerup icons, CTF flag icons, crosshairs, and the disruptor and binocular zoom views replace the low-resolution vanilla ones.
-- Force Drain grab, for logged-in characters with Drain 4 or 5: using Drain on someone right in front grabs him by the throat and drains him while you hold him, instead of the ranged drain. It drains the same way (Force first, health only through Drain Shield) but a little more per Force spent, and both of you are rooted while it lasts. It ends when you let go, run out of Force, are knocked down or pulled away, or after 10 seconds, and can't be used again for 5 seconds. The victim breaks free by activating Absorb at your Drain level or higher. Works on humanoid NPCs too.
+- Force Drain grab, for logged-in characters with Drain 4 or 5: using Drain on someone right in front grabs him by the throat and drains him while you hold him, instead of the ranged drain. It drains the same way (Force first, health only through Drain Shield) but a little more per Force spent, and both of you are rooted while it lasts. It ends when you let go, run out of Force, are knocked down or pulled away, or after 10 seconds, and can't be used again for 5 seconds. The victim breaks free by activating Absorb at your Drain level minus 1 or higher (Absorb 3 against Drain 4, Absorb 4 against Drain 5). Works on humanoid NPCs too.
 - Melee head lock: strafe left or right + Attack + Alt Attack grabs an opponent in a head lock: three chokes, then a push that throws them to the ground (50 damage in all, scaled by the Melee skill like every melee hit). Forward/back + both buttons is still the punch grapple, and no movement key the knee throw.
 - Ledge grab (from OJP Enhanced): jumping or falling next to a ledge grabs it by itself. While hanging, forward or jump pulls you up, back or crouch lets go and strafe moves along the ledge; a hit, push, pull, grip or knockdown makes you let go. Server cvar `rp_ledgeGrab` (default 1), for players running the Universe RP client.
 - `/wehug` and `/wekiss` (as in JA++): hug or kiss the player in your crosshair, both of you playing the paired animation. The kissed player can slap out of the kiss with Force Push. A hit, push, grip or knockdown ends it; `rp_allow_emotes` controls them like `/emote`.
 - 22 animations from JA+ (melee kicks, back falls, the backflip attack, stabs and stance changes), playable with `/anim 1501`–`1522`. TaystJK and JAPro players see them too.
 - `/emote` plays JA++-style emotes, each with its own ending: hiltthrow, cower, die, heal, heroic, kneel, fear, commlink, sleep, surrender, lean and more (`/emote list`). Held ones last until you jump, crouch, press Use or Attack, then play their ending; some keep you in place.
+- Melee spin kicks (from JA+): forward + right + Alt Attack is a turn-around back kick, forward + left + Alt Attack a spin kick.
+- Side flip kicks (as in JA++ and JAPro): with Jump 2 or higher, strafe-jumping toward a player or NPC beside you flips off him and kicks him.
 
 ### Changed
 - `/admholo` and `/admghost` are renamed to `/holo` and `/ghost`. Any logged-in player can use them on themselves; using them on another player still needs the "Player effects" admin flag. `/admwalkthrough` and `/admhidden` are unchanged.
@@ -33,6 +35,7 @@
 - Melee grapples: the punch grapple's last hit now always knocks the opponent down (after a get-up, dodge, taunt or emote it could turn into a get-up instead). The knee throw's victim now lands face down and gets up through his own animation, instead of popping back up halfway through it.
 - Players on other clients are no longer kicked ("Bad animation number") when someone near them uses `/helpup`, or uses some of the mod's custom animations.
 - `/anim victory` played nothing; it now plays a victory animation.
+- The flip kick (jump, then jump again with forward held into a player or NPC, Jump 2 or higher) now triggers reliably; it used to need an almost perfect double tap and never worked from a held Force jump.
 
 ## [3.8.5]
 
