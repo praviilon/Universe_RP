@@ -18,7 +18,7 @@
 - Ledge grab (from OJP Enhanced): jumping or falling next to a ledge grabs it by itself. While hanging, forward or jump pulls you up, back or crouch lets go and strafe moves along the ledge; a hit, push, pull, grip or knockdown makes you let go. Server cvar `rp_ledgeGrab` (default 1), for players running the Universe RP client.
 - `/wehug` and `/wekiss` (as in JA++): hug or kiss the player in your crosshair, both of you playing the paired animation. The kissed player can slap out of the kiss with Force Push. A hit, push, grip or knockdown ends it; `rp_allow_emotes` controls them like `/emote`.
 - 22 animations from JA+ (melee kicks, back falls, the backflip attack, stabs and stance changes), playable with `/anim 1501`–`1522`. TaystJK and JAPro players see them too.
-- `/emote` plays JA++-style emotes, each with its own ending: hiltthrow, cower, die, heal, hips, kneel, fear, commlink, sleep, surrender, lean and more (`/emote list`). Held ones last until you jump, crouch or press Use, then play their ending; some keep you in place.
+- `/emote` plays JA++-style emotes, each with its own ending: hiltthrow, cower, die, heal, heroic, kneel, fear, commlink, sleep, surrender, lean and more (`/emote list`). Held ones last until you jump, crouch, press Use or Attack, then play their ending; some keep you in place.
 
 ### Changed
 - `/admholo` and `/admghost` are renamed to `/holo` and `/ghost`. Any logged-in player can use them on themselves; using them on another player still needs the "Player effects" admin flag. `/admwalkthrough` and `/admhidden` are unchanged.
