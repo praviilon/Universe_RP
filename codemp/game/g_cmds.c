@@ -1492,9 +1492,10 @@ void Cmd_Emote_f( gentity_t *ent )
 /*
 =============================================================================
 GLX_U: [Couple Emotes] /wehug and /wekiss, after JA++'s /amhug and /amkiss. The player in your crosshair
-within 55 units is turned to face you and set box to box in front of you, and both play a paired animation,
-rooted (HANDEXTEND_DODGE, which every client predicts): single player's cinematic hug and its release (about
-1.9 s), or JA+'s kiss (3.6 s). No consent, as in JA++. The kissed player's Force Push key slaps: a backhand,
+within 55 units is turned to face you and set in front of you (box to box for a kiss, chests touching for a
+hug, walking out of each other after: RP_StartOverlapRelease), and both play a paired animation, rooted
+(HANDEXTEND_DODGE, which every client predicts): single player's cinematic hug and its release (about 1.9 s),
+or JA+'s kiss (3.6 s). No consent, as in JA++. The kissed player's Force Push key slaps: a backhand,
 and at its swing the kisser flinches (no damage). Either player hit (G_Damage), knocked down, pushed, gripped,
 off the ground, dead, downed or gone ends the hug or kiss for both. In a private duel, only with the opponent.
 RP_PairEmoteThink() runs every frame.
@@ -1503,7 +1504,8 @@ RP_PairEmoteThink() runs every frame.
 #define RP_PAIR_HUG			1
 #define RP_PAIR_KISS		2
 #define RP_PAIR_REACH		55		// crosshair reach
-#define RP_PAIR_DIST		31		// origins: box to box (30), and a unit apart or they'd be stuck in each other
+#define RP_PAIR_DIST		31		// the kiss's origins: box to box (30), and a unit apart or they'd be stuck in each other
+#define RP_PAIR_HUG_DIST	12		// the hug's origins: as the animation is made (chests touching); the boxes overlap
 #define RP_PAIR_STEP		18		// how far up or down the floor in front may be (STEPSIZE)
 #define RP_PAIR_SLAP_SWING	750		// the backhand's swing across the face, into BOTH_FORCEGRIP3THROW
 
@@ -1787,16 +1789,18 @@ static void Cmd_PairEmote( gentity_t *ent, int kind )
 		return;
 	}
 
-	//box to box in front of us, on the floor there (a step up or down at most), if he fits there and no wall is
-	//in between; else he stays where he is
+	//in front of us (box to box for a kiss, closer for a hug), on the floor there (a step up or down at most), if he
+	//fits there and no wall is in between; else he stays where he is. A hug's spot overlaps us, so bodies are
+	//ignored there: RP_StartOverlapRelease() below lets the two (and anyone else in the way) walk out after
 	VectorSet( yawAng, 0, ent->client->ps.viewangles[YAW], 0 );
 	AngleVectors( yawAng, fwd, NULL, NULL );
-	VectorMA( ent->client->ps.origin, RP_PAIR_DIST, fwd, spot );
+	VectorMA( ent->client->ps.origin, ( kind == RP_PAIR_HUG ) ? RP_PAIR_HUG_DIST : RP_PAIR_DIST, fwd, spot );
 	VectorCopy( spot, start );
 	start[2] = other->client->ps.origin[2] + RP_PAIR_STEP;
 	VectorCopy( spot, end );
 	end[2] = other->client->ps.origin[2] - RP_PAIR_STEP;
-	trap->Trace( &tr, start, other->r.mins, other->r.maxs, end, other->s.number, other->clipmask, qfalse, 0, 0 );
+	trap->Trace( &tr, start, other->r.mins, other->r.maxs, end, other->s.number,
+		( kind == RP_PAIR_HUG ) ? ( other->clipmask & ~CONTENTS_BODY ) : other->clipmask, qfalse, 0, 0 );
 	if ( !tr.startsolid && !tr.allsolid && tr.fraction < 1.0f )
 	{
 		VectorCopy( tr.endpos, spot );
@@ -1820,6 +1824,9 @@ static void Cmd_PairEmote( gentity_t *ent, int kind )
 	{
 		RP_PairStart( ent, other, kind, BOTH_HUGGER1, BOTH_HUGGERSTOP1 );
 		RP_PairStart( other, ent, kind, BOTH_HUGGEE1, BOTH_HUGGEESTOP1 );
+		//GLX_U: [Couple Emotes] inside each other: both pass through bodies until they step apart (g_active.c)
+		RP_StartOverlapRelease( ent );
+		RP_StartOverlapRelease( other );
 	}
 	else
 	{
