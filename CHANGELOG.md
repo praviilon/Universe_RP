@@ -17,18 +17,21 @@
 - Ledge grab (from OJP Enhanced): jumping or falling next to a ledge grabs it by itself. While hanging, forward or jump pulls you up, back or crouch lets go and strafe moves along the ledge; a hit, push, pull, grip or knockdown makes you let go. Server cvar `rp_ledgeGrab` (default 1), for players running the Universe RP client.
 - `/wehug` and `/wekiss` (as in JA++): hug or kiss the player in your crosshair, both of you playing the paired animation. The kissed player can slap out of the kiss with Force Push. A hit, push, grip or knockdown ends it; `rp_allow_emotes` controls them like `/emote`.
 - 22 animations from JA+ (melee kicks, back falls, the backflip attack, stabs and stance changes), playable with `/anim 1501`–`1522`. TaystJK and JAPro players see them too.
+- `/emote` plays JA++-style emotes, each with its own ending: hiltthrow, cower, die, heal, hips, kneel, fear, commlink, sleep, surrender, lean and more (`/emote list`). Held ones last until you jump, crouch or press Use, then play their ending; some keep you in place.
 
 ### Changed
 - `/admholo` and `/admghost` are renamed to `/holo` and `/ghost`. Any logged-in player can use them on themselves; using them on another player still needs the "Player effects" admin flag. `/admwalkthrough` and `/admhidden` are unchanged.
 - `/list models` is renamed to `/list md3`, to tell it apart from `/list glm`.
 - The Extras menu's Props is renamed to MD3 Props, next to the new GLM Props.
 - Widescreen: the main HUD (both styles), the radar, the crosshair and the bars under it keep their shape on a wide screen instead of stretching. Uses the TaystJK engine's `cl_ratioFix` (on by default); `cl_ratioFix 0` brings back the stretched look.
+- `/anim` and `/emote` are now separate commands: `/anim` plays single animations by number or name, as before. It has 13 more names from JA++ (sit8, sit9, dance1–3, breakdance, power, stand and others), and `/anim list` now shows the Body animations, `/anim list 2` the rest.
 
 ### Fixed
 - The top-right HUD no longer keeps an empty gap where the removed leader/duel info used to be, so the team score line and powerup icons sit at the top again. Jedi Master still shows its "Get Saber!" hint.
 - Melee grapples (the punch, the knee throw and the head lock) no longer hit shields first: their damage goes straight to health, as kicks and punches already do.
 - Melee grapples: the punch grapple's last hit now always knocks the opponent down (after a get-up, dodge, taunt or emote it could turn into a get-up instead). The knee throw's victim now lands face down and gets up through his own animation, instead of popping back up halfway through it.
 - Players on other clients are no longer kicked ("Bad animation number") when someone near them uses `/helpup`, or uses some of the mod's custom animations.
+- `/anim victory` played nothing; it now plays a victory animation.
 
 ## [3.8.5]
 
