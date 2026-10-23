@@ -3096,10 +3096,11 @@ qboolean RP_CanFireHook( gentity_t *ent )
 RP_JumpKickLand
 
 GalaxyRP: [Jump Kick] the jump kick -- jump, then jump again with forward held next to a player or NPC
-to run up them and flip off. PM_CheckJump() (bg_pmove.c) finds the target and leaves its number in
-ps.forceKickFlip; this does the rest, once, in ClientThink_real(). It was written out inline there and
-is unchanged in who may kick whom: the team, private duel, duel tournament, melee arena and noclip
-rules (OnSameTeam, zyk_can_hit_target) all still apply, and an ally NPC counts as a teammate in FFA.
+to flip back off them, or strafe-jump beside one to flip off sideways (GLX_U: [Flip Kick]). PM_CheckJump()
+(bg_pmove.c) finds the target and leaves its number in ps.forceKickFlip; this does the rest, once, in
+ClientThink_real(). It was written out inline there and is unchanged in who may kick whom: the team,
+private duel, duel tournament, melee arena and noclip rules (OnSameTeam, zyk_can_hit_target) all still
+apply, and an ally NPC counts as a teammate in FFA.
 
 What changed, and why:
 
@@ -3108,11 +3109,10 @@ What changed, and why:
   it. G_Damage() goes on to scale it exactly as it did before, as for any melee hit: the Melee skill,
   Force Rage, the kicker's maximum health and where it lands (g_locationBasedDamage). It still ignores
   shields (DAMAGE_NO_ARMOR), as it always has.
-- The push follows the way the kicker faces: RP_JUMP_KICK_PUSH forward and RP_JUMP_KICK_LIFT up. It
-  used to be the reverse of the kicker's own velocity. At Jump 2 that is the same direction and, the
-  arithmetic cancelling, the same 300 units a second give or take rounding -- but at Jump 3 and above
-  the flip off the target leaves the kicker going straight up, so the "push" was straight down and
-  the target was only lifted. (Stock JKA never kicked at Jump 3; the Zyk mod turned it on.)
+- The push goes from the kicker to the target, flat: RP_JUMP_KICK_PUSH away and RP_JUMP_KICK_LIFT up
+  (GLX_U: [Flip Kick] it followed the way the kicker faced, which would push a target kicked from the
+  side forward; for the kick in front it is the same direction). It used to be the reverse of the
+  kicker's own velocity, which a flip straight up turned into a push straight down.
 - Kill credit is given whenever the kick lands. It used to be set only in the branch that pushed;
   G_Damage() covered most of the rest, but not a hit without knockback, so a target attacking in red
   stance that takes no knockback (FL_NO_KNOCKBACK) could be kicked off a ledge with nobody credited --
@@ -3201,8 +3201,14 @@ static void RP_JumpKickLand( gentity_t *ent )
 	protectedTarget = RP_JumpKickProtected( faceKicked );
 	immovable = RP_JumpKickImmovable( faceKicked );
 
-	VectorSet( fwdAngles, 0, client->ps.viewangles[YAW], 0 );
-	AngleVectors( fwdAngles, pushDir, NULL, NULL );
+	// away from the kicker, flat; the way he faces if they are at the same spot
+	VectorSubtract( faceKicked->client->ps.origin, client->ps.origin, pushDir );
+	pushDir[2] = 0;
+	if ( VectorNormalize( pushDir ) < 1.0f )
+	{
+		VectorSet( fwdAngles, 0, client->ps.viewangles[YAW], 0 );
+		AngleVectors( fwdAngles, pushDir, NULL, NULL );
+	}
 
 	// no knockback from the damage either for those two: G_Damage() adds it before it looks at spawn
 	// protection or godmode, so a protected target would still be nudged by a hit it takes nothing from

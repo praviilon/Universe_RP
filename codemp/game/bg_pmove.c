@@ -2323,6 +2323,37 @@ static void PM_AdjustAngleForWallGrap( playerState_t *ps, usercmd_t *ucmd )
 
 /*
 =============
+PM_RpFlipKickTarget
+
+GLX_U: [Flip Kick] the player or NPC right in front to flip off and kick: the whole body (feet to head, the
+run-up-wall check only looks from the waist up and passes over his head) swept 32 units along the view yaw.
+-1 if none.
+=============
+*/
+static int PM_RpFlipKickTarget( void )
+{
+	vec3_t fwd, fwdAngles, traceto;
+	trace_t trace;
+	bgEntity_t *ent;
+
+	VectorSet( fwdAngles, 0, pm->ps->viewangles[YAW], 0 );
+	AngleVectors( fwdAngles, fwd, NULL, NULL );
+	VectorMA( pm->ps->origin, 32, fwd, traceto );
+	pm->trace( &trace, pm->ps->origin, pm->mins, pm->maxs, traceto, pm->ps->clientNum, MASK_PLAYERSOLID );
+	if ( trace.fraction >= 1.0f || trace.entityNum >= ENTITYNUM_WORLD )
+	{
+		return -1;
+	}
+	ent = PM_BGEntForNum( trace.entityNum );
+	if ( !ent || ( trace.entityNum >= MAX_CLIENTS && ent->s.eType != ET_NPC ) )
+	{
+		return -1;
+	}
+	return trace.entityNum;
+}
+
+/*
+=============
 PM_CheckJump
 =============
 */
@@ -2784,6 +2815,7 @@ static qboolean PM_CheckJump( void )
 				trace_t	trace;
 				qboolean doTrace = qfalse;
 				int contents = MASK_SOLID;//MASK_PLAYERSOLID;
+				int sideKickTarget = -1;
 
 				VectorSet(mins, pm->mins[0],pm->mins[1],0);
 				VectorSet(maxs, pm->maxs[0],pm->maxs[1],24);
@@ -2816,17 +2848,32 @@ static qboolean PM_CheckJump( void )
 					break;
 				}
 
+				if ( anim == BOTH_WALL_FLIP_LEFT || anim == BOTH_WALL_FLIP_RIGHT )
+				{// GLX_U: [Flip Kick] a player or NPC beside you does for a wall flip too (and gets kicked, below), as in
+				 // JA++ and JAPro; wall runs still need a real wall
+					contents = MASK_PLAYERSOLID;
+				}
+
 				if ( doTrace )
 				{
 					pm->trace( &trace, pm->ps->origin, mins, maxs, traceto, pm->ps->clientNum, contents );
+					if ( trace.fraction < 1.0f && trace.entityNum < ENTITYNUM_WORLD )
+					{
+						bgEntity_t *sideEnt = PM_BGEntForNum( trace.entityNum );
+
+						if ( trace.entityNum < MAX_CLIENTS || ( sideEnt && sideEnt->s.eType == ET_NPC ) )
+						{
+							sideKickTarget = trace.entityNum;
+						}
+					}
 					VectorCopy( trace.plane.normal, wallNormal );
 					VectorNormalize( wallNormal );
 					VectorSubtract( pm->ps->origin, traceto, idealNormal );
 					VectorNormalize( idealNormal );
 				}
 
-				if ( !doTrace || (trace.fraction < 1.0f && (trace.entityNum < MAX_CLIENTS || DotProduct(wallNormal,idealNormal) > 0.7)) )
-				{//there is a wall there.. or hit a client
+				if ( !doTrace || (trace.fraction < 1.0f && (trace.entityNum < MAX_CLIENTS || sideKickTarget >= 0 || DotProduct(wallNormal,idealNormal) > 0.7)) )
+				{//there is a wall there.. or hit a client (or an NPC)
 					if ( (anim != BOTH_WALL_RUN_LEFT
 							&& anim != BOTH_WALL_RUN_RIGHT
 							&& anim != BOTH_FORCEWALLRUNFLIP_START)
@@ -2853,15 +2900,11 @@ static qboolean PM_CheckJump( void )
 							VectorMA( pm->ps->velocity, -150, fwd, pm->ps->velocity );
 						}
 
-						/*
-						if ( doTrace && anim != BOTH_WALL_RUN_LEFT && anim != BOTH_WALL_RUN_RIGHT )
+						// GLX_U: [Flip Kick] flipped off a player or NPC: the server kicks him (RP_JumpKickLand, g_active.c)
+						if ( sideKickTarget >= 0 )
 						{
-							if (trace.entityNum < MAX_CLIENTS)
-							{
-								pm->ps->forceKickFlip = trace.entityNum+1; //let the server know that this person gets kicked by this client
-							}
+							pm->ps->forceKickFlip = sideKickTarget+1; //let the server know that this person gets kicked by this client
 						}
-						*/
 
 						//up
 						if ( vertPush )
@@ -2897,6 +2940,7 @@ static qboolean PM_CheckJump( void )
 		else
 		{//in the air
 			int legsAnim = pm->ps->legsAnim;
+			int flipKickTarget = -1;
 
 			if ( legsAnim == BOTH_WALL_RUN_LEFT || legsAnim == BOTH_WALL_RUN_RIGHT )
 			{//running on a wall
@@ -3067,6 +3111,40 @@ static qboolean PM_CheckJump( void )
 				}
 			}
 			*/
+			// GLX_U: [Flip Kick] JA+'s flip kick (as JA++ and JAPro bring back), without its "still rising faster than
+			// 200" test, which left about one frame after letting go of jump: jump again with forward held, Jump 2+,
+			// near the ground, not in a special move (plain jumps and Force jump flips count), and flip back off the
+			// player or NPC in front. The server does the kick (RP_JumpKickLand, g_active.c).
+			else if ( pm->cmd.forwardmove > 0
+				&& pm->ps->fd.forcePowerLevel[FP_LEVITATION] > FORCE_LEVEL_1
+				&& PM_GroundDistance() <= 80
+				&& !BG_InSpecialJump( legsAnim )
+				&& allowWallFlips	// a saber that forbids wall flips forbids this one too
+				&& ( flipKickTarget = PM_RpFlipKickTarget() ) >= 0 )
+			{//flip off him
+				vec3_t fwd, fwdAngles;
+				int parts = SETANIM_LEGS;
+
+				VectorSet( fwdAngles, 0, pm->ps->viewangles[YAW], 0 );
+				AngleVectors( fwdAngles, fwd, NULL, NULL );
+				pm->ps->velocity[0] = pm->ps->velocity[1] = 0;
+				VectorMA( pm->ps->velocity, -150, fwd, pm->ps->velocity );
+				pm->ps->velocity[2] += 128;
+
+				if ( !pm->ps->weaponTime )
+				{
+					parts = SETANIM_BOTH;
+				}
+				PM_SetAnim( parts, BOTH_WALL_FLIP_BACK1, SETANIM_FLAG_OVERRIDE|SETANIM_FLAG_HOLD );
+				pm->ps->legsTimer -= 600; //played to the end so he doesn't land on his head, shortened as JA+ does
+
+				PM_SetForceJumpZStart( pm->ps->origin[2] );//so we don't take damage if we land at same height
+				pm->cmd.upmove = 0;
+				pm->ps->fd.forceJumpSound = 1;
+				BG_ForcePowerDrain( pm->ps, FP_LEVITATION, 5 );
+
+				pm->ps->forceKickFlip = flipKickTarget + 1; //let the server know that this person gets kicked by this client
+			}
 			else if ( pm->cmd.forwardmove > 0 //pushing forward
 				&& pm->ps->fd.forceRageRecoveryTime < pm->cmd.serverTime	//not in a force Rage recovery period
 				&& pm->ps->fd.forcePowerLevel[FP_LEVITATION] > FORCE_LEVEL_1
@@ -3078,8 +3156,8 @@ static qboolean PM_CheckJump( void )
 					//FIXME: have to be moving... make sure it's opposite the wall... or at least forward?
 					int wallWalkAnim = BOTH_WALL_FLIP_BACK1;
 					int parts = SETANIM_LEGS;
-					// zyk: changed MASK so it will be possible to kickflip players or npcs
-					int contents = MASK_PLAYERSOLID;//MASK_SOLID;//CONTENTS_SOLID;
+					// GLX_U: [Flip Kick] walls only again (stock): a player or NPC in front is the flip kick's, above
+					int contents = MASK_SOLID;//MASK_PLAYERSOLID;//CONTENTS_SOLID;
 					//qboolean kick = qtrue;
 					if ( pm->ps->fd.forcePowerLevel[FP_LEVITATION] > FORCE_LEVEL_2 )
 					{
