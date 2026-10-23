@@ -13671,16 +13671,16 @@ void Cmd_ListAccount_f( gentity_t *ent ) {
 ^3/vehicle_cloak: ^7While piloting a vehicle with the Cloak Item at level 2, cloaks or decloaks the vehicle together with you.\n\
 ^3/updateforce: ^7Applies your force power menu pick instantly, no respawn needed (logged-out players only).\n\"");
 				// GLX_U: [Cosmetics] /cosmetics (a client command, the cgame's) goes with the other looks
-				// commands here; with it this block is 926 of SV_SendServerCommand's 1022 characters, so a
+				// commands here; with it this block is 930 of SV_SendServerCommand's 1022 characters, so a
 				// further line belongs in a message of its own.
-				trap->SendServerCommand(ent - g_entities, "print \"^3/maplist <page (optional)>: ^7Lists the maps you can vote for in the current gametype, for /callvote map.\n\
+				trap->SendServerCommand(ent - g_entities, "print \"^3/maplist <page (optional)>: ^7Lists the maps you can vote for in the current gametype, for ^3/callvote map^7.\n\
 ^3/saber <saber1> <saber2>: ^7Changes lightsabers of the player.\n\
 ^3/sabercolor <1|2> <r g b>/<color name>: ^7Sets the RGB or a preset color of saber 1 or 2. Run with no arguments to see current colors.\n\
 ^3/saberblade <1|2> <type>: ^7Sets the RGB blade style (classic/flame1/electric1/flame2/electric2) of saber 1 or 2.\n\
 ^3/updatesaber: ^7Applies your saber menu pick instantly, no respawn needed.\n\
 ^3/scale <size> ^7or ^3/scale <player name or ID> <size>: ^7Scales your character model, 20 to 500 (default 100). ^3/scale help ^7lists sizes next to real-life heights. ^1Scaling other players needs the Scale admin flag.\n\
 ^3/cosmetics <hats|capes|clear> <number or name>: ^7Puts on a hat or cape, or takes it off if you already wear it. ^3/cosmetics hats ^7or ^3capes ^7lists them. Saved with a logged-in character.\n\"");
-				// GLX_U: [Phase] /ghost and /holo next to /scale, in a message of their own (the block above is at 926)
+				// GLX_U: [Phase] /ghost and /holo next to /scale, in a message of their own (the block above is at 930)
 				trap->SendServerCommand(ent - g_entities, "print \"^3/ghost <player name or ID (optional)>: ^7Turns you into a Force ghost: see-through, glowing, passes through people, off the radar. Again to turn it off. ^1Using it on other players needs the Player effects admin flag.\n\
 ^3/holo <player name or ID (optional)>: ^7Turns you into a hologram: blue, scanlines, passes through people, off the radar. Again to turn it off. ^1Using it on other players needs the Player effects admin flag.\n\
 ^7Only players with the " RP_MOD_NAME " client see the ghost and hologram look.\n\"");
@@ -13690,7 +13690,7 @@ void Cmd_ListAccount_f( gentity_t *ent ) {
 				// 1022 characters, and going over does not truncate, it silently drops the whole section.
 				trap->SendServerCommand(ent - g_entities, "print \"\
 ^3/away: ^7Goes AFK after 20 seconds without input: a protection bubble and a comlink animation until you move, look around or press a key. Also happens on its own after a longer while.\n\
-^3/afk: ^7The TaystJK client's own command: puts [AFK] in front of your name, or takes it off. No protection: use /away for that.\n\
+^3/afk: ^7The TaystJK client's own command: puts [AFK] in front of your name, or takes it off. No protection: use ^3/away^7 for that.\n\
 ^3/getup: ^7Gets you up from a combat knockdown, once your timer runs out. Cannot end an admin paralysis.\n\
 ^3/helpup <player name>: ^7Helps a nearby player up from a combat knockdown. Cannot end an admin paralysis.\n\
 ^3/training <on|off>: ^7Turns training saber mode (near-zero damage) on or off.\n\
