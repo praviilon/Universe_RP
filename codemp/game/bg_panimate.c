@@ -2133,7 +2133,10 @@ static void BG_StartLegsAnim( playerState_t *ps, int anim )
 		return;		// a high priority animation is running
 	}
 
-	if (ps->legsAnim == anim)
+	// GLX_U: [Melee Kicks] a kick starting always flips the restart bit. Held kicks come back after one input frame of
+	// standing, which the server rarely snapshots (ent->s is rebuilt every input frame, so the check below misses it
+	// too): other clients saw kick, kick, the bit unchanged, and kept the first one frozen on its last frame.
+	if (ps->legsAnim == anim || BG_KickingAnim(anim))
 	{
 		BG_FlipPart(ps, SETANIM_LEGS);
 	}
@@ -2198,7 +2201,7 @@ void BG_StartTorsoAnim( playerState_t *ps, int anim )
 		return;
 	}
 
-	if (ps->torsoAnim == anim)
+	if (ps->torsoAnim == anim || BG_KickingAnim(anim))	// GLX_U: [Melee Kicks] as the legs, above
 	{
 		BG_FlipPart(ps, SETANIM_TORSO);
 	}
