@@ -2,6 +2,11 @@
 
 
 
+## [3.8.7]
+
+### Fixed
+- HOTFIX: Destroyed TURBO turrets stay gone again
+
 ## [3.8.6]
 
 ### Added
