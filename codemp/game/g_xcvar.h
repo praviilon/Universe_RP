@@ -187,7 +187,8 @@ XCVAR_DEF( g_logClientInfo,				"0",			NULL,				CVAR_ARCHIVE,									qtrue )
 XCVAR_DEF( g_logSync,					"0",			NULL,				CVAR_ARCHIVE,									qfalse )
 XCVAR_DEF( g_maxConnPerIP,				"3",			NULL,				CVAR_ARCHIVE,									qfalse )
 XCVAR_DEF( g_maxForceRank,				"7",			NULL,				CVAR_SERVERINFO|CVAR_ARCHIVE|CVAR_LATCH,		qfalse )
-XCVAR_DEF( g_maxGameClients,			"0",			NULL,				CVAR_SERVERINFO|CVAR_LATCH|CVAR_ARCHIVE,		qfalse )
+// GLX_U: [Serverinfo] not serverinfo: no client reads it, and the string's 1024 limit dropped the engine's version
+XCVAR_DEF( g_maxGameClients,			"0",			NULL,				CVAR_LATCH|CVAR_ARCHIVE,						qfalse )
 XCVAR_DEF( g_maxHolocronCarry,			"3",			NULL,				CVAR_LATCH,										qfalse )
 XCVAR_DEF( g_motd,						"",				NULL,				CVAR_NONE,										qfalse )
 XCVAR_DEF( g_needpass,					"0",			NULL,				CVAR_SERVERINFO|CVAR_ROM,						qfalse )
@@ -540,11 +541,13 @@ XCVAR_DEF( rp_rpg_max_level,			"100",			RP_CVU_rpgMaxLevel,			CVAR_ARCHIVE|CVAR_
 // Shield a LOGGED-OUT player spawns with; an RPG character's starting shield comes from their Max
 // Shield skill instead (pers.max_rpg_shield, see set_max_shield in g_cmds.c).
 XCVAR_DEF( rp_starting_shield,			"25",			RP_CVU_startingShield,		CVAR_ARCHIVE|CVAR_NORESTART,					qtrue )
-XCVAR_DEF( g_duelForcePowerDisable,	"0",			NULL,				CVAR_ARCHIVE|CVAR_LATCH|CVAR_SERVERINFO,						qtrue )
+// GLX_U: [Serverinfo] not serverinfo: no client reads it, and the string's 1024 limit dropped the engine's version
+XCVAR_DEF( g_duelForcePowerDisable,	"0",			NULL,				CVAR_ARCHIVE|CVAR_LATCH,										qtrue )
 
 XCVAR_DEF( rp_default_account_permissions,		"0",	NULL,					CVAR_ARCHIVE | CVAR_NORESTART,					qtrue )
 XCVAR_DEF( rp_pluginRequired,					"1",	RP_CVU_pluginRequired,	CVAR_ARCHIVE | CVAR_SERVERINFO,					qtrue )
-XCVAR_DEF( rp_loginRequired,					"0",	NULL,					CVAR_ARCHIVE | CVAR_SERVERINFO,					qtrue )
+// GLX_U: [Serverinfo] not serverinfo: no client reads it, and the string's 1024 limit dropped the engine's version
+XCVAR_DEF( rp_loginRequired,					"0",	NULL,					CVAR_ARCHIVE,									qtrue )
 // GLX_U: [Cosmetics] 1 = hats and capes are drawn, 0 = nobody sees them (they stay saved). Serverinfo so
 // /cosmetics can say so -- see RP_CVU_allowCosmetics (g_cvar.c) and G_RpRepublishCosmetics (g_client.c).
 XCVAR_DEF( rp_allow_cosmetics,				"1",	RP_CVU_allowCosmetics,	CVAR_ARCHIVE | CVAR_NORESTART | CVAR_SERVERINFO,	qtrue )
