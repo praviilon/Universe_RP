@@ -1939,7 +1939,7 @@ forward or jump pulls up, back or crouch lets go, strafe shimmies along the ledg
 #define LEDGEGRABMINHEIGHT		40
 #define LEDGEGRABHEIGHT			52.4f	// where the anims hold the ledge, above the origin
 #define LEDGEVERTOFFSET			LEDGEGRABHEIGHT
-#define LEDGEGRABDISTANCE		40		// how far ahead a ledge is looked for
+#define LEDGEGRABDISTANCE		45		// how far ahead of the origin a ledge is looked for: 30 past the body. GLX_U: was OJP's 40
 #define LEDGEHOROFFSET			22.3f	// the origin's distance from the wall while hanging
 
 static const int ledgeAnims[] = { BOTH_LEDGE_GRAB, BOTH_LEDGE_HOLD, BOTH_LEDGE_LEFT, BOTH_LEDGE_RIGHT, BOTH_LEDGE_MERCPULL };
