@@ -13578,6 +13578,7 @@ void Cmd_ListAccount_f( gentity_t *ent ) {
 ^3/stuff item <number (optional)> ^7or ^3/stuff upgrade <number (optional)>: ^7Shows info about merchandise. Run without a number to list available options in that category.\n\n\" ");
 				trap->SendServerCommand(ent - g_entities, "print \"^3--------Ally System--------\n\
 ^3/allyadd <player name>: ^7Adds a player as an ally.\n\
+^3/allyaim: ^7Adds the player you are aiming at as an ally, or removes him if he already is one.\n\
 ^3/allychat <text>: ^7Sends message to your allies. Any distance, every gametype.\n\
 ^3/allyremove <player name>: ^7Removes player from allies.\n\
 ^3/allylist: ^7Lists your allies.\n\n\" ");
@@ -15096,6 +15097,67 @@ static void RP_AllyBreak(gentity_t *a, gentity_t *b, const char *why)
 	}
 }
 
+// GLX_U: [Ally] what /allyadd, /allyremove and /allyaim share: the Duel Tournament refusal (qtrue: refused, and
+// told), then adding or removing one client with the checks, the radar update and both players' messages
+static qboolean RP_AllyBlocked( gentity_t *ent, const char *verb )
+{
+	// GalaxyRP fix: [Guardian] a guardian_mode>0 guard blocking /allyadd during a boss battle used
+	// to be here. guardian_mode is permanently 0 now, so it was unreachable.
+
+	if (level.duel_tournament_mode > 0 && level.duel_players[ent->s.number] != -1)
+	{ // zyk: cant add or remove allies while in Duel Tournament
+		trap->SendServerCommand(ent->s.number, va("print \"You cannot %s allies while in a Duel Tournament.\n\"", verb));
+		return qtrue;
+	}
+	return qfalse;
+}
+
+static void RP_AllyAddClient( gentity_t *ent, int client_id )
+{
+	if (client_id == (ent-g_entities))
+	{ // zyk: player cant add himself as ally
+		trap->SendServerCommand(ent->s.number, va("print \"You cannot add yourself as ally\n\"") );
+		return;
+	}
+
+	if (zyk_is_ally(ent,&g_entities[client_id]) == qtrue)
+	{
+		trap->SendServerCommand(ent->s.number, va("print \"You already have this ally.\n\"") );
+		return;
+	}
+
+	// zyk: add this player as an ally
+	zyk_add_ally(ent, client_id);
+
+	// zyk: sending the updated ally set to the client-side radar
+	// GalaxyRP fix: [Radar] was G_AddEvent(ent, EV_USE_ITEM14, client_id), one bit of a per-slot
+	// client cache. The whole set goes in one reliable server command now; see send_ally_update().
+	send_ally_update(ent);
+
+	trap->SendServerCommand(ent->s.number, va("print \"Added ally %s^7\n\"", g_entities[client_id].client->pers.netname) );
+	trap->SendServerCommand( client_id, va("print \"%s^7 added you as ally\n\"", ent->client->pers.netname) );
+}
+
+static void RP_AllyRemoveClient( gentity_t *ent, int client_id )
+{
+	if (zyk_is_ally(ent,&g_entities[client_id]) == qfalse)
+	{
+		trap->SendServerCommand( ent-g_entities, va("print \"You do not have this ally.\n\"") );
+		return;
+	}
+
+	// zyk: removes this ally
+	zyk_remove_ally(ent, client_id);
+
+	// zyk: sending the updated ally set to the client-side radar
+	// GalaxyRP fix: [Radar] was G_AddEvent(ent, EV_USE_ITEM14, client_id + MAX_CLIENTS), the
+	// "no longer an ally" half of the same per-slot cache. See send_ally_update().
+	send_ally_update(ent);
+
+	trap->SendServerCommand( ent-g_entities, va("print \"Removed ally %s^7\n\"", g_entities[client_id].client->pers.netname) );
+	trap->SendServerCommand( client_id, va("print \"%s^7 removed you as an ally\n\"", ent->client->pers.netname) );
+}
+
 /*
 ==================
 Cmd_AllyAdd_f
@@ -15111,12 +15173,8 @@ void Cmd_AllyAdd_f( gentity_t *ent ) {
 		char arg1[MAX_STRING_CHARS];
 		int client_id = -1;
 
-		// GalaxyRP fix: [Guardian] a guardian_mode>0 guard blocking /allyadd during a boss battle used
-		// to be here. guardian_mode is permanently 0 now, so it was unreachable.
-
-		if (level.duel_tournament_mode > 0 && level.duel_players[ent->s.number] != -1)
-		{ // zyk: cant add allies while in Duel Tournament
-			trap->SendServerCommand(ent->s.number, va("print \"You cannot add allies while in a Duel Tournament.\n\""));
+		if (RP_AllyBlocked(ent, "add"))
+		{
 			return;
 		}
 
@@ -15128,28 +15186,62 @@ void Cmd_AllyAdd_f( gentity_t *ent ) {
 			return;
 		}
 
-		if (client_id == (ent-g_entities))
-		{ // zyk: player cant add himself as ally
-			trap->SendServerCommand(ent->s.number, va("print \"You cannot add yourself as ally\n\"") );
-			return; 
-		}
+		RP_AllyAddClient(ent, client_id);
+	}
+}
 
-		if (zyk_is_ally(ent,&g_entities[client_id]) == qtrue)
+/*
+==================
+Cmd_AllyAim_f
+
+GLX_U: [Ally] /allyaim: the player you aim at (a line from the eyes along the view, 256 units as engaging a
+private duel, walls stop it) becomes your ally, or stops being one if he already is -- /allyadd or /allyremove
+on him, the same checks and messages. Not while spectating: a following spectator's view is someone else's.
+==================
+*/
+#define RP_ALLYAIM_REACH	256
+
+void Cmd_AllyAim_f( gentity_t *ent ) {
+	vec3_t start, fwd, end;
+	trace_t tr;
+	gentity_t *target;
+
+	if (ent->client->sess.sessionTeam == TEAM_SPECTATOR || (ent->client->ps.pm_flags & PMF_FOLLOW) ||
+		ent->client->tempSpectate >= level.time)
+	{
+		trap->SendServerCommand(ent->s.number, "print \"You cannot aim at players while spectating. Use ^3/allyadd^7 or ^3/allyremove^7 with a name.\n\"");
+		return;
+	}
+
+	VectorCopy(ent->client->ps.origin, start);
+	start[2] += ent->client->ps.viewheight;
+	AngleVectors(ent->client->ps.viewangles, fwd, NULL, NULL);
+	VectorMA(start, RP_ALLYAIM_REACH, fwd, end);
+	trap->Trace(&tr, start, NULL, NULL, end, ent->s.number, MASK_PLAYERSOLID, qfalse, 0, 0);
+
+	if (tr.fraction >= 1.0f || tr.entityNum >= MAX_CLIENTS)
+	{
+		trap->SendServerCommand(ent->s.number, "print \"Aim at a player to add or remove him as an ally.\n\"");
+		return;
+	}
+
+	target = &g_entities[tr.entityNum];
+	if (!target->inuse || !target->client || target->client->pers.connected != CON_CONNECTED)
+	{
+		trap->SendServerCommand(ent->s.number, "print \"Aim at a player to add or remove him as an ally.\n\"");
+		return;
+	}
+
+	if (zyk_is_ally(ent, target) == qtrue)
+	{
+		if (!RP_AllyBlocked(ent, "remove"))
 		{
-			trap->SendServerCommand(ent->s.number, va("print \"You already have this ally.\n\"") );
-			return;
+			RP_AllyRemoveClient(ent, tr.entityNum);
 		}
-
-		// zyk: add this player as an ally
-		zyk_add_ally(ent, client_id);
-
-		// zyk: sending the updated ally set to the client-side radar
-		// GalaxyRP fix: [Radar] was G_AddEvent(ent, EV_USE_ITEM14, client_id), one bit of a per-slot
-		// client cache. The whole set goes in one reliable server command now; see send_ally_update().
-		send_ally_update(ent);
-
-		trap->SendServerCommand(ent->s.number, va("print \"Added ally %s^7\n\"", g_entities[client_id].client->pers.netname) );
-		trap->SendServerCommand( client_id, va("print \"%s^7 added you as ally\n\"", ent->client->pers.netname) );
+	}
+	else if (!RP_AllyBlocked(ent, "add"))
+	{
+		RP_AllyAddClient(ent, tr.entityNum);
 	}
 }
 
@@ -15205,9 +15297,8 @@ void Cmd_AllyRemove_f( gentity_t *ent ) {
 		char arg1[MAX_STRING_CHARS];
 		int client_id = -1;
 
-		if (level.duel_tournament_mode > 0 && level.duel_players[ent->s.number] != -1)
-		{ // zyk: cant remove allies while in Duel Tournament
-			trap->SendServerCommand(ent->s.number, va("print \"You cannot remove allies while in a Duel Tournament.\n\""));
+		if (RP_AllyBlocked(ent, "remove"))
+		{
 			return;
 		}
 
@@ -15219,22 +15310,7 @@ void Cmd_AllyRemove_f( gentity_t *ent ) {
 			return;
 		}
 
-		if (zyk_is_ally(ent,&g_entities[client_id]) == qfalse)
-		{
-			trap->SendServerCommand( ent-g_entities, va("print \"You do not have this ally.\n\"") );
-			return;
-		}
-
-		// zyk: removes this ally
-		zyk_remove_ally(ent, client_id);
-
-		// zyk: sending the updated ally set to the client-side radar
-		// GalaxyRP fix: [Radar] was G_AddEvent(ent, EV_USE_ITEM14, client_id + MAX_CLIENTS), the
-		// "no longer an ally" half of the same per-slot cache. See send_ally_update().
-		send_ally_update(ent);
-
-		trap->SendServerCommand( ent-g_entities, va("print \"Removed ally %s^7\n\"", g_entities[client_id].client->pers.netname) );
-		trap->SendServerCommand( client_id, va("print \"%s^7 removed you as an ally\n\"", ent->client->pers.netname) );
+		RP_AllyRemoveClient(ent, client_id);
 	}
 }
 // TODO: JLH start here
@@ -26221,6 +26297,7 @@ command_t commands[] = {
 	{ "admhidden",			Cmd_AdmHidden_f,			CMD_LOGGEDIN | CMD_NOINTERMISSION },
 	{ "anim",				Cmd_Anim_f,					CMD_ALIVE | CMD_NOINTERMISSION },
 	{ "allyadd",			Cmd_AllyAdd_f,				CMD_NOINTERMISSION },
+	{ "allyaim",			Cmd_AllyAim_f,				CMD_NOINTERMISSION },	// GLX_U: [Ally]
 	{ "allychat",			Cmd_AllyChat_f,				0 },					// GalaxyRP: [Chat] a say mode, so no flags -- see Cmd_AllyChat_f
 	{ "allylist",			Cmd_AllyList_f,				CMD_NOINTERMISSION },
 	{ "allyremove",			Cmd_AllyRemove_f,			CMD_NOINTERMISSION },
