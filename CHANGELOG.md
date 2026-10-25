@@ -4,6 +4,9 @@
 
 ## [3.8.8]
 
+### Added
+- Custom lock messages: `/entlockmessage <lock> <message>` sets what a refused player is told instead of "Locked." (up to 150 characters, `\n` for a new line, colour codes work), and `/entlockmessage <lock> default` brings "Locked." back. Messages are saved per map in `locks/<map>/messages.txt`, and bad lines in a hand-edited file are skipped and logged.
+
 ### Fixed
 - Standing or sitting on a solid prop (MD3 props, GLM props with a box of their own, MD3 movers) no longer makes your own animation flicker while others see you still. Universe RP client only.
 
