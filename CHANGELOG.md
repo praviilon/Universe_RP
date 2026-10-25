@@ -4,11 +4,16 @@
 
 ## [3.8.7]
 
+### Added
+- `/sabercolor` accepts hex colours: `/sabercolor 1 #7A3CFF` (the `#` is optional).
+- NPC files can give sabers a custom colour (`saberColor #RRGGBB` or `saberRGB r g b`), an RGB blade style (`saberBlade classic|flame1|electric1|flame2|electric2`) and black, with `saber2…` keys for the second saber. Shown by the Universe RP client.
+
 ### Changed
 - `/settings 3` is renamed "Ignite Saber when Drawn": OFF now also draws the saber unlit (hilt only, no ignition sound) on every switch to it, not only on spawn.
 
 ### Fixed
 - HOTFIX: Destroyed TURBO turrets stay gone again
+- NPC files: `saberColor black` showed the first saber green and the second red; an NPC with only `saber2Color` showed its first saber red.
 
 ## [3.8.6]
 
