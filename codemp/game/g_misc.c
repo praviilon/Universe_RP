@@ -1725,6 +1725,8 @@ model (g_misc_model.cpp), with these added:
 				only "endframe": from frame 0. No key: the model's base pose. A frame past the file's last
 				shows frame 0 (the renderer checks)
 "light"/"color"	a light on the model, as misc_model_breakable's
+"tint"			GLX_U: red green blue, each 0 to 255 (default 255 255 255): the entity colour (s.customRGBA)
+				its shaders are drawn with -- see RP_GhoulTint()
 "targetname"	using it shows or hides it
 
 SOLID (1)		blocks movement and shots with its box, as misc_model_breakable's SOLID
@@ -1895,6 +1897,46 @@ const char *RP_GhoulSpawnProblem( gentity_t *ent, char *path, int pathSize, char
 	return NULL;
 }
 
+/*
+GLX_U fix: [SP Maps] the entity colour its shaders are drawn with: s.customRGBA, which CG_General hands the
+renderer as the model's shaderRGBA. A shader stage with "rgbGen entity", "rgbGen lightingDiffuseEntity" or
+"alphaGen entity" takes its colour from it -- a player model's tintable parts (the base Jedi's robes) and
+glows such as the kotor pack's Bao-Dur arm. Nothing set it, so it was 0 0 0 0: those parts were drawn black,
+and an additive glow not at all. A player has 255 255 255 or his character colour (ClientUserinfoChanged), an
+NPC 255 255 255 or its file's customRGBA (NPC_stats.c); this prop now has white, or its "tint" key: three
+numbers, each rounded and kept to 0 to 255 as the character colour is. Alpha is always 255. A value that is
+not three numbers is logged and white -- the entity commands refuse it before it gets here
+(zyk_vector_keys in g_cmds.c). Set on every spawn, so /entedit, and the key removed, take effect.
+*/
+static void RP_GhoulTint( gentity_t *ent )
+{
+	char *value = NULL;
+	vec3_t tint;
+	int k;
+
+	for ( k = 0; k < 4; k++ )
+		ent->s.customRGBA[k] = 255;
+
+	if ( !G_SpawnString( "tint", "", &value ) || !value )
+		return;
+
+	if ( sscanf( value, "%f %f %f", &tint[0], &tint[1], &tint[2] ) != 3 ||
+		!RP_FINITE( tint[0] ) || !RP_FINITE( tint[1] ) || !RP_FINITE( tint[2] ) )
+	{
+		G_LogPrintf( "misc_model_ghoul %d at %s: tint %s is not three numbers; white is used\n",
+			ent->s.number, vtos( ent->s.origin ), RP_ShownText( value ) );
+		return;
+	}
+
+	for ( k = 0; k < 3; k++ )
+	{
+		// kept to the range before it becomes an int: a number past what an int holds is not one
+		const float c = ( tint[k] < 0.0f ) ? 0.0f : ( tint[k] > 255.0f ) ? 255.0f : tint[k];
+
+		ent->s.customRGBA[k] = Com_Clampi( 0, 255, (int)floor( c + 0.5f ) );
+	}
+}
+
 static void RP_GhoulShow( gentity_t *ent, qboolean shown )
 {
 	if ( shown )
@@ -2040,6 +2082,9 @@ void SP_misc_model_ghoul( gentity_t *ent )
 	lightSet = G_SpawnFloat( "light", "100", &light );
 	colorSet = G_SpawnVector( "color", "1 1 1", color );
 	ent->s.constantLight = ( lightSet || colorSet ) ? RP_PackConstantLight( light, color ) : 0;
+
+	// GLX_U fix: [SP Maps] the colour its shaders take from the entity: white, or its tint
+	RP_GhoulTint( ent );
 
 	// the frames: CG_General plays torsoAnim up to legsAnim, the last one not played, and again whenever
 	// torsoFlip changes -- which it does here on every spawn, so a client that builds the model anew

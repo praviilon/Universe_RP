@@ -931,7 +931,8 @@ static const rpEntHelp_t rp_ent_help[] = {
 	{ "misc_model_ghoul", 0, NULL,
 		"A Ghoul2 (.glm) model prop: any .glm with an optional skin, which can play a range of its animation frames once or looped and carry a light. "
 		"Using it (targetname) shows or hides it, and it takes no damage. The Entity System refuses a model not on the server or not a .glm, bad frames or radius, or no model slot. "
-		"Players need the " RP_MOD_NAME " client to see a skin of its own.",
+		"Players need the " RP_MOD_NAME " client to see a skin of its own. "
+		"Parts of a model that take a player's colour (a Jedi's robes, a glowing arm) are drawn white, or in its tint.",
 		"1|SOLID|Blocks movement and shots with its box.\n"
 		"2|LOOP|Plays the frames over and over (needs more than one frame).\n"
 		"4096|START_OFF|Starts hidden and not solid.",
@@ -946,7 +947,8 @@ static const rpEntHelp_t rp_ent_help[] = {
 		"startframe||First frame played, 0 to 65534. Alone: a still pose on that frame.\n"
 		"endframe||Last frame played (from frame 0 without startframe). Frames play once at 20 a second and stay on the last. No frame keys: the base pose.\n"
 		"light||Radius of a light on the model (100 when only color is given).\n"
-		"color||Light colour, red green blue from 0 to 1 (default white).\n"
+		"color||Light colour, red green blue from 0 to 1 (default white). Not the model's own colour: that is tint.\n"
+		"tint|255 255 255|Colour for the parts of the model a player's colour tints, red green blue from 0 to 255, typed in quotes.\n"
 		"targetname||Using it shows or hides it.",
 		"misc_model_ghoul model models/players/stormtrooper/model.glm startframe 0 endframe 40 spawnflags 3",
 		"common misc_model_breakable" },

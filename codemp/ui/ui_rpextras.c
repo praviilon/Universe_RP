@@ -1471,6 +1471,9 @@ static void RPX_DrawModelPreview( rectDef_t *rect, float scale, vec4_t color, in
 	if ( ghoul2 ) {
 		ent.ghoul2 = ghoul2;
 		ent.radius = 1000;	// as the ui's own menu models (Item_Model_Paint)
+		// GLX_U fix: [Extras] white, as the misc_model_ghoul it places is drawn (RP_GhoulTint() in game/g_misc.c):
+		// the parts that take a player's colour, and glows like it, were black or missing here too
+		ent.shaderRGBA[0] = ent.shaderRGBA[1] = ent.shaderRGBA[2] = ent.shaderRGBA[3] = 255;
 	} else {
 		ent.hModel = hModel;
 	}

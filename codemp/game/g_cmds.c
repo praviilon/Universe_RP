@@ -17057,7 +17057,8 @@ NULL when the arguments are fine, else the message, in a static buffer.
 */
 static const char *const zyk_vector_keys[] = {
 	"origin", "angles", "angles2", "mins", "maxs", "trdelta",	// the fields table's F_VECTOR keys (G_ParseField)
-	"color", "offcolor", "modelscale_vec", "spinangles"			// read by spawn functions (G_SpawnVector)
+	"color", "offcolor", "modelscale_vec", "spinangles",		// read by spawn functions (G_SpawnVector)
+	"tint"														// GLX_U: misc_model_ghoul's (RP_GhoulTint() in g_misc.c)
 };
 
 static const char *zyk_entity_pairs_problem( int first, int count, qboolean edit )
