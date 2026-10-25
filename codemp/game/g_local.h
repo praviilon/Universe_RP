@@ -1113,7 +1113,8 @@ typedef struct clientPersistant_s {
 	// retiring it. It's now "Activate Saber on Spawn" (/settings 3): whether the blade is ignited
 	// immediately on spawn (the default/ON) or starts selected but not ignited (OFF) -- see the gate
 	// alongside the weapon-selection code in zyk_load_common_settings().
-	// 11 - Activate Saber on Spawn (/settings 3)
+	// 11 - Ignite Saber when Drawn (/settings 3; was "Activate Saber on Spawn"). GLX_U: [Saber Draw] OFF also
+	//      draws it unlit on every switch to it (ps.userInt3, PM_FinishWeaponChange)
 	// GalaxyRP fix: [Settings] bit 12 ("Jetpack") documentation removed here -- that setting has been
 	// removed from the game entirely (its bit was only ever read back by its own status line, never by
 	// anything gating actual jetpack availability).

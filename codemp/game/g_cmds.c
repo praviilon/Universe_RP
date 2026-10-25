@@ -15420,13 +15420,14 @@ void Cmd_Settings_f( gentity_t *ent ) {
 		// migration needed. Inverted like every other /settings toggle (clear == ON, set == OFF): ON is
 		// the default and matches the pre-existing behavior of igniting the blade immediately on spawn;
 		// OFF spawns the saber selected but not ignited. See the gate in zyk_load_common_settings().
+		// GLX_U: [Saber Draw] renamed "Ignite Saber when Drawn": OFF also draws it unlit on every switch to it
 		if (ent->client->pers.player_settings & (1 << 11))
 		{
-			len += sprintf(message + len, "\n^3 3 - Activate Saber on Spawn - ^1OFF");
+			len += sprintf(message + len, "\n^3 3 - Ignite Saber when Drawn - ^1OFF");
 		}
 		else
 		{
-			len += sprintf(message + len, "\n^3 3 - Activate Saber on Spawn - ^2ON");
+			len += sprintf(message + len, "\n^3 3 - Ignite Saber when Drawn - ^2ON");
 		}
 
 		// GalaxyRP: [Use hint] new setting: reuses player_settings bit 6, freed up when the old "Allow
@@ -15612,7 +15613,7 @@ void Cmd_Settings_f( gentity_t *ent ) {
 		}
 		else if (value == 11)
 		{
-			trap->SendServerCommand( ent-g_entities, va("print \"Activate Saber on Spawn %s\n\"", new_status) );
+			trap->SendServerCommand( ent-g_entities, va("print \"Ignite Saber when Drawn %s\n\"", new_status) );
 		}
 		// GalaxyRP fix: [Use hint] this branch was missing when /settings 4 was added, so the toggle
 		// flipped the bit and saved it but printed nothing at all -- the player had no way to tell

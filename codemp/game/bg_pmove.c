@@ -6799,6 +6799,11 @@ void PM_FinishWeaponChange( void ) {
 
 	if (weapon == WP_SABER)
 	{
+		// GLX_U: [Saber Draw] /settings 3 OFF (ps.userInt3, set by the server): drawn unlit, the hilt only
+		if ( pm->ps->userInt3 && pm->ps->weapon != WP_SABER )
+		{
+			pm->ps->saberHolstered = 2;
+		}
 		PM_SetSaberMove(LS_DRAW);
 	}
 	else

@@ -4513,6 +4513,9 @@ void ClientThink_real( gentity_t *ent ) {
 
 	pmove.gametype = level.gametype;
 	pmove.debugMelee = g_debugMelee.integer;
+	// GLX_U: [Saber Draw] /settings 3 OFF (bit 11) draws the saber unlit (PM_FinishWeaponChange); the player state
+	// carries it so our client predicts the same
+	client->ps.userInt3 = ( ent->s.number < MAX_CLIENTS && ( client->pers.player_settings & (1 << 11) ) ) ? 1 : 0;
 	pmove.stepSlideFix = g_stepSlideFix.integer;
 
 	pmove.noSpecMove = g_noSpecMove.integer;
