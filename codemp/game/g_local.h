@@ -3306,6 +3306,8 @@ int RP_NpcFreezeFromValue( const char *value );
 #define RP_TEAM_RECORD( playerTeam, enemyTeam ) ( 0x10000 | ( ( (playerTeam) & 0xff ) << 8 ) | ( (enemyTeam) & 0xff ) )
 void RP_StartOverlapRelease( gentity_t *ent );
 void RP_PoseLetGo( gentity_t *ent, int anim );	// GLX_U: [Emote] g_active.c
+void RP_NpcSabersInit( void );					// GLX_U: [NPC Saber Colours] NPC_stats.c
+void RP_NpcSaberClear( int entNum );
 // DAJ_RP: [Vehicles] the vehicle an entity is part of (itself for a vehicle, the one ridden for a rider), 0 for none
 // -- g_utils.c; and a teleported vehicle's riders seated with it at once -- g_misc.c
 int RP_VehicleOf( const gentity_t *ent );

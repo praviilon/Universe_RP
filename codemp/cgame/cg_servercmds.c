@@ -1014,6 +1014,10 @@ static void CG_ConfigStringModified( void ) {
 	{
 		CG_SetLightstyle(num - CS_LIGHT_STYLES);
 	}
+	else if ( num >= CS_RP_NPCSABERS && num < CS_RP_NPCSABERS + RP_NPCSABER_GROUPS )
+	{	// GLX_U: [NPC Saber Colours]
+		CG_RpParseNpcSabers( num - CS_RP_NPCSABERS );
+	}
 
 }
 

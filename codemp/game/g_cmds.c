@@ -13681,16 +13681,16 @@ void Cmd_ListAccount_f( gentity_t *ent ) {
 ^3/vehicle_cloak: ^7While piloting a vehicle with the Cloak Item at level 2, cloaks or decloaks the vehicle together with you.\n\
 ^3/updateforce: ^7Applies your force power menu pick instantly, no respawn needed (logged-out players only).\n\"");
 				// GLX_U: [Cosmetics] /cosmetics (a client command, the cgame's) goes with the other looks
-				// commands here; with it this block is 930 of SV_SendServerCommand's 1022 characters, so a
+				// commands here; with it this block is 937 of SV_SendServerCommand's 1022 characters, so a
 				// further line belongs in a message of its own.
 				trap->SendServerCommand(ent - g_entities, "print \"^3/maplist <page (optional)>: ^7Lists the maps you can vote for in the current gametype, for ^3/callvote map^7.\n\
 ^3/saber <saber1> <saber2>: ^7Changes lightsabers of the player.\n\
-^3/sabercolor <1|2> <r g b>/<color name>: ^7Sets the RGB or a preset color of saber 1 or 2. Run with no arguments to see current colors.\n\
+^3/sabercolor <1|2> <r g b>/<#hex>/<color name>: ^7Sets the RGB or a preset color of saber 1 or 2. Run with no arguments to see current colors.\n\
 ^3/saberblade <1|2> <type>: ^7Sets the RGB blade style (classic/flame1/electric1/flame2/electric2) of saber 1 or 2.\n\
 ^3/updatesaber: ^7Applies your saber menu pick instantly, no respawn needed.\n\
 ^3/scale <size> ^7or ^3/scale <player name or ID> <size>: ^7Scales your character model, 20 to 500 (default 100). ^3/scale help ^7lists sizes next to real-life heights. ^1Scaling other players needs the Scale admin flag.\n\
 ^3/cosmetics <hats|capes|clear> <number or name>: ^7Puts on a hat or cape, or takes it off if you already wear it. ^3/cosmetics hats ^7or ^3capes ^7lists them. Saved with a logged-in character.\n\"");
-				// GLX_U: [Phase] /ghost and /holo next to /scale, in a message of their own (the block above is at 930)
+				// GLX_U: [Phase] /ghost and /holo next to /scale, in a message of their own (the block above is at 937)
 				trap->SendServerCommand(ent - g_entities, "print \"^3/ghost <player name or ID (optional)>: ^7Turns you into a Force ghost: see-through, glowing, passes through people, off the radar. Again to turn it off. ^1Using it on other players needs the Player effects admin flag.\n\
 ^3/holo <player name or ID (optional)>: ^7Turns you into a hologram: blue, scanlines, passes through people, off the radar. Again to turn it off. ^1Using it on other players needs the Player effects admin flag.\n\
 ^7Only players with the " RP_MOD_NAME " client see the ghost and hologram look.\n\"");
@@ -24081,7 +24081,24 @@ static const struct { const char *name; saber_colors_t color; } saberOrdinaryCol
 static void SaberColorUsage( gentity_t *ent ) {
 	trap->SendServerCommand( ent - g_entities,
 		"print \"Usage: ^5/sabercolor <1|2> <red> <green> <blue>^7 (0-255 each)\n"
+		"       ^5/sabercolor <1|2> <#RRGGBB>^7 (hex, the # is optional)\n"
 		"       ^5/sabercolor <1|2> <red|orange|yellow|green|blue|purple|black>^7\n\"" );
+}
+
+// GLX_U: [Saber Hex] a custom colour, from <r> <g> <b> or hex (was inline in the <r> <g> <b> branch)
+static void SaberColorSetRGB( gentity_t *ent, int saberNum, int rgb ) {
+	ent->client->pers.saberRGB[saberNum - 1] = rgb;
+	// GalaxyRP: [Saber RGB] entering an RGB triplet defaults the blade style to "classic" (6)
+	// only if it wasn't already one of the five RGB-family values -- so re-picking the colour
+	// on an already-blade-typed saber (via /saberblade) doesn't reset the style back to classic.
+	if ( ent->client->pers.saberColorMode[saberNum - 1] < SABER_RGB ||
+		ent->client->pers.saberColorMode[saberNum - 1] > SABER_ELEC2 )
+		ent->client->pers.saberColorMode[saberNum - 1] = SABER_RGB;
+
+	update_saber_colors( ent );
+
+	trap->SendServerCommand( ent - g_entities, va( "print \"Saber %i colour set to %i %i %i (#%02X%02X%02X).\n\"",
+		saberNum, SABERRGB_R( rgb ), SABERRGB_G( rgb ), SABERRGB_B( rgb ), SABERRGB_R( rgb ), SABERRGB_G( rgb ), SABERRGB_B( rgb ) ) );
 }
 
 /*
@@ -24090,6 +24107,7 @@ Cmd_SaberColor_f
 
   /sabercolor                          -- show both blades' current colours and the usage
   /sabercolor <1|2> <r> <g> <b>        -- set that blade's custom RGB colour (0-255 each channel)
+  /sabercolor <1|2> <#RRGGBB>          -- the same in hex, the # optional (GLX_U: [Saber Hex])
   /sabercolor <1|2> <colour name>      -- set that blade to an ordinary palette colour, switching
                                            it out of RGB mode
 ==================
@@ -24108,11 +24126,11 @@ void Cmd_SaberColor_f( gentity_t *ent ) {
 			int mode = ent->client->pers.saberColorMode[i];
 
 			if ( mode >= SABER_RGB && mode <= SABER_ELEC2 ) {
-				trap->SendServerCommand( ent - g_entities, va( "print \"Saber %i is currently RGB %i %i %i.\n\"",
-					i + 1,
-					SABERRGB_R( ent->client->pers.saberRGB[i] ),
-					SABERRGB_G( ent->client->pers.saberRGB[i] ),
-					SABERRGB_B( ent->client->pers.saberRGB[i] ) ) );
+				const int rgb = ent->client->pers.saberRGB[i];
+
+				trap->SendServerCommand( ent - g_entities, va( "print \"Saber %i is currently RGB %i %i %i (#%02X%02X%02X).\n\"",
+					i + 1, SABERRGB_R( rgb ), SABERRGB_G( rgb ), SABERRGB_B( rgb ),
+					SABERRGB_R( rgb ), SABERRGB_G( rgb ), SABERRGB_B( rgb ) ) );
 			} else {
 				trap->SendServerCommand( ent - g_entities, va( "print \"Saber %i is currently %s.\n\"",
 					i + 1, SaberColorToString( (saber_colors_t)mode ) ) );
@@ -24130,28 +24148,20 @@ void Cmd_SaberColor_f( gentity_t *ent ) {
 
 	if ( argc == 5 ) {
 		// /sabercolor <n> <r> <g> <b>
-		int rgb = SABERRGB_PACK( SaberColorArg( 2 ), SaberColorArg( 3 ), SaberColorArg( 4 ) );
-
-		ent->client->pers.saberRGB[saberNum - 1] = rgb;
-		// GalaxyRP: [Saber RGB] entering an RGB triplet defaults the blade style to "classic" (6)
-		// only if it wasn't already one of the five RGB-family values -- so re-picking the colour
-		// on an already-blade-typed saber (via /saberblade) doesn't reset the style back to classic.
-		if ( ent->client->pers.saberColorMode[saberNum - 1] < SABER_RGB ||
-			ent->client->pers.saberColorMode[saberNum - 1] > SABER_ELEC2 )
-			ent->client->pers.saberColorMode[saberNum - 1] = SABER_RGB;
-
-		update_saber_colors( ent );
-
-		trap->SendServerCommand( ent - g_entities, va( "print \"Saber %i colour set to %i %i %i.\n\"",
-			saberNum, SABERRGB_R( rgb ), SABERRGB_G( rgb ), SABERRGB_B( rgb ) ) );
+		SaberColorSetRGB( ent, saberNum, SABERRGB_PACK( SaberColorArg( 2 ), SaberColorArg( 3 ), SaberColorArg( 4 ) ) );
 		return;
 	}
 
 	if ( argc == 3 ) {
-		// /sabercolor <n> <name>
-		int i;
+		// /sabercolor <n> <name>, or <n> <#RRGGBB>
+		int i, rgb;
 
 		trap->Argv( 2, arg2, sizeof( arg2 ) );
+
+		if ( BG_ParseSaberHex( arg2, &rgb ) ) {	// GLX_U: [Saber Hex]
+			SaberColorSetRGB( ent, saberNum, rgb );
+			return;
+		}
 
 		for ( i = 0; i < (int)ARRAY_LEN( saberOrdinaryColors ); i++ ) {
 			if ( !Q_stricmp( arg2, saberOrdinaryColors[i].name ) ) {
@@ -24170,7 +24180,7 @@ void Cmd_SaberColor_f( gentity_t *ent ) {
 		}
 
 		trap->SendServerCommand( ent - g_entities, va(
-			"print \"Unknown saber colour '%s'. Valid names: red, orange, yellow, green, blue, purple, black.\n\"",
+			"print \"Unknown saber colour '%s'. Valid: red, orange, yellow, green, blue, purple, black, or hex #RRGGBB.\n\"",
 			arg2 ) );
 		return;
 	}

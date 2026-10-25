@@ -2763,6 +2763,8 @@ void G_FreeEntity( gentity_t *ed ) {
 		return;
 	}
 
+	RP_NpcSaberClear( ed->s.number );	// GLX_U: [NPC Saber Colours] the next entity in this slot starts without
+
 	// zyk: if npc is cleaned directly, test if goal entity is still there. If it is, clean the goal entity too
 	if (ed->NPC && ed->NPC->tempGoal)
 	{

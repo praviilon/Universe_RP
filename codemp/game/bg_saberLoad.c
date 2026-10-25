@@ -210,6 +210,33 @@ saber_colors_t TranslateSaberColor( const char *name ) {
 	return SABER_BLUE;
 }
 
+// GLX_U: [Saber Hex] "#RRGGBB" or bare "RRGGBB" (either case) -> packed colour (SABERRGB_PACK); qfalse for anything else
+qboolean BG_ParseSaberHex( const char *s, int *rgb ) {
+	int i, v = 0;
+
+	if ( !s ) {
+		return qfalse;
+	}
+	if ( *s == '#' ) {
+		s++;
+	}
+	for ( i = 0; i < 6; i++ ) {
+		const char c = s[i];
+		int d;
+
+		if ( c >= '0' && c <= '9' )			d = c - '0';
+		else if ( c >= 'a' && c <= 'f' )	d = c - 'a' + 10;
+		else if ( c >= 'A' && c <= 'F' )	d = c - 'A' + 10;
+		else								return qfalse;	// also the end of a string shorter than 6
+		v = ( v << 4 ) | d;
+	}
+	if ( s[6] ) {
+		return qfalse;
+	}
+	*rgb = SABERRGB_PACK( ( v >> 16 ) & 0xFF, ( v >> 8 ) & 0xFF, v & 0xFF );
+	return qtrue;
+}
+
 const char *SaberColorToString( saber_colors_t color ) {
 	if ( color == SABER_RED )		return "red";
 	if ( color == SABER_ORANGE )	return "orange";

@@ -150,7 +150,13 @@ Ghoul2 Insert End
 #define CS_TERRAINS				(CS_LIGHT_STYLES + (MAX_LIGHT_STYLES*3))
 #define CS_BSP_MODELS			(CS_TERRAINS + MAX_TERRAINS)
 
-#define CS_MAX					(CS_BSP_MODELS + MAX_SUB_BSP)
+// GLX_U: [NPC Saber Colours] NPC saber colours beyond the classic six (RGB, the RGB blade styles, black): one string per
+// RP_NPCSABER_GROUP_SIZE NPC entity numbers, "ent mode1 rrggbb mode2 rrggbb;" for each NPC that has one (NPC_stats.c)
+#define RP_NPCSABER_GROUP_SIZE	32
+#define RP_NPCSABER_GROUPS		( ( MAX_GENTITIES - MAX_CLIENTS ) / RP_NPCSABER_GROUP_SIZE )
+#define CS_RP_NPCSABERS			(CS_BSP_MODELS + MAX_SUB_BSP)
+
+#define CS_MAX					(CS_RP_NPCSABERS + RP_NPCSABER_GROUPS)
 
 #if (CS_MAX) > MAX_CONFIGSTRINGS
 #error overflow: (CS_MAX) > MAX_CONFIGSTRINGS
@@ -1888,6 +1894,7 @@ qboolean BG_SaberInSpecialAttack( int anim );
 qboolean BG_SaberInKata( int saberMove );
 qboolean BG_InKataAnim(int anim);
 qboolean BG_KickingAnim( int anim );
+qboolean BG_ParseSaberHex( const char *s, int *rgb );	// GLX_U: [Saber Hex] bg_saberLoad.c
 int BG_InGrappleMove(int anim);
 qboolean BG_InLedgeMove( int anim );	// GLX_U: [Ledge]
 qboolean BG_InCoupleEmote( int anim );	// GLX_U: [Couple Emotes]

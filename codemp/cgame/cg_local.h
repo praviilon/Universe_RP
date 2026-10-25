@@ -2000,6 +2000,8 @@ void CG_DestroyNPCClient(clientInfo_t **ci);
 
 void CG_Player( centity_t *cent );
 void CG_RpLoadCosmetics( void );	// GLX_U: [Cosmetics] cg_players.c
+void CG_RpParseNpcSabers( int group );	// GLX_U: [NPC Saber Colours] cg_players.c
+void CG_RpParseAllNpcSabers( void );
 int CG_RpCosmeticForColor( int kind, const char *colorValue );	// GLX_U: [Cosmetics] index + 1, 0 for none
 int CG_RpCosmeticForName( int kind, const char *name );	// GLX_U: [Cosmetics] index + 1, 0 for none
 qboolean CG_RpCosmeticNameValid( const char *name );	// GLX_U: [Cosmetics]

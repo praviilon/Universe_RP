@@ -338,6 +338,137 @@ static rank_t TranslateRankName( const char *name )
 
 extern saber_colors_t TranslateSaberColor( const char *name );
 
+/*
+GLX_U: [NPC Saber Colours] NPC sabers in the colours beyond the classic six: a hex or RGB colour, the four RGB blade
+styles, black. Clients learn an NPC's saber colour from s.boltToPlayer, 3 bits a saber, which only holds the classic
+ones (black overflowed into the other saber's bits). These go out in CS_RP_NPCSABERS instead (bg_public.h), read by
+our client (CG_RpParseNpcSabers); the classic ones stay in boltToPlayer for every client.
+*/
+static int rpNpcSaberMode[MAX_GENTITIES][2];	// 0: none, else SABER_RGB..SABER_ELEC2 or SABER_BLACK
+static int rpNpcSaberRGB[MAX_GENTITIES][2];
+
+static void RP_NpcSaberPublish( int group )
+{
+	char buf[MAX_STRING_CHARS];
+	const int first = MAX_CLIENTS + group * RP_NPCSABER_GROUP_SIZE;
+	int i;
+
+	buf[0] = '\0';
+	for ( i = first; i < first + RP_NPCSABER_GROUP_SIZE; i++ )
+	{
+		if ( rpNpcSaberMode[i][0] || rpNpcSaberMode[i][1] )
+		{	// at most 32 * 23 characters
+			Q_strcat( buf, sizeof( buf ), va( "%i %i %06x %i %06x;", i,
+				rpNpcSaberMode[i][0], rpNpcSaberRGB[i][0] & SABERRGB_MASK, rpNpcSaberMode[i][1], rpNpcSaberRGB[i][1] & SABERRGB_MASK ) );
+		}
+	}
+	trap->SetConfigstring( CS_RP_NPCSABERS + group, buf );
+}
+
+void RP_NpcSabersInit( void )
+{
+	int group;
+
+	memset( rpNpcSaberMode, 0, sizeof( rpNpcSaberMode ) );
+	memset( rpNpcSaberRGB, 0, sizeof( rpNpcSaberRGB ) );
+	for ( group = 0; group < RP_NPCSABER_GROUPS; group++ )
+	{	// a map_restart keeps the configstrings
+		trap->SetConfigstring( CS_RP_NPCSABERS + group, "" );
+	}
+}
+
+static void RP_NpcSaberSet( int entNum, const int mode[2], const int rgb[2] )
+{
+	if ( entNum < MAX_CLIENTS || entNum >= MAX_CLIENTS + RP_NPCSABER_GROUPS * RP_NPCSABER_GROUP_SIZE )
+	{
+		return;
+	}
+	if ( rpNpcSaberMode[entNum][0] == mode[0] && rpNpcSaberMode[entNum][1] == mode[1]
+		&& rpNpcSaberRGB[entNum][0] == rgb[0] && rpNpcSaberRGB[entNum][1] == rgb[1] )
+	{
+		return;
+	}
+	rpNpcSaberMode[entNum][0] = mode[0];
+	rpNpcSaberMode[entNum][1] = mode[1];
+	rpNpcSaberRGB[entNum][0] = rgb[0];
+	rpNpcSaberRGB[entNum][1] = rgb[1];
+	RP_NpcSaberPublish( ( entNum - MAX_CLIENTS ) / RP_NPCSABER_GROUP_SIZE );
+}
+
+void RP_NpcSaberClear( int entNum )
+{
+	static const int none[2] = { 0, 0 };
+
+	RP_NpcSaberSet( entNum, none, none );
+}
+
+// saberBlade / saber2Blade: the RGB blade styles, named as for /saberblade
+static int RP_NpcSaberBladeStyle( const char *name )
+{
+	if ( !Q_stricmp( name, "classic" ) )	return SABER_RGB;
+	if ( !Q_stricmp( name, "flame1" ) )		return SABER_FLAME1;
+	if ( !Q_stricmp( name, "electric1" ) )	return SABER_ELEC1;
+	if ( !Q_stricmp( name, "flame2" ) )		return SABER_FLAME2;
+	if ( !Q_stricmp( name, "electric2" ) )	return SABER_ELEC2;
+	return 0;
+}
+
+// saberColor / saber2Color: a classic name as before (boltToPlayer); hex, black and the rgb names for CS_RP_NPCSABERS
+static void RP_NpcSaberColorKey( gentity_t *NPC, int saberNum, const char *value, int *mode, int *rgb, int *classic )
+{
+	const int shift = saberNum ? 3 : 0;
+	saber_colors_t color;
+	int n, hex;
+
+	*mode = 0;
+	*rgb = 0;
+	*classic = -1;
+	if ( BG_ParseSaberHex( value, &hex ) )
+	{
+		color = SABER_RGB;
+		*mode = SABER_RGB;
+		*rgb = hex;
+	}
+	else
+	{
+		color = TranslateSaberColor( value );
+		if ( color >= SABER_RED && color <= SABER_PURPLE )
+		{
+			*classic = color;
+		}
+		else
+		{	// black, or rgb..rgb5 without a colour: the .sab's customRGB if it has one (client side), else white
+			*mode = color;
+			*rgb = ( color == SABER_BLACK ) ? 0 : SABERRGB_PACK( 255, 255, 255 );
+		}
+	}
+
+	for ( n = 0; n < MAX_BLADES; n++ )
+	{
+		NPC->client->saber[saberNum].blade[n].color = color;
+	}
+	NPC->s.boltToPlayer &= ~( 7 << shift );
+	if ( *classic >= 0 )
+	{
+		NPC->s.boltToPlayer |= ( *classic + 1 ) << shift;
+	}
+}
+
+// a saberBlade style on a saber with a classic colour: that colour as RGB (the client's palette, CG_RGBForSaberColor)
+static int RP_NpcSaberClassicRGB( int color )
+{
+	switch ( color )
+	{
+	case SABER_RED:		return SABERRGB_PACK( 255, 51, 51 );
+	case SABER_ORANGE:	return SABERRGB_PACK( 255, 128, 26 );
+	case SABER_YELLOW:	return SABERRGB_PACK( 255, 255, 51 );
+	case SABER_GREEN:	return SABERRGB_PACK( 51, 255, 51 );
+	case SABER_BLUE:	return SABERRGB_PACK( 51, 102, 255 );
+	case SABER_PURPLE:	return SABERRGB_PACK( 230, 51, 255 );
+	default:			return SABERRGB_PACK( 255, 255, 255 );
+	}
+}
+
 /* static int MethodNameToNumber( const char *name ) {
 	if ( !Q_stricmp( name, "EXPONENTIAL" ) ) {
 		return METHOD_EXPONENTIAL;
@@ -1004,6 +1135,8 @@ qboolean NPC_ParseParms( const char *NPCName, gentity_t *NPC )
 	vec3_t playerMaxs;
 	int npcSaber1 = 0;
 	int npcSaber2 = 0;
+	// GLX_U: [NPC Saber Colours] per saber: the mode and colour for CS_RP_NPCSABERS, the classic colour, the saberBlade
+	int rpSaberMode[2] = { 0, 0 }, rpSaberRGB[2] = { 0, 0 }, rpSaberClassic[2] = { -1, -1 }, rpSaberStyle[2] = { 0, 0 };
 
 	VectorSet(playerMins, -15, -15, DEFAULT_MINS_2);
 	VectorSet(playerMaxs, 15, 15, DEFAULT_MAXS_2);
@@ -2744,14 +2877,49 @@ qboolean NPC_ParseParms( const char *NPCName, gentity_t *NPC )
 					continue;
 				}
 				if ( NPC->client )
+				{	// GLX_U: [NPC Saber Colours] also hex, black and the rgb names (was the classic six in boltToPlayer only)
+					RP_NpcSaberColorKey( NPC, 0, value, &rpSaberMode[0], &rpSaberRGB[0], &rpSaberClassic[0] );
+				}
+				continue;
+			}
+
+			// GLX_U: [NPC Saber Colours] saberRGB / saber2RGB <r> <g> <b>, saberBlade / saber2Blade <style>
+			if ( !Q_stricmp( token, "saberRGB" ) || !Q_stricmp( token, "saber2RGB" ) )
+			{
+				const int saberNum = ( token[5] == '2' ) ? 1 : 0;
+				int c[3], i;
+
+				for ( i = 0; i < 3; i++ )
 				{
-					saber_colors_t color = TranslateSaberColor( value );
-					for ( n = 0; n < MAX_BLADES; n++ )
+					if ( COM_ParseInt( &p, &c[i] ) )
 					{
-						NPC->client->saber[0].blade[n].color = color;
-						NPC->s.boltToPlayer = NPC->s.boltToPlayer & 0x38;//(111000)
-						NPC->s.boltToPlayer += (color + 1);
+						break;
 					}
+				}
+				if ( i < 3 )
+				{
+					Com_Printf( S_COLOR_YELLOW "WARNING: %s wants three numbers 0-255 in NPC '%s'\n", token, NPCName );
+					continue;
+				}
+				if ( NPC->client )
+				{
+					RP_NpcSaberColorKey( NPC, saberNum, va( "%02x%02x%02x", Com_Clampi( 0, 255, c[0] ), Com_Clampi( 0, 255, c[1] ), Com_Clampi( 0, 255, c[2] ) ),
+						&rpSaberMode[saberNum], &rpSaberRGB[saberNum], &rpSaberClassic[saberNum] );
+				}
+				continue;
+			}
+			if ( !Q_stricmp( token, "saberBlade" ) || !Q_stricmp( token, "saber2Blade" ) )
+			{
+				const int saberNum = ( token[5] == '2' ) ? 1 : 0;
+
+				if ( COM_ParseString( &p, &value ) )
+				{
+					continue;
+				}
+				rpSaberStyle[saberNum] = RP_NpcSaberBladeStyle( value );
+				if ( !rpSaberStyle[saberNum] )
+				{
+					Com_Printf( S_COLOR_YELLOW "WARNING: unknown %s '%s' in NPC '%s' (classic, flame1, electric1, flame2, electric2)\n", token, value, NPCName );
 				}
 				continue;
 			}
@@ -2854,14 +3022,8 @@ qboolean NPC_ParseParms( const char *NPCName, gentity_t *NPC )
 					continue;
 				}
 				if ( NPC->client )
-				{
-					saber_colors_t color = TranslateSaberColor( value );
-					for ( n = 0; n < MAX_BLADES; n++ )
-					{
-						NPC->client->saber[1].blade[n].color = color;
-						NPC->s.boltToPlayer = NPC->s.boltToPlayer & 0x7;//(000111)
-						NPC->s.boltToPlayer += ((color + 1) << 3);
-					}
+				{	// GLX_U: [NPC Saber Colours] as saberColor above
+					RP_NpcSaberColorKey( NPC, 1, value, &rpSaberMode[1], &rpSaberRGB[1], &rpSaberClassic[1] );
 				}
 				continue;
 			}
@@ -3538,6 +3700,29 @@ Ghoul2 Insert Start
 
 		NPC->s.npcSaber1 = npcSaber1;
 		NPC->s.npcSaber2 = npcSaber2;
+
+		{	// GLX_U: [NPC Saber Colours] a saberBlade makes that saber RGB in its style (a classic colour as its RGB, none
+			// as the .sab's customRGB or white; not with black), then the colours beyond the classic six go to clients
+			int s, b;
+
+			for ( s = 0; s < 2; s++ )
+			{
+				if ( !rpSaberStyle[s] || rpSaberMode[s] == SABER_BLACK )
+				{
+					continue;
+				}
+				if ( !rpSaberMode[s] )
+				{	// boltToPlayer keeps a classic colour for clients that don't read CS_RP_NPCSABERS
+					rpSaberRGB[s] = ( rpSaberClassic[s] >= 0 ) ? RP_NpcSaberClassicRGB( rpSaberClassic[s] ) : SABERRGB_PACK( 255, 255, 255 );
+				}
+				rpSaberMode[s] = rpSaberStyle[s];
+				for ( b = 0; b < MAX_BLADES; b++ )
+				{
+					NPC->client->saber[s].blade[b].color = rpSaberStyle[s];
+				}
+			}
+			RP_NpcSaberSet( NPC->s.number, rpSaberMode, rpSaberRGB );
+		}
 
 		if (!customSkin[0])
 		{

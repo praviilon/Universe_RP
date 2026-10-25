@@ -2703,6 +2703,7 @@ Ghoul2 Insert End
 
 	// Make sure we have update values (scores)
 	CG_SetConfigValues();
+	CG_RpParseAllNpcSabers();	// GLX_U: [NPC Saber Colours]
 
 	CG_StartMusic(qfalse);
 

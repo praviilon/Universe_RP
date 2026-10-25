@@ -7200,6 +7200,65 @@ void CG_SaberCompWork(vec3_t start, vec3_t end, centity_t *owner, int saberNum, 
 
 qboolean BG_SuperBreakWinAnim( int anim );
 
+/*
+GLX_U: [NPC Saber Colours] NPC saber colours beyond the classic six, from CS_RP_NPCSABERS (the server's NPC_stats.c):
+"ent mode1 rrggbb mode2 rrggbb;" per NPC that has one, mode 0 meaning none for that saber.
+*/
+static int cgRpNpcSaberMode[MAX_GENTITIES][2];
+static int cgRpNpcSaberRGB[MAX_GENTITIES][2];
+
+void CG_RpParseNpcSabers( int group )
+{
+	const int first = MAX_CLIENTS + group * RP_NPCSABER_GROUP_SIZE;
+	const char *s;
+	int i;
+
+	if ( group < 0 || group >= RP_NPCSABER_GROUPS )
+	{
+		return;
+	}
+	for ( i = first; i < first + RP_NPCSABER_GROUP_SIZE; i++ )
+	{
+		cgRpNpcSaberMode[i][0] = cgRpNpcSaberMode[i][1] = 0;
+		cgRpNpcSaberRGB[i][0] = cgRpNpcSaberRGB[i][1] = 0;
+	}
+
+	s = CG_ConfigString( CS_RP_NPCSABERS + group );
+	while ( s && *s )
+	{
+		int ent, m[2];
+		unsigned int c[2];
+
+		if ( sscanf( s, "%d %d %x %d %x", &ent, &m[0], &c[0], &m[1], &c[1] ) == 5
+			&& ent >= first && ent < first + RP_NPCSABER_GROUP_SIZE )
+		{
+			for ( i = 0; i < 2; i++ )
+			{
+				if ( ( m[i] >= SABER_RGB && m[i] <= SABER_ELEC2 ) || m[i] == SABER_BLACK )
+				{
+					cgRpNpcSaberMode[ent][i] = m[i];
+					cgRpNpcSaberRGB[ent][i] = (int)( c[i] & SABERRGB_MASK );
+				}
+			}
+		}
+		s = strchr( s, ';' );
+		if ( s )
+		{
+			s++;
+		}
+	}
+}
+
+void CG_RpParseAllNpcSabers( void )
+{
+	int group;
+
+	for ( group = 0; group < RP_NPCSABER_GROUPS; group++ )
+	{
+		CG_RpParseNpcSabers( group );
+	}
+}
+
 void CG_AddSaberBlade( centity_t *cent, centity_t *scent, refEntity_t *saber, int renderfx, int modelIndex, int saberNum, int bladeNum, vec3_t origin, vec3_t angles, qboolean fromSaber, qboolean dontDraw)
 {
 	vec3_t	org_, end, v,
@@ -7284,8 +7343,19 @@ void CG_AddSaberBlade( centity_t *cent, centity_t *scent, refEntity_t *saber, in
 
 	if (cent->currentState.eType == ET_NPC)
 	{
-		if (cent->currentState.boltToPlayer)
+		const int npcNum = cent->currentState.number;
+		float *npcRGB = saberNum ? client->rgb2 : client->rgb1;
+
+		if ( npcNum >= 0 && npcNum < MAX_GENTITIES && cgRpNpcSaberMode[npcNum][saberNum & 1] )
+		{	// GLX_U: [NPC Saber Colours] RGB, an RGB blade style or black, the colour where the RGB drawing looks for it
+			const int v = cgRpNpcSaberRGB[npcNum][saberNum & 1];
+
+			scolor = cgRpNpcSaberMode[npcNum][saberNum & 1];
+			VectorSet( npcRGB, SABERRGB_R( v ), SABERRGB_G( v ), SABERRGB_B( v ) );
+		}
+		else if (cent->currentState.boltToPlayer)
 		{
+			VectorClear( npcRGB );	// GLX_U: [NPC Saber Colours] none left over from an earlier colour
 			if (saberNum == 0)
 			{
 				scolor = (cent->currentState.boltToPlayer & 0x07) - 1;
@@ -7294,9 +7364,14 @@ void CG_AddSaberBlade( centity_t *cent, centity_t *scent, refEntity_t *saber, in
 			{
 				scolor = ((cent->currentState.boltToPlayer & 0x38) >> 3) - 1;
 			}
+			if ( scolor < 0 )
+			{	// GLX_U: [NPC Saber Colours] only the other saber has a colour from the NPC file: this one keeps its .sab's
+				scolor = client->saber[saberNum].blade[bladeNum].color;
+			}
 		}
 		else
 		{
+			VectorClear( npcRGB );	// GLX_U: [NPC Saber Colours]
 			scolor = client->saber[saberNum].blade[bladeNum].color;
 		}
 	}

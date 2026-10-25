@@ -2013,6 +2013,7 @@ void G_InitGame( int levelTime, int randomSeed, int restart ) {
 	// MAX_GENTITIES of them, but the logical region is reused from map to map just the same.
 	memset( g_entities, 0, MAX_ENTITIESTOTAL * sizeof(g_entities[0]) );
 	level.gentities = g_entities;
+	RP_NpcSabersInit();	// GLX_U: [NPC Saber Colours]
 	level.num_logicalents = 0;
 	// GalaxyRP: [Logical Entities] the cvar is latched, but this copy is what the allocator reads,
 	// so nothing can move between regions while a map is running.
