@@ -1174,6 +1174,8 @@ static void CG_MapRestart( void ) {
 
 	cgs.voteTime = 0;
 
+	CG_RpAutoWalkStop( qtrue );	// GLX_U: [AutoWalk] everyone respawns
+
 	cg.mapRestart = qtrue;
 
 	CG_StartMusic(qtrue);

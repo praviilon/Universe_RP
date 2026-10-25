@@ -2189,6 +2189,8 @@ void CG_DrawOldTourneyScoreboard( void );
 //
 qboolean CG_ConsoleCommand( void );
 void CG_InitConsoleCommands( void );
+void CG_RpAutoWalkStop( qboolean announce );	// GLX_U: [AutoWalk]
+void CG_RpAutoWalkCheck( void );
 
 //
 // cg_servercmds.c

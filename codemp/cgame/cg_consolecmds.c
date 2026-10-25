@@ -394,6 +394,117 @@ static void CG_Cosmetics_f( void ) {
 	}
 }
 
+/*
+=================
+GLX_U: [AutoWalk] /autowalk -- keeps him moving hands-free, e.g. to type while walking. It presses the
+movement as +forward typed in the console does: a button held by no key, so it stays down with the chat box
+or console open, and keys he presses or lets go meanwhile don't end it (the movement code keeps walking
+while chatting).
+  Direction: the movement keys held at that moment (forward/back, strafe), forward if none.
+  Speed:     walking or running, as he was (the walk key is held for him if it was down).
+It stops on /autowalk again, and on its own on death, a knockdown (downed or paralyzed), spectating
+or following, intermission, map_restart and leaving the map (cgame shutdown, CG_Init as a backstop).
+cg_autowalk holds what was pressed (RP_AW_*), so only those are let go, with the "-1" key the console
+uses: a real key still held keeps working.
+=================
+*/
+#define RP_AW_ON		1
+#define RP_AW_FORWARD	2
+#define RP_AW_BACK		4
+#define RP_AW_RIGHT		8
+#define RP_AW_LEFT		16
+#define RP_AW_SPEED		32
+
+static int CG_RpAutoWalkState( void ) {
+	char buf[16];
+
+	trap->Cvar_VariableStringBuffer( "cg_autowalk", buf, sizeof( buf ) );
+	return atoi( buf );
+}
+
+void CG_RpAutoWalkStop( qboolean announce ) {
+	const int state = CG_RpAutoWalkState();
+
+	if ( !( state & RP_AW_ON ) ) {
+		return;
+	}
+	trap->SendConsoleCommand( va( "%s%s%s%s%s",
+		( state & RP_AW_FORWARD ) ? "-forward -1\n" : "",
+		( state & RP_AW_BACK ) ? "-back -1\n" : "",
+		( state & RP_AW_RIGHT ) ? "-moveright -1\n" : "",
+		( state & RP_AW_LEFT ) ? "-moveleft -1\n" : "",
+		( state & RP_AW_SPEED ) ? "-speed -1\n" : "" ) );
+	trap->Cvar_Set( "cg_autowalk", "0" );
+	if ( announce ) {
+		Com_Printf( "AutoWalk off.\n" );
+	}
+}
+
+// dead, knocked down (downed, admin paralysis, any knockdown), spectating, following, intermission
+static qboolean CG_RpAutoWalkBlocked( void ) {
+	const playerState_t *ps = &cg.predictedPlayerState;
+
+	return ( ps->stats[STAT_HEALTH] <= 0 || ps->pm_type >= PM_DEAD || ps->pm_type == PM_SPECTATOR
+		|| ( ps->pm_flags & PMF_FOLLOW ) || ( ps->eFlags & EF_DEAD )
+		|| cg.snap->ps.persistant[PERS_TEAM] == TEAM_SPECTATOR
+		|| ps->forceHandExtend == HANDEXTEND_KNOCKDOWN ) ? qtrue : qfalse;
+}
+
+// every frame, after prediction (cg_view.c)
+void CG_RpAutoWalkCheck( void ) {
+	if ( cg_autowalk.integer && !cg.demoPlayback && cg.snap && CG_RpAutoWalkBlocked() ) {
+		CG_RpAutoWalkStop( qtrue );
+	}
+}
+
+static void CG_AutoWalk_f( void ) {
+	usercmd_t	cmd;
+	char		buf[16];
+	int			state = RP_AW_ON;
+	qboolean	walking, clRun;
+	const char	*fb, *rl;
+
+	if ( CG_RpAutoWalkState() & RP_AW_ON ) {
+		CG_RpAutoWalkStop( qtrue );
+		return;
+	}
+	if ( !cg.snap || cg.demoPlayback || CG_RpAutoWalkBlocked() ) {
+		Com_Printf( "AutoWalk works only while you are up and playing.\n" );
+		return;
+	}
+
+	memset( &cmd, 0, sizeof( cmd ) );
+	trap->GetUserCmd( trap->GetCurrentCmdNumber(), &cmd );
+	if ( cmd.forwardmove > 0 )		state |= RP_AW_FORWARD;
+	else if ( cmd.forwardmove < 0 )	state |= RP_AW_BACK;
+	if ( cmd.rightmove > 0 )		state |= RP_AW_RIGHT;
+	else if ( cmd.rightmove < 0 )	state |= RP_AW_LEFT;
+	if ( !( state & ( RP_AW_FORWARD | RP_AW_BACK | RP_AW_RIGHT | RP_AW_LEFT ) ) ) {
+		state |= RP_AW_FORWARD;
+	}
+
+	// the engine walks when the walk key (+speed) and cl_run agree: hold the key for him if it is down now
+	walking = ( cmd.buttons & BUTTON_WALKING ) ? qtrue : qfalse;
+	trap->Cvar_VariableStringBuffer( "cl_run", buf, sizeof( buf ) );
+	clRun = atoi( buf ) ? qtrue : qfalse;
+	if ( walking == clRun ) {
+		state |= RP_AW_SPEED;
+	}
+
+	trap->Cvar_Set( "cg_autowalk", va( "%i", state ) );
+	trap->SendConsoleCommand( va( "%s%s%s%s%s",
+		( state & RP_AW_FORWARD ) ? "+forward\n" : "",
+		( state & RP_AW_BACK ) ? "+back\n" : "",
+		( state & RP_AW_RIGHT ) ? "+moveright\n" : "",
+		( state & RP_AW_LEFT ) ? "+moveleft\n" : "",
+		( state & RP_AW_SPEED ) ? "+speed\n" : "" ) );
+
+	fb = ( state & RP_AW_FORWARD ) ? "forward" : ( state & RP_AW_BACK ) ? "back" : "";
+	rl = ( state & RP_AW_RIGHT ) ? "right" : ( state & RP_AW_LEFT ) ? "left" : "";
+	Com_Printf( "AutoWalk on (%s %s%s%s), /autowalk again to stop.\n", walking ? "walking" : "running",
+		fb, ( fb[0] && rl[0] ) ? " and " : "", rl );
+}
+
 typedef struct consoleCommand_s {
 	const char	*cmd;
 	void		(*func)(void);
@@ -409,6 +520,7 @@ static consoleCommand_t	commands[] = {
 	{ "-grapple",					CG_GrappleUp_f },
 	{ "-scores",					CG_ScoresUp_f },
 	{"char",						NULL},
+	{ "autowalk",					CG_AutoWalk_f },	// GLX_U: [AutoWalk]
 	{ "briefing",					CG_SiegeBriefing_f },
 	{ "clientlist",					CG_ClientList_f },
 	{ "cosmetics",					CG_Cosmetics_f },	// GLX_U: [Cosmetics]

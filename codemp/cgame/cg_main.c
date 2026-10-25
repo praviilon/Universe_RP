@@ -2633,6 +2633,7 @@ Ghoul2 Insert End
 	// fix belongs in the engine (proposed to TaystJK: a mod folder that opts out of fs_forcegame).
 
 	CG_InitConsoleCommands();
+	CG_RpAutoWalkStop( qfalse );	// GLX_U: [AutoWalk] a new map (or a client that went without shutting down) starts standing
 
 	// GalaxyRP: [Extras] the Extras menus start this map afresh -- cg_rpextras.c
 	CG_RpxInit();
@@ -2788,6 +2789,8 @@ Called before every level change or subsystem restart
 */
 void CG_Shutdown( void )
 {
+	CG_RpAutoWalkStop( qfalse );	// GLX_U: [AutoWalk] leaving the map: the engine would keep the buttons held
+
 	BG_ClearAnimsets(); //free all dynamic allocations made through the engine
 
     CG_DestroyAllGhoul2();

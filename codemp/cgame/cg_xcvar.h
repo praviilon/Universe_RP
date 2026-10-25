@@ -39,6 +39,7 @@ XCVAR_DEF( cg_animBlend,						"1",					NULL,					CVAR_NONE )
 XCVAR_DEF( cg_animSpeed,						"1",					NULL,					CVAR_CHEAT )
 XCVAR_DEF( cg_auraShell,						"1",					NULL,					CVAR_ARCHIVE )
 XCVAR_DEF( cg_autoSwitch,						"1",					NULL,					CVAR_ARCHIVE )
+XCVAR_DEF( cg_autowalk,						"0",					NULL,					CVAR_INTERNAL )	// GLX_U: [AutoWalk] what /autowalk holds down (cg_consolecmds.c), not saved
 XCVAR_DEF( cg_bobPitch,							"0.002",				NULL,					CVAR_ARCHIVE )
 XCVAR_DEF( cg_bobRoll,							"0.002",				NULL,					CVAR_ARCHIVE )
 XCVAR_DEF( cg_bobUp,							"0.005",				NULL,					CVAR_ARCHIVE )

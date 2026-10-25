@@ -10543,6 +10543,131 @@ static void CG_BobaJetFlames( centity_t *cent )
 	}
 }
 
+// GLX_U: [Sit Placement] sits and meditation are drawn with the pelvis on what is under it (a bench, a step),
+// not at the pose's fixed height. Visual only (the model, not the player): raised at most RP_SIT_RAISE_MAX,
+// lowered no further than the floor under the feet allows, so a chair sit in the open stays as it was.
+#define RP_SIT_BUTT			4.0f	// pelvis above the seat (a floor sit's own, if lower)
+#define RP_SIT_RAISE_MAX	8.0f
+
+static qboolean CG_RpSitPlacementAnim( int anim )
+{
+	switch ( anim )
+	{
+	case BOTH_SIT1: case BOTH_SIT2: case BOTH_SIT3: case BOTH_SIT4: case BOTH_SIT5: case BOTH_SIT6: case BOTH_SIT7:
+	case BOTH_SITARMS: case BOTH_SITCROSS: case BOTH_SITCROSS2: case BOTH_SITLEAN: case BOTH_SITFEET:
+	case BOTH_SITPALM: case BOTH_SITPALM2: case BOTH_SITUP:
+	case BOTH_MEDITATE: case BOTH_MEDITATION2: case BOTH_MEDITATEFORCE: case BOTH_STAND5TOSIT2:
+		return qtrue;	// not BOTH_GUNSIT1: the emplaced gun places its gunner
+	default:
+		return qfalse;
+	}
+}
+
+static qboolean CG_RpSitBonePos( centity_t *cent, const refEntity_t *legs, const char *bone, vec3_t out )
+{
+	mdxaBone_t	m;
+	const int	bolt = trap->G2API_AddBolt( cent->ghoul2, 0, bone );
+
+	if ( bolt < 0 )
+	{
+		return qfalse;
+	}
+	trap->G2API_GetBoltMatrix( cent->ghoul2, 0, bolt, &m, cent->turAngles, legs->origin, cg.time, cgs.gameModels, cent->modelScale );
+	BG_GiveMeVectorFromMatrix( &m, ORIGIN, out );
+	return qtrue;
+}
+
+static void CG_RpSitPlacement( centity_t *cent, refEntity_t *legs )
+{
+	vec3_t	pelvis, foot[2], start, end;
+	trace_t	tr;
+	float	scale, floorZ, butt, offset, lowest;
+	int		i;
+
+	if ( !cent->ghoul2 || !CG_RpSitPlacementAnim( cent->currentState.legsAnim )
+		|| ( cent->currentState.eFlags & EF_DEAD ) || cent->isRagging
+		|| ( cent->currentState.eFlags2 & EF2_HELD_BY_MONSTER ) || cent->currentState.m_iVehicleNum )
+	{
+		return;
+	}
+	if ( cent->currentState.number == cg.snap->ps.clientNum && !cg.renderingThirdPerson )
+	{ // own body in first person (cg_fpls): keep it under the camera
+		return;
+	}
+	if ( !CG_RpSitBonePos( cent, legs, "pelvis", pelvis )
+		|| !CG_RpSitBonePos( cent, legs, "ltalus", foot[0] )
+		|| !CG_RpSitBonePos( cent, legs, "rtalus", foot[1] ) )
+	{ // not a humanoid skeleton
+		return;
+	}
+
+	scale = cent->modelScale[2] ? cent->modelScale[2] : 1.0f;
+	floorZ = legs->origin[2] + DEFAULT_MINS_2 * scale;	// the floor the pose is made for: the one he stands on
+	butt = pelvis[2] - floorZ;
+	if ( butt > RP_SIT_BUTT * scale )
+	{
+		butt = RP_SIT_BUTT * scale;
+	}
+	else if ( butt < 0 )
+	{
+		butt = 0;
+	}
+
+	// the seat: under the pelvis, from just above it down to a step below his floor
+	VectorSet( start, pelvis[0], pelvis[1], pelvis[2] + 8.0f );
+	VectorSet( end, pelvis[0], pelvis[1], floorZ - STEPSIZE );
+	if ( end[2] >= start[2] )
+	{
+		return;
+	}
+	CG_Trace( &tr, start, NULL, NULL, end, cent->currentState.number, MASK_SOLID );
+	if ( tr.startsolid || tr.allsolid || tr.fraction >= 1.0f )
+	{
+		return;
+	}
+
+	offset = tr.endpos[2] + butt - pelvis[2];
+	if ( offset > RP_SIT_RAISE_MAX )
+	{
+		offset = RP_SIT_RAISE_MAX;
+	}
+	else if ( offset < 0 )
+	{ // the pose has its feet on his floor: lower only as far as the floor under each foot is lower than his
+		lowest = offset;
+		for ( i = 0; i < 2; i++ )
+		{
+			VectorSet( start, foot[i][0], foot[i][1], ( foot[i][2] > floorZ ? foot[i][2] : floorZ ) + 8.0f );
+			VectorSet( end, foot[i][0], foot[i][1], floorZ - 64.0f );
+			CG_Trace( &tr, start, NULL, NULL, end, cent->currentState.number, MASK_SOLID );
+			if ( tr.startsolid || tr.allsolid )
+			{
+				lowest = 0;
+				break;
+			}
+			if ( tr.fraction < 1.0f && tr.endpos[2] - floorZ > lowest )
+			{ // (nothing under a foot, over an edge: no limit from it)
+				lowest = tr.endpos[2] - floorZ;
+			}
+		}
+		if ( lowest > 0 )
+		{
+			lowest = 0;
+		}
+		if ( offset < lowest )
+		{
+			offset = lowest;
+		}
+	}
+
+	if ( offset > -0.05f && offset < 0.05f )
+	{
+		return;
+	}
+	legs->origin[2] += offset;
+	legs->oldorigin[2] += offset;
+	legs->lightingOrigin[2] += offset;
+}
+
 void CG_Player( centity_t *cent ) {
 	clientInfo_t	*ci;
 	refEntity_t		legs;
@@ -11614,6 +11739,7 @@ void CG_Player( centity_t *cent ) {
 	// get the animation state (after rotation, to allow feet shuffle)
 	CG_PlayerAnimation( cent, &legs.oldframe, &legs.frame, &legs.backlerp,
 		 &torso.oldframe, &torso.frame, &torso.backlerp );
+	CG_RpSitPlacement( cent, &legs );	// GLX_U: [Sit Placement] after the pose is set, before anything is placed from it
 
 	// add the talk baloon or disconnect icon
 	CG_PlayerSprites( cent );
