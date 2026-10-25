@@ -58,7 +58,7 @@ static const rpEntHelp_t rp_ent_help[] = {
 		"entities (M in /entlist) are not edited: /entcopy them.",
 		NULL,
 		"classname||The class. /entedit cannot change it: /entremove it and /entadd the new class.\n"
-		"origin|where you stand|Position x y z. /entadd uses the /entorigin point when one is set, /entaddaim the surface aimed at "
+		"origin|where you stand|Position x y z, typed in quotes. /entadd uses the /entorigin point when one is set, /entaddaim the surface aimed at "
 		"(a typed origin is ignored).\n"
 		"angle|0|Facing as one yaw in degrees, the same as angles 0 <angle> 0. Handy on the command line.\n"
 		"angles|0 0 0|Pitch yaw roll in degrees, typed in quotes. With none given, /entadd takes the /entorigin angles when set.\n"
@@ -1209,7 +1209,7 @@ static const rpEntHelp_t rp_ent_help[] = {
 		NULL,
 		"common misc_model_breakable misc_model_ghoul" },
 	{ "mover", RP_EH_TOPIC, NULL,
-		"What the func_ mover classes share. Each takes a model: *N, one of the current map's inline brush models from *1 (*0, the map itself, and a number this map does not have are refused), or an .md3 file, refused if the server lacks it. A *N model is drawn shifted by the origin from where the map built it unless it was built around an origin brush, so origin 0 0 0 puts a plain one back in place. An .md3 one has no size or collision of its own: give mins and maxs, and spawnflag 1024.",
+		"What the func_ mover classes share. Each takes a model: *N, one of the current map's inline brush models from *1 (*0, the map itself, and a number this map does not have are refused), or an .md3 file, refused if the server lacks it. A *N model is drawn shifted by the origin from where the map built it unless it was built around an origin brush, so origin 0 0 0 (in quotes) puts a plain one back in place. An .md3 one has no size or collision of its own: give mins and maxs, and spawnflag 1024.",
 		"32|CRUSH_THROUGH|A player or NPC in its way takes dmg and it keeps moving. dmg is 2 unless set on doors, plats, trains, bobbing, pendulums and rotating ones, 0 on buttons. On func_breakable 32 is HEAVY_WEAP.\n"
 		"64|PLAYER_USE|Players can use it with the use key (an .md3 one must be SOLID to be aimed at). Not on func_glass, func_timer or a func_rotating with health. func_breakable uses 128 for this.\n"
 		"128|INACTIVE|Ignores every use until a target_activate activates it. Not on func_breakable, func_timer or a func_rotating with health. A level 5 Stun Baton (with rp_stun_baton_door_unlock 1) clears it on doors, plats and buttons (a later target_deactivate can set it again). In a team, a use reaching the leader follows the leader's state, but a member's own 128 still refuses the use key and shots aimed at it, and target_activate cannot clear it (its name moved to the leader).\n"

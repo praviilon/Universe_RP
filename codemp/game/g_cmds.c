@@ -17038,6 +17038,74 @@ static int zyk_args_bytes( int first, int count )
 	return bytes;
 }
 
+/*
+==================
+zyk_entity_pairs_problem
+
+GLX_U fix: [Entity System] the key/value arguments from `first` on, read before anything changes, for what
+the console makes of a value with spaces typed without quotes: "origin 456 556 333" arrives as four words,
+origin = 456 and a key 556 = 333. The count is even, so it passed; G_ParseField() then read the origin as
+0 0 0 (saying so in the server console only) and the entity went to the middle of the map, and the stray
+key stayed in its record and went on into /entsave. So:
+  - a key starts with a letter or an underscore, as every key the game reads does (the fields table and
+    every G_Spawn* call), and the shifted number of a vector typed without quotes is refused. /entedit
+    (edit) takes any key whose value is zykremovekey, so a stray key already stored can still be removed;
+  - a key the game reads as three numbers (zyk_vector_keys) is given three finite ones, read as
+    G_ParseField() and G_SpawnVector() read them, which also catches a short value typed in quotes.
+NULL when the arguments are fine, else the message, in a static buffer.
+==================
+*/
+static const char *const zyk_vector_keys[] = {
+	"origin", "angles", "angles2", "mins", "maxs", "trdelta",	// the fields table's F_VECTOR keys (G_ParseField)
+	"color", "offcolor", "modelscale_vec", "spinangles"			// read by spawn functions (G_SpawnVector)
+};
+
+static const char *zyk_entity_pairs_problem( int first, int count, qboolean edit )
+{
+	static char problem[256];
+	char key[MAX_STRING_CHARS];
+	char value[MAX_STRING_CHARS];
+	vec3_t v;
+	int i, k;
+
+	for ( i = first; i + 1 < count; i += 2 )
+	{
+		trap->Argv( i, key, sizeof( key ) );
+		trap->Argv( i + 1, value, sizeof( value ) );
+
+		if ( edit && Q_stricmp( value, "zykremovekey" ) == 0 )
+			continue;
+
+		if ( !key[0] )
+		{
+			Q_strncpyz( problem, "A key cannot be empty.", sizeof( problem ) );
+			return problem;
+		}
+
+		if ( !( ( key[0] >= 'a' && key[0] <= 'z' ) || ( key[0] >= 'A' && key[0] <= 'Z' ) || key[0] == '_' ) )
+		{
+			Com_sprintf( problem, sizeof( problem ), "^3%s^7 is not a key. A value with spaces (origin, angles, color...) is typed in double quotes.",
+				RP_ShownText( zyk_shown_name( key ) ) );
+			return problem;
+		}
+
+		for ( k = 0; k < (int)ARRAY_LEN( zyk_vector_keys ); k++ )
+		{
+			if ( Q_stricmp( key, zyk_vector_keys[k] ) != 0 )
+				continue;
+
+			if ( sscanf( value, "%f %f %f", &v[0], &v[1], &v[2] ) != 3 || !RP_FINITE( v[0] ) || !RP_FINITE( v[1] ) || !RP_FINITE( v[2] ) )
+			{
+				Com_sprintf( problem, sizeof( problem ), "^3%s^7 takes three numbers, typed in double quotes.", zyk_vector_keys[k] );
+				return problem;
+			}
+			break;
+		}
+	}
+
+	return NULL;
+}
+
 static void zyk_entadd( gentity_t *ent, qboolean aim, qboolean grab ) {
 	gentity_t *new_ent = NULL;
 	int number_of_args = trap->Argc();
@@ -17098,6 +17166,17 @@ static void zyk_entadd( gentity_t *ent, qboolean aim, qboolean grab ) {
 	{
 		trap->SendServerCommand( ent-g_entities, va("print \"An entity can hold at most %d key/value pairs, classname included.\n\"", ZYK_MAX_SPAWN_STRING_SLOTS / 2) );
 		return;
+	}
+
+	// GLX_U fix: [Entity System] a value with spaces typed without quotes: a stray key, a vector read as 0 0 0
+	{
+		const char *problem = zyk_entity_pairs_problem( 2, number_of_args, qfalse );
+
+		if ( problem )
+		{
+			trap->SendServerCommand( ent-g_entities, va( "print \"%s\n\"", problem ) );
+			return;
+		}
 	}
 
 	trap->Argv( 1, arg1, sizeof( arg1 ) );
@@ -17695,6 +17774,19 @@ void Cmd_EntEdit_f( gentity_t *ent ) {
 		{
 			trap->SendServerCommand( ent-g_entities, "print \"Each key needs a value: give key/value pairs.\n\"" );
 			return;
+		}
+
+		// GLX_U fix: [Entity System] a value with spaces typed without quotes ("origin 456 556 333"): the origin
+		// was read as 0 0 0 and the entity respawned in the middle of the map, with a stray key 556 -- see
+		// zyk_entity_pairs_problem(). Removing any key with zykremovekey is still taken.
+		{
+			const char *problem = zyk_entity_pairs_problem( first_pair, number_of_args, qtrue );
+
+			if ( problem )
+			{
+				trap->SendServerCommand( ent-g_entities, va( "print \"Entity %d was not edited: %s\n\"", entity_id, problem ) );
+				return;
+			}
 		}
 
 		// GalaxyRP fix: [Entity System] the classname is not editable. /entedit respawns the entity in
@@ -21671,7 +21763,7 @@ void Cmd_EntitiesAndRemaps_f( gentity_t *ent ) {
 	lines[n++] = "^3--------Entity System--------\n";
 
 	lines[n++] = "^5Placing\n";
-	lines[n++] = "^3/entadd <classname> <key> <value> <key> <value>...: ^7Adds a new entity where you stand, at the /entorigin position, or at an origin you give (origin 0 0 0 keeps a map brush in place).\n";
+	lines[n++] = "^3/entadd <classname> <key> <value> <key> <value>...: ^7Adds a new entity where you stand, at the /entorigin position, or at an origin you give (origin 0 0 0 in quotes keeps a map brush in place). A value with spaces is typed in double quotes.\n";
 	lines[n++] = "^3/entaddaim <classname> <key> <value>...: ^7Like /entadd, but puts the entity on the surface you aim at (through players and NPCs); ^3aimoffset <units>^7 puts it that far out from the surface.\n";
 	lines[n++] = "^3/entorigin: ^7Sets your position as origin for new entities. Use again to unset.\n";
 	lines[n++] = "^3/entundo: ^7Removes last added entity; a spawner takes the NPCs it made with it. Only works once.\n";
