@@ -109,7 +109,8 @@
 		});
 	}
 
-	fetchRelease(OUR_REPO, "urp-release-full").then(function (rel) {
+	// site.js (loaded first) shares one request for our release with the badge
+	(window.urpLatestRelease ? window.urpLatestRelease() : fetchRelease(OUR_REPO, "urp-release-full")).then(function (rel) {
 		ourRelease = rel;
 		addSizes(rel);
 		refresh();

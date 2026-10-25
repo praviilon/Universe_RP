@@ -64,11 +64,52 @@
 		el.textContent = String(new Date().getFullYear());
 	});
 
+	// The latest Universe RP release from the GitHub API, asked once per visit and shared: kept in
+	// sessionStorage between pages, and as one promise on the page so the badge and the download
+	// picker (download.js) don't each ask. Unauthenticated API calls are limited per visitor.
+	window.urpLatestRelease = function () {
+		if (window.urpLatestReleasePromise) {
+			return window.urpLatestReleasePromise;
+		}
+		var KEY = "urp-release-full";
+		var cached = null;
+		try {
+			cached = JSON.parse(window.sessionStorage.getItem(KEY) || "null");
+		} catch (e) { /* storage blocked */ }
+		if (cached && cached.tag_name) {
+			window.urpLatestReleasePromise = Promise.resolve(cached);
+		} else if (!window.fetch) {
+			window.urpLatestReleasePromise = Promise.reject(new Error("no fetch"));
+		} else {
+			window.urpLatestReleasePromise = fetch("https://api.github.com/repos/" + REPO + "/releases/latest", { headers: { Accept: "application/vnd.github+json" } })
+				.then(function (r) {
+					if (!r.ok) {
+						throw new Error(r.status);
+					}
+					return r.json();
+				})
+				.then(function (rel) {
+					var slim = {
+						tag_name: rel.tag_name,
+						published_at: rel.published_at,
+						html_url: rel.html_url,
+						assets: (rel.assets || []).map(function (a) { return [a.name, a.size]; })
+					};
+					try {
+						window.sessionStorage.setItem(KEY, JSON.stringify(slim));
+					} catch (e) { /* ignore */ }
+					return slim;
+				});
+		}
+		return window.urpLatestReleasePromise;
+	};
+	var urpLatestRelease = window.urpLatestRelease;
+
 	// Latest release: version and date from the GitHub API, kept for the visit (sessionStorage) so
 	// moving between pages asks only once. Anything that goes wrong leaves the badge's plain
 	// fallback text and link in place.
 	var badges = document.querySelectorAll("[data-release-badge]");
-	if (!badges.length || !window.fetch) {
+	if (!badges.length) {
 		return;
 	}
 
@@ -88,28 +129,5 @@
 		});
 	}
 
-	var KEY = "urp-latest-release";
-	try {
-		var cached = JSON.parse(window.sessionStorage.getItem(KEY) || "null");
-		if (cached && cached.tag_name) {
-			show(cached);
-			return;
-		}
-	} catch (e) { /* storage blocked: just ask the API */ }
-
-	fetch("https://api.github.com/repos/" + REPO + "/releases/latest", { headers: { Accept: "application/vnd.github+json" } })
-		.then(function (r) {
-			if (!r.ok) {
-				throw new Error(r.status);
-			}
-			return r.json();
-		})
-		.then(function (rel) {
-			var slim = { tag_name: rel.tag_name, published_at: rel.published_at, html_url: rel.html_url };
-			try {
-				window.sessionStorage.setItem(KEY, JSON.stringify(slim));
-			} catch (e) { /* ignore */ }
-			show(slim);
-		})
-		.catch(function () { /* keep the fallback text */ });
+	urpLatestRelease().then(show).catch(function () { /* keep the fallback text */ });
 })();
