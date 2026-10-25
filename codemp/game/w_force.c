@@ -6581,14 +6581,14 @@ qboolean G_SpecialRollGetup(gentity_t *self)
 
 // GalaxyRP fix: [Skills] Sense Health, reworked.
 //
-// Targeting: the skill used to read ps.lookTarget, which is not "who you are looking at" but a side
+// Targeting: the skill used to read ps.lookTarget, which was then not "who you are looking at" but a side
 // product of the saber auto-block routine (WP_SaberStartMissileBlockCheck): the nearest visible
 // player/NPC within 256 units, and only on frames that routine got far enough to pick one -- never
 // while your weapon was busy, while knocked down, or at all with a saber that cannot actively block.
 // It also went unchecked from one frame to the next. The skill now picks its own target: whoever is
 // under the crosshair within ZYK_SENSE_HEALTH_AIM_RANGE, else the nearest visible one within
 // ZYK_SENSE_HEALTH_NEAR_RANGE (what it effectively did before). ps.lookTarget itself is untouched --
-// head turning and /npc still use it.
+// it drives head turning, and a player's is now picked by RP_PlayerLookThink() (w_saber.c).
 //
 // Display: it used to be a "cp" -- the big centre-print font, 30% down the screen, held for
 // cg_centerTime (3s) and overwriting every other centre print twice a second while Sight was on.

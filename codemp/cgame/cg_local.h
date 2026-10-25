@@ -486,6 +486,11 @@ typedef struct centity_s {
 	// lift only while it still equals that. Its riders are lifted by as much (cg_players.c).
 	float			rpVehicleLift;
 	vec3_t			rpVehicleLiftedOrigin;
+
+	// GLX_U: [Head Tracking] where this player's or NPC's head was this frame, for the heads turned to it, and
+	// for which frame (cg.clientFrame + 1; anything else: not worked out yet) -- see CG_RpLookEyes() in cg_players.c
+	vec3_t			rpLookEyes;
+	int				rpLookEyesFrame;
 } centity_t;
 
 qboolean CG_RpVehicleLiftApplied( const centity_t *veh );	// DAJ_RP: [NPC Scale] cg_players.c

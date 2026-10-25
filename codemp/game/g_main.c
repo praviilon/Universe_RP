@@ -9191,6 +9191,7 @@ void G_RunFrame( int levelTime ) {
 				WP_ForcePowersUpdate(ent, &ent->client->pers.cmd );
 				WP_SaberPositionUpdate(ent, &ent->client->pers.cmd);
 				WP_SaberStartMissileBlockCheck(ent, &ent->client->pers.cmd);
+				RP_PlayerLookThink(ent);	// GLX_U: [Head Tracking] who his head turns to (w_saber.c)
 			}
 
 			if (g_allowNPC.integer)

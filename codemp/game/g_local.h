@@ -1601,6 +1601,11 @@ struct gclient_s {
 	vec3_t		lastHeadAngles;
 	int			lookTime;
 
+	// GLX_U: [Head Tracking] the one last under the crosshair, and when (0: nobody) -- see RP_PlayerLookThink()
+	// in w_saber.c. Zeroed with the rest of the client by ClientSpawn().
+	int			rpLookTarget;
+	int			rpLookTargetTime;
+
 	int			brokenLimbs;
 
 	qboolean	noCorpse; //don't leave a corpse on respawn this time.
@@ -3287,6 +3292,7 @@ qboolean RP_CanFireHook( gentity_t *ent );
 qboolean RP_PhasePassesThrough( const gentity_t *ent );
 // DAJ_RP: [Phase] /admhidden -- see RP_HiddenApplyState() in g_active.c
 qboolean RP_PlayerIsHidden( const gentity_t *ent );
+void RP_PlayerLookThink( gentity_t *self );	// GLX_U: [Head Tracking] w_saber.c
 void RP_HiddenApplyState( const gentity_t *player, entityState_t *s );
 void RP_ClearPhaseMode( gentity_t *ent );
 const char *convert_phase_mode_to_text( int mode );

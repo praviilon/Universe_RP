@@ -5216,6 +5216,57 @@ qboolean CG_G2PlayerHeadAnims( centity_t *cent )
 }
 
 
+/*
+=================
+GLX_U: [Head Tracking] where a humanoid's eyes are this frame
+
+The head bone (bolt_head: *head_top, or ceyebrow), so a sitting, kneeling, crouching or scaled player is
+right; without one, the origin plus the standing eye height, scaled. Worked out at most once a frame per
+entity, however many heads turn to it: each look-up builds the model's skeleton once more.
+=================
+*/
+static void CG_RpLookEyes( centity_t *cent, vec3_t eyes )
+{
+	clientInfo_t	*ci = NULL;
+	float			scale;
+
+	if ( cent->rpLookEyesFrame == cg.clientFrame + 1 )
+	{
+		VectorCopy( cent->rpLookEyes, eyes );
+		return;
+	}
+
+	if ( cent->currentState.eType == ET_NPC )
+	{
+		ci = cent->npcClient;
+	}
+	else if ( cent->currentState.number >= 0 && cent->currentState.number < MAX_CLIENTS )
+	{
+		ci = &cgs.clientinfo[cent->currentState.number];
+	}
+
+	if ( ci && ci->bolt_head >= 0 && cent->localAnimIndex <= 1
+		&& cent->ghoul2 && trap->G2_HaveWeGhoul2Models( cent->ghoul2 ) )
+	{
+		mdxaBone_t boltMatrix;
+
+		trap->G2API_GetBoltMatrix( cent->ghoul2, 0, ci->bolt_head, &boltMatrix, cent->turAngles, cent->lerpOrigin,
+			cg.time, cgs.gameModels, cent->modelScale );
+		BG_GiveMeVectorFromMatrix( &boltMatrix, ORIGIN, eyes );
+	}
+	else
+	{
+		scale = cent->modelScale[2] ? cent->modelScale[2] : 1.0f;
+		VectorCopy( cent->lerpOrigin, eyes );
+		eyes[2] += DEFAULT_VIEWHEIGHT * scale;
+	}
+
+	VectorCopy( eyes, cent->rpLookEyes );
+	cent->rpLookEyesFrame = cg.clientFrame + 1;
+}
+
+#define RP_LOOK_PITCH_LIMIT	35.0f	// GLX_U: [Head Tracking] how far a head tilts up or down to its look target
+
 static void CG_G2PlayerAngles( centity_t *cent, matrix3_t legs, vec3_t legsAngles)
 {
 	clientInfo_t *ci;
@@ -5257,17 +5308,57 @@ static void CG_G2PlayerAngles( centity_t *cent, matrix3_t legs, vec3_t legsAngle
 		vec3_t lookAngles;
 		entityState_t *emplaced = NULL;
 
-		if (cent->currentState.hasLookTarget)
-		{
-			VectorSubtract(cg_entities[cent->currentState.lookTarget].lerpOrigin, cent->lerpOrigin, lookAngles);
-			vectoangles(lookAngles, lookAngles);
-			ci->lookTime = cg.time + 1000;
+		if ( cent->currentState.hasLookTarget
+			&& cent->currentState.eType == ET_PLAYER
+			&& !(cent->currentState.eFlags2 & EF2_HELD_BY_MONSTER)
+			&& cent->currentState.lookTarget >= 0 && cent->currentState.lookTarget < ENTITYNUM_WORLD )
+		{ // GLX_U: [Head Tracking] a player turns his head to his look target (RP_PlayerLookThink(), w_saber.c) and
+		  // tilts it up or down to the target's eyes, within RP_LOOK_PITCH_LIMIT. Only to one this client has now:
+		  // anyone else's position is stale, so then the head stays as with no target. Held by a monster, and
+		  // for NPCs, it is all as it was (below).
+			centity_t	*target = &cg_entities[cent->currentState.lookTarget];
+			vec3_t		myEyes, targetEyes, dir, dirAngles;
+
+			if ( target->currentValid || cent->currentState.lookTarget == cg.predictedPlayerState.clientNum )
+			{
+				VectorSubtract( target->lerpOrigin, cent->lerpOrigin, lookAngles );
+				vectoangles( lookAngles, lookAngles );
+
+				CG_RpLookEyes( cent, myEyes );
+				CG_RpLookEyes( target, targetEyes );
+				VectorSubtract( targetEyes, myEyes, dir );
+				if ( VectorLengthSquared( dir ) < 1.0f )
+				{ // eyes in the same place: no direction to tilt to
+					lookAngles[PITCH] = 0;
+				}
+				else
+				{
+					vectoangles( dir, dirAngles );
+					lookAngles[PITCH] = Com_Clamp( -RP_LOOK_PITCH_LIMIT, RP_LOOK_PITCH_LIMIT, AngleNormalize180( dirAngles[PITCH] ) );
+				}
+
+				ci->lookTime = cg.time + 1000;
+			}
+			else
+			{
+				VectorCopy( cent->lerpAngles, lookAngles );
+				lookAngles[PITCH] = 0;
+			}
 		}
 		else
 		{
-			VectorCopy(cent->lerpAngles, lookAngles);
+			if (cent->currentState.hasLookTarget)
+			{
+				VectorSubtract(cg_entities[cent->currentState.lookTarget].lerpOrigin, cent->lerpOrigin, lookAngles);
+				vectoangles(lookAngles, lookAngles);
+				ci->lookTime = cg.time + 1000;
+			}
+			else
+			{
+				VectorCopy(cent->lerpAngles, lookAngles);
+			}
+			lookAngles[PITCH] = 0;
 		}
-		lookAngles[PITCH] = 0;
 
 		if (cent->currentState.otherEntityNum2)
 		{

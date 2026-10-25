@@ -5742,8 +5742,8 @@ GalaxyRP: [NPC System] the live NPC under the admin's crosshair, for /npc team, 
 /npc killaim. Vehicles are NPCs too, and are found the same way -- but not the one the admin is
 riding, whose box the eye is inside of: it would be "hit" at once and hide everything ahead.
 
-/npc team used to take ps.hasLookTarget / ps.lookTarget, which is not the crosshair at all:
-WP_SaberStartMissileBlockCheck() sets it to whatever living body is within 256 units and in view,
+/npc team used to take ps.hasLookTarget / ps.lookTarget, which was not the crosshair at all:
+WP_SaberStartMissileBlockCheck() then set it to whatever living body was within 256 units and in view,
 so it could name a bystander instead of the NPC being aimed at, and nothing beyond 256 units. And
 no ordinary trace can find an NPC that spawned non-solid -- the NOTSOLID spawnflag gives it contents
 0 -- which is exactly the NPC /npc effect clear exists for.

@@ -5546,6 +5546,208 @@ qboolean Jedi_WaitingAmbush( gentity_t *self );
 void Jedi_Ambush( gentity_t *self );
 evasionType_t Jedi_SaberBlockGo( gentity_t *self, usercmd_t *cmd, vec3_t pHitloc, vec3_t phitDir, gentity_t *incoming, float dist );
 void NPC_SetLookTarget( gentity_t *self, int entNum, int clearTime );
+
+/*
+=================
+GLX_U: [Head Tracking] who a player's head turns to
+
+A player's look target (ps.hasLookTarget / ps.lookTarget, copied to s and drawn by every client's
+CG_G2PlayerAngles) used to be picked inside the saber auto-block routine below: the nearest visible
+living player or NPC within RP_LOOK_NEAR_RADIUS, and nobody at all whenever that routine returned
+early -- weapon busy, knocked down, a saber that cannot actively block. RP_PlayerLookThink() picks it
+instead, every frame, in this order:
+  1. whoever is under the crosshair within RP_LOOK_AIM_RANGE (remembered, with the time);
+  2. the one last under the crosshair, for RP_LOOK_HOLD_MSEC after it left them, while they stay a
+     valid target, within RP_LOOK_AIM_RANGE and in sight;
+  3. the nearest valid target in sight within RP_LOOK_NEAR_RADIUS (the old rule, unchanged);
+  4. nobody.
+Never while held by a monster: the Rancor sets the look target to itself and clears it on release,
+and G_HeldByMonster(), cg_view.c and BG_AttachToRancor() all read it, so nothing here touches it
+then -- and the remembered target is forgotten, so it does not come back after the release.
+A target is never someone hidden from anyone: everyone sees a head turn, so turning to a cloaked,
+/admhidden or Mind Tricking player would give them away.
+Players only; NPCs keep the block routine's renderInfo.lookTarget.
+=================
+*/
+#define RP_LOOK_AIM_RANGE		1024.0f
+#define RP_LOOK_HOLD_MSEC		3000
+#define RP_LOOK_NEAR_RADIUS		256.0f
+
+static qboolean RP_LookTargetValid( const gentity_t *self, const gentity_t *ent )
+{
+	const playerState_t *ps;
+
+	if ( !ent || !ent->inuse || !ent->client || ent == self )
+	{
+		return qfalse;
+	}
+
+	if ( ent->s.eType != ET_PLAYER && ent->s.eType != ET_NPC )
+	{
+		return qfalse;
+	}
+
+	if ( ent->s.eType == ET_NPC && ent->s.NPC_class == CLASS_VEHICLE )
+	{ // don't look at vehicle NPCs
+		return qfalse;
+	}
+
+	ps = &ent->client->ps;
+
+	if ( ent->client->sess.sessionTeam == TEAM_SPECTATOR || (ps->pm_flags & PMF_FOLLOW) || ent->health <= 0 )
+	{
+		return qfalse;
+	}
+
+	if ( ps->powerups[PW_CLOAKED] || RP_PlayerIsHidden( ent ) )
+	{
+		return qfalse;
+	}
+
+	if ( ps->fd.forceMindtrickTargetIndex || ps->fd.forceMindtrickTargetIndex2
+		|| ps->fd.forceMindtrickTargetIndex3 || ps->fd.forceMindtrickTargetIndex4 )
+	{ // hidden from somebody by Mind Trick
+		return qfalse;
+	}
+
+	return qtrue;
+}
+
+// the old line-of-sight test: from the eyes to the target's origin, through nothing a player can't walk through
+static qboolean RP_LookCanSee( const gentity_t *self, const vec3_t eyes, const gentity_t *ent )
+{
+	trace_t tr;
+
+	trap->Trace( &tr, eyes, NULL, NULL, ent->client->ps.origin, self->s.number, MASK_PLAYERSOLID, qfalse, 0, 0 );
+
+	return ( tr.fraction == 1.0f || tr.entityNum == ent->s.number ) ? qtrue : qfalse;
+}
+
+void RP_PlayerLookThink( gentity_t *self )
+{
+	gclient_t	*client;
+	gentity_t	*target = NULL;
+	vec3_t		eyes, forward, end, mins, maxs;
+	trace_t		tr;
+	int			i;
+
+	if ( !self || !self->client || self->s.number < 0 || self->s.number >= MAX_CLIENTS )
+	{
+		return;
+	}
+
+	client = self->client;
+
+	if ( client->ps.eFlags2 & EF2_HELD_BY_MONSTER )
+	{ // the look target is the monster's, see above
+		client->rpLookTargetTime = 0;
+		return;
+	}
+
+	client->ps.hasLookTarget = qfalse;
+
+	if ( self->health <= 0 || client->ps.pm_type == PM_DEAD || client->sess.sessionTeam == TEAM_SPECTATOR )
+	{
+		client->rpLookTargetTime = 0;
+		return;
+	}
+
+	if ( PM_InKnockDown( &client->ps ) )
+	{
+		return;
+	}
+
+	VectorCopy( client->ps.origin, eyes );
+	eyes[2] += client->ps.viewheight;
+
+	// 1. the crosshair
+	AngleVectors( client->ps.viewangles, forward, NULL, NULL );
+	VectorMA( eyes, RP_LOOK_AIM_RANGE, forward, end );
+	trap->Trace( &tr, eyes, NULL, NULL, end, self->s.number, MASK_SHOT, qfalse, 0, 0 );
+
+	if ( !tr.startsolid && tr.entityNum >= 0 && tr.entityNum < ENTITYNUM_WORLD
+		&& RP_LookTargetValid( self, &g_entities[tr.entityNum] ) )
+	{
+		target = &g_entities[tr.entityNum];
+		client->rpLookTarget = tr.entityNum;
+		client->rpLookTargetTime = level.time;
+	}
+
+	// 2. the one last under the crosshair, for a while
+	if ( !target && client->rpLookTargetTime )
+	{
+		gentity_t *held = NULL;
+
+		if ( level.time - client->rpLookTargetTime <= RP_LOOK_HOLD_MSEC
+			&& client->rpLookTarget >= 0 && client->rpLookTarget < ENTITYNUM_WORLD )
+		{
+			held = &g_entities[client->rpLookTarget];
+
+			if ( !RP_LookTargetValid( self, held )
+				|| Distance( client->ps.origin, held->client->ps.origin ) > RP_LOOK_AIM_RANGE
+				|| !RP_LookCanSee( self, eyes, held ) )
+			{
+				held = NULL;
+			}
+		}
+
+		if ( held )
+		{
+			target = held;
+		}
+		else
+		{ // gone, out of range, out of sight or too long ago: forgotten
+			client->rpLookTargetTime = 0;
+		}
+	}
+
+	// 3. the nearest one around (the old rule: within a box of RP_LOOK_NEAR_RADIUS, nearest by origin)
+	if ( !target )
+	{
+		int		entityList[MAX_GENTITIES];
+		int		numListedEntities, e;
+		float	bestDist = -1;
+
+		for ( i = 0; i < 3; i++ )
+		{
+			mins[i] = self->r.currentOrigin[i] - RP_LOOK_NEAR_RADIUS;
+			maxs[i] = self->r.currentOrigin[i] + RP_LOOK_NEAR_RADIUS;
+		}
+
+		numListedEntities = trap->EntitiesInBox( mins, maxs, entityList, MAX_GENTITIES );
+
+		for ( e = 0; e < numListedEntities; e++ )
+		{
+			gentity_t	*ent = &g_entities[entityList[e]];
+			float		dist;
+
+			if ( !RP_LookTargetValid( self, ent ) )
+			{
+				continue;
+			}
+
+			dist = Distance( client->ps.origin, ent->client->ps.origin );
+
+			if ( bestDist != -1 && dist >= bestDist )
+			{
+				continue;
+			}
+
+			if ( RP_LookCanSee( self, eyes, ent ) )
+			{
+				target = ent;
+				bestDist = dist;
+			}
+		}
+	}
+
+	if ( target )
+	{
+		client->ps.hasLookTarget = qtrue;
+		client->ps.lookTarget = target->s.number;
+	}
+}
+
 void WP_SaberStartMissileBlockCheck( gentity_t *self, usercmd_t *ucmd  )
 {
 	float		dist;
@@ -5559,12 +5761,12 @@ void WP_SaberStartMissileBlockCheck( gentity_t *self, usercmd_t *ucmd  )
 	trace_t		trace;
 	vec3_t		traceTo, entDir;
 	float		dot1, dot2;
-	float		lookTDist = -1;
 	gentity_t	*lookT = NULL;
 	qboolean	doFullRoutine = qtrue;
 
 	//keep this updated even if we don't get below
-	if ( !(self->client->ps.eFlags2&EF2_HELD_BY_MONSTER) )
+	// GLX_U: [Head Tracking] an NPC's only: a player's look target is RP_PlayerLookThink()'s (above)
+	if ( self->s.number >= MAX_CLIENTS && !(self->client->ps.eFlags2&EF2_HELD_BY_MONSTER) )
 	{//lookTarget is set by and to the monster that's holding you, no other operations can change that
 		self->client->ps.hasLookTarget = qfalse;
 	}
@@ -5666,39 +5868,8 @@ void WP_SaberStartMissileBlockCheck( gentity_t *self, usercmd_t *ucmd  )
 		if (ent == self)
 			continue;
 
-		//as long as we're here I'm going to get a looktarget too, I guess. -rww
-		if (self->s.eType == ET_PLAYER &&
-			ent->client &&
-			(ent->s.eType == ET_NPC || ent->s.eType == ET_PLAYER) &&
-			// !OnSameTeam(ent, self) && // zyk: now its possible to look at players or npcs in the same team
-			ent->client->sess.sessionTeam != TEAM_SPECTATOR &&
-			!(ent->client->ps.pm_flags & PMF_FOLLOW) &&
-			(ent->s.eType != ET_NPC || ent->s.NPC_class != CLASS_VEHICLE) && //don't look at vehicle NPCs
-			ent->health > 0)
-		{ //seems like a valid enemy to look at.
-			vec3_t vecSub;
-			float vecLen;
-
-			VectorSubtract(self->client->ps.origin, ent->client->ps.origin, vecSub);
-			vecLen = VectorLength(vecSub);
-
-			if (lookTDist == -1 || vecLen < lookTDist)
-			{
-				trace_t tr;
-				vec3_t myEyes;
-
-				VectorCopy(self->client->ps.origin, myEyes);
-				myEyes[2] += self->client->ps.viewheight;
-
-				trap->Trace(&tr, myEyes, NULL, NULL, ent->client->ps.origin, self->s.number, MASK_PLAYERSOLID, qfalse, 0, 0);
-
-				if (tr.fraction == 1.0f || tr.entityNum == ent->s.number)
-				{ //we have a clear line of sight to him, so it's all good.
-					lookT = ent;
-					lookTDist = vecLen;
-				}
-			}
-		}
+		// GLX_U: [Head Tracking] a player's look target used to be picked here, the nearest one in sight
+		// -- now RP_PlayerLookThink() (above), which keeps that rule as its last resort
 
 		if (!doFullRoutine)
 		{ //don't care about the rest then
@@ -5888,7 +6059,7 @@ void WP_SaberStartMissileBlockCheck( gentity_t *self, usercmd_t *ucmd  )
 	}
 
 	if (lookT)
-	{ //we got a looktarget at some point so we'll assign it then.
+	{ //we got a looktarget at some point so we'll assign it then. (GLX_U: [Head Tracking] NPCs only now)
 		if ( !(self->client->ps.eFlags2&EF2_HELD_BY_MONSTER) )
 		{//lookTarget is set by and to the monster that's holding you, no other operations can change that
 			self->client->ps.hasLookTarget = qtrue;
@@ -9611,8 +9782,8 @@ geometry in between. Any distance.
 
 This replaces the "reticule on attacker" shortcut WP_SaberCanBlock() used to take on
 ps.hasLookTarget. That flag does not mean what the old comment said: WP_SaberStartMissileBlockCheck()
-sets it whenever ANY living client or NPC -- teammate, bystander, a downed player -- is within 256
-units and in sight, and it knows nothing about the attacker. Returning 1 on it skipped every later
+set it whenever ANY living client or NPC -- teammate, bystander, a downed player -- was within 256
+units and in sight (for a player, RP_PlayerLookThink() now picks it), and it knows nothing about the attacker. Returning 1 on it skipped every later
 check: Saber Defense 0 blocked (and, through the level-0 fall-through in G_MissileImpact, reflected
 everything), blocking worked from behind and while channelling Grip/Lightning/Drain, and Defense 3+
 was immune to disruptor shots from any direction. hasLookTarget itself is left alone; it still drives
