@@ -1,0 +1,6 @@
+# Text files are stored with LF and checked out in the platform's line ending, as on develop.
+* text=auto
+*.png binary
+*.jpg binary
+*.webp binary
+*.woff2 binary
