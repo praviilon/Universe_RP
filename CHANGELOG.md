@@ -2,6 +2,11 @@
 
 
 
+## [3.8.8]
+
+### Fixed
+- Standing or sitting on a solid prop (MD3 props, GLM props with a box of their own, MD3 movers) no longer makes your own animation flicker while others see you still. Universe RP client only.
+
 ## [3.8.7]
 
 ### Added
