@@ -4,6 +4,9 @@
 
 ## [3.8.7]
 
+### Changed
+- `/settings 3` is renamed "Ignite Saber when Drawn": OFF now also draws the saber unlit (hilt only, no ignition sound) on every switch to it, not only on spawn.
+
 ### Fixed
 - HOTFIX: Destroyed TURBO turrets stay gone again
 
