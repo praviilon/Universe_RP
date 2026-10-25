@@ -10557,6 +10557,7 @@ static qboolean CG_RpSitPlacementAnim( int anim )
 	case BOTH_SITARMS: case BOTH_SITCROSS: case BOTH_SITCROSS2: case BOTH_SITLEAN: case BOTH_SITFEET:
 	case BOTH_SITPALM: case BOTH_SITPALM2: case BOTH_SITUP:
 	case BOTH_MEDITATE: case BOTH_MEDITATION2: case BOTH_MEDITATEFORCE: case BOTH_STAND5TOSIT2:
+	case BOTH_MEDITATE_END:	// getting up from /meditate: raised only, see CG_RpSitPlacement()
 		return qtrue;	// not BOTH_GUNSIT1: the emplaced gun places its gunner
 	default:
 		return qfalse;
@@ -10630,6 +10631,10 @@ static void CG_RpSitPlacement( centity_t *cent, refEntity_t *legs )
 	if ( offset > RP_SIT_RAISE_MAX )
 	{
 		offset = RP_SIT_RAISE_MAX;
+	}
+	else if ( offset < 0 && cent->currentState.legsAnim == BOTH_MEDITATE_END )
+	{ // getting up from /meditate: a raise fades out as he rises off the seat; lowering him mid-rise could sink him
+		return;
 	}
 	else if ( offset < 0 )
 	{ // the pose has its feet on his floor: lower only as far as the floor under each foot is lower than his
