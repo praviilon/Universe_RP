@@ -14,7 +14,7 @@
 - `/settings 3` is renamed "Ignite Saber when Drawn": OFF now also draws the saber unlit (hilt only, no ignition sound) on every switch to it, not only on spawn.
 
 ### Fixed
-- HOTFIX: Destroyed TURBO turrets stay gone again
+- HOTFIX: Destroyed TURBO turrets stay gone again, GLM entities have white tint.
 - NPC files: `saberColor black` showed the first saber green and the second red; an NPC with only `saber2Color` showed its first saber red.
 
 ## [3.8.6]
