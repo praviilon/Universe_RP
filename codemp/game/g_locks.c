@@ -3,7 +3,7 @@
 DAJ_RP: [Locks] account-locked entities.
 
 A door, a lift, a button, a trigger -- any entity -- can carry a lock: the name of a list of accounts
-kept for the map in GalaxyRP/locks/<map>/locks.txt. Players whose account is not on that list cannot
+kept for the map in UniverseRP/locks/<map>/locks.txt. Players whose account is not on that list cannot
 use it, however they reach it:
 
   Use_BinaryMover()   doors, lifts and buttons: their own triggers, a touch, the use key, a chain
@@ -35,6 +35,14 @@ The file, plain text, one line each:
   model *<N> <name>
 read at map start (RP_LocksLoad, G_InitGame) and written back whole after every change, with what it
 could not use kept as it was written. "none" is never a lock name: it means no lock.
+
+GLX_U: [Locks] what a player who may not pass is told: "Locked.", or the lock's own message, kept in a
+second file next to it, UniverseRP/locks/<map>/messages.txt, one line each:
+  <name> <message>
+set with /entlockmessage, read at map start with the locks and written back the same way -- see
+RP_LockMessagesLoad(). A message is checked (RP_LockMessageProblem) whether it was typed or written into
+the file by hand: a centre print with a double quote, a StringEd reference (@@@) or no length limit could
+cut the print short, crash the client or be dropped by the engine.
 ===========================================================================
 */
 
@@ -60,6 +68,12 @@ extern qboolean StringIsInteger( const char *s );
 										// standing in a locked trigger is not told every moment, and other centre
 										// prints (/clientprint) are not covered over
 #define RP_LOCK_INVALID_NAME	"(invalid)"	// a "lock" key that is no lock name (RP_LockNameOf)
+#define RP_LOCK_MESSAGE_LENGTH	150		// GLX_U: a lock's message, as stored: colour codes and each \n count
+#define RP_LOCK_MESSAGE_LINES	4		// GLX_U: lines a message may have: three \n
+#define RP_LOCK_MESSAGE_FILE_LINE	512	// GLX_U: one line of messages.txt; longer is skipped
+#define RP_LOCK_MESSAGE_READ_LINE	( RP_LOCK_MESSAGE_FILE_LINE * 2 )	// GLX_U: a comment line may be this long: one the
+															// loader commented out has its reason in front
+#define RP_LOCK_MESSAGE_DEFAULT	"default"	// GLX_U: /entlockmessage <lock> default: back to "Locked."
 #define RP_LOCK_NONE			"none"		// no lock: never a lock name
 
 typedef struct {
@@ -80,6 +94,16 @@ static int				rp_numLockModels;
 static char				rp_lockMap[MAX_QPATH];
 static int				rp_lockBypass;
 static int				rp_lockMessageTime[MAX_CLIENTS];
+
+// GLX_U: [Locks] the map's lock messages (messages.txt), any lock name, at most one each
+typedef struct {
+	char	lock[RP_LOCK_NAME_LENGTH];
+	char	text[RP_LOCK_MESSAGE_LENGTH + 1];
+} rpLockMessage_t;
+
+static rpLockMessage_t	rp_lockMessages[RP_LOCK_MAX];
+static int				rp_numLockMessages;
+static void				RP_LockMessagesLoad( void );
 
 /*
 =============================================================================
@@ -283,6 +307,7 @@ void RP_LocksLoad( void )
 	rp_lockKeptLen = 0;
 	memset( rp_lockMessageTime, 0, sizeof( rp_lockMessageTime ) );
 	RP_LockMapName( rp_lockMap, sizeof( rp_lockMap ) );
+	RP_LockMessagesLoad();	// GLX_U: [Locks] the messages have their own file, there with or without locks.txt
 
 	f = fopen( va( RP_MOD_FOLDER "/locks/%s/locks.txt", rp_lockMap ), "r" );
 	if ( !f )
@@ -450,6 +475,328 @@ static qboolean RP_LocksSave( void )
 }
 
 /*
+=============================================================================
+
+GLX_U: [Locks] MESSAGES
+
+=============================================================================
+*/
+
+/*
+==================
+RP_LockMessageProblem
+
+GLX_U: [Locks] why a lock's message cannot be used, or NULL. It goes to the client as the argument of a
+centre print, "cp \"<message>\"", so:
+  - 1 to RP_LOCK_MESSAGE_LENGTH characters as stored: with the admin's lock line, far below the 1022 the
+    engine sends (a longer server command is dropped whole);
+  - printable ASCII (space to ~) only: a tab, a control character or a byte the font cannot show is not;
+  - no double quote: it would end the print's argument and cut the message short;
+  - no "@@@": the client reads it as a StringEd reference -- see RP_BreakStringEdRefs() in g_utils.c;
+  - a backslash only as \n, a new line, and at most RP_LOCK_MESSAGE_LINES lines.
+The same for a message typed with /entlockmessage and one written into messages.txt by hand. The text
+never reaches a format string: it is always an argument (va( "cp \"%s\"", ... )).
+==================
+*/
+static const char *RP_LockMessageProblem( const char *text )
+{
+	int i, len, lines = 1;
+
+	if ( !text || !text[0] )
+		return "a message cannot be empty";
+
+	len = (int)strlen( text );
+	if ( len > RP_LOCK_MESSAGE_LENGTH )
+		return va( "a message is at most %d characters, colour codes and each \\n included (this one is %d)", RP_LOCK_MESSAGE_LENGTH, len );
+
+	for ( i = 0; text[i]; i++ )
+	{
+		const unsigned char c = (unsigned char)text[i];
+
+		if ( c < ' ' || c > '~' )
+			return "a message takes plain characters only: letters, digits, punctuation and spaces";
+		if ( c == '"' )
+			return "a message cannot contain a double quote";
+		if ( c == '\\' )
+		{
+			if ( text[i + 1] != 'n' )
+				return "a backslash in a message is only for \\n, a new line";
+			lines++;
+			i++;
+		}
+	}
+
+	if ( lines > RP_LOCK_MESSAGE_LINES )
+		return va( "a message has at most %d lines (%d times \\n)", RP_LOCK_MESSAGE_LINES, RP_LOCK_MESSAGE_LINES - 1 );
+
+	if ( RP_HasStringEdRef( text ) )
+		return "a message cannot contain @@@";
+
+	return NULL;
+}
+
+static rpLockMessage_t *RP_LockMessageFind( const char *name )
+{
+	int i;
+
+	if ( !name )
+		return NULL;
+
+	for ( i = 0; i < rp_numLockMessages; i++ )
+	{
+		if ( !Q_stricmp( rp_lockMessages[i].lock, name ) )
+			return &rp_lockMessages[i];
+	}
+
+	return NULL;
+}
+
+static void RP_LockMessageDelete( rpLockMessage_t *msg )
+{
+	int index = msg - rp_lockMessages;
+
+	if ( index < 0 || index >= rp_numLockMessages )
+		return;
+
+	if ( index < rp_numLockMessages - 1 )
+		memmove( &rp_lockMessages[index], &rp_lockMessages[index + 1], sizeof( rp_lockMessages[0] ) * ( rp_numLockMessages - 1 - index ) );
+	rp_numLockMessages--;
+}
+
+// GLX_U: [Locks] a stored message as the client shows it: each \n a new line
+static void RP_LockMessageShown( const char *text, char *out, int size )
+{
+	int i, n = 0;
+
+	for ( i = 0; text[i] && n < size - 1; i++ )
+	{
+		if ( text[i] == '\\' && text[i + 1] == 'n' )
+		{
+			out[n++] = '\n';
+			i++;
+		}
+		else
+		{
+			out[n++] = text[i];
+		}
+	}
+	out[n] = '\0';
+}
+
+/*
+==================
+RP_LockMessagesLoad / RP_LockMessagesSave
+
+GLX_U: [Locks] the map's messages.txt, next to locks.txt, read at map start and written back whole after every
+/entlockmessage, as locks.txt is (RP_LocksLoad): the owner's comments and what the loader could not use are
+kept under the same mark, the header is written again, a UTF-8 byte order mark is skipped. A line is the lock
+name, then the message, the rest of the line. What is not loaded, and why, is logged:
+  - a line over RP_LOCK_MESSAGE_FILE_LINE characters -- a comment, over twice that, since one this loader
+    commented out has its reason in front: skipped, not kept (read in pieces, its second half would have been
+    taken for a line of its own);
+  - a first word that is no lock name: kept as written;
+  - a message RP_LockMessageProblem() refuses, or one past RP_LOCK_MAX: kept, commented out, so it does not
+    come back on its own;
+  - a second message for the same lock: the later one counts, as it would have after an /entlockmessage.
+==================
+*/
+#define RP_LOCK_MESSAGE_HEADER	"# Lock messages for "
+
+static const char *rp_lockMessageHeader[] = {
+	NULL,	// the first line names the map (RP_LockMessagesSave)
+	"# One line per lock: \"<lock> <message>\". \\n starts a new line, ^1 to ^9 colour the text. At most 150",
+	"# characters and 4 lines; no double quotes and no @@@. /entlockmessage writes this file.",
+	NULL
+};
+
+static char	rp_lockMessageKept[RP_LOCK_KEPT_SIZE];
+static int	rp_lockMessageKeptLen;
+
+static void RP_LockMessageKeep( const char *text, int lineNumber )
+{
+	int len = (int)strlen( text );
+
+	if ( rp_lockMessageKeptLen + len + 2 > (int)sizeof( rp_lockMessageKept ) )
+	{
+		G_LogPrintf( "messages.txt line %d: no room left to keep it, so it will not be written back\n", lineNumber );
+		return;
+	}
+
+	memcpy( rp_lockMessageKept + rp_lockMessageKeptLen, text, len );
+	rp_lockMessageKeptLen += len;
+	rp_lockMessageKept[rp_lockMessageKeptLen++] = '\n';
+	rp_lockMessageKept[rp_lockMessageKeptLen] = '\0';
+}
+
+static qboolean RP_LockMessageHeaderLine( const char *text )
+{
+	int i;
+
+	if ( !Q_strncmp( text, RP_LOCK_MESSAGE_HEADER, (int)strlen( RP_LOCK_MESSAGE_HEADER ) ) || !strcmp( text, RP_LOCK_KEPT_MARK ) )
+		return qtrue;
+
+	for ( i = 1; rp_lockMessageHeader[i]; i++ )
+	{
+		if ( !strcmp( text, rp_lockMessageHeader[i] ) )
+			return qtrue;
+	}
+
+	return qfalse;
+}
+
+static void RP_LockMessagesLoad( void )
+{
+	char line[RP_LOCK_MESSAGE_READ_LINE + 3];	// the line, its \r\n and the terminator
+	char raw[RP_LOCK_MESSAGE_READ_LINE + 3];
+	FILE *f;
+	int lineNumber = 0;
+
+	rp_numLockMessages = 0;
+	rp_lockMessageKept[0] = '\0';
+	rp_lockMessageKeptLen = 0;
+
+	f = fopen( va( RP_MOD_FOLDER "/locks/%s/messages.txt", rp_lockMap ), "r" );
+	if ( !f )
+		return;
+
+	while ( fgets( line, sizeof( line ), f ) )
+	{
+		char name[RP_LOCK_MESSAGE_READ_LINE + 3];
+		const char *problem;
+		char *p = line, *text;
+		rpLockMessage_t *msg;
+		int len, n = 0;
+
+		lineNumber++;
+
+		len = (int)strlen( line );
+		if ( len == (int)sizeof( line ) - 1 && line[len - 1] != '\n' && !feof( f ) )
+		{	// too long to read whole: skip the rest of it too
+			int c;
+
+			while ( ( c = fgetc( f ) ) != EOF && c != '\n' )
+				;
+			G_LogPrintf( "messages.txt line %d: longer than %d characters, ignored, and it will not be written back\n", lineNumber, RP_LOCK_MESSAGE_READ_LINE );
+			continue;
+		}
+
+		if ( lineNumber == 1 && (unsigned char)line[0] == 0xEF && (unsigned char)line[1] == 0xBB && (unsigned char)line[2] == 0xBF )
+			p += 3;	// a UTF-8 byte order mark (Notepad)
+
+		// the line as written, without its line break, for keeping
+		Q_strncpyz( raw, p, sizeof( raw ) );
+		len = (int)strlen( raw );
+		while ( len > 0 && ( raw[len - 1] == '\n' || raw[len - 1] == '\r' ) )
+			raw[--len] = '\0';
+		if ( len > RP_LOCK_MESSAGE_READ_LINE )
+		{	// a line of exactly the buffer's length with no line break, at the end of the file
+			G_LogPrintf( "messages.txt line %d: longer than %d characters, ignored, and it will not be written back\n", lineNumber, RP_LOCK_MESSAGE_READ_LINE );
+			continue;
+		}
+
+		// the lock name: the first word
+		while ( *p && (unsigned char)*p <= ' ' )
+			p++;
+		if ( !*p )
+			continue;
+
+		if ( *p == '#' )
+		{	// a comment: the owner's is kept, the file's own header is written again. Up to twice a line's length:
+			// a line this loader commented out has its reason in front, and must survive the next load too.
+			if ( !RP_LockMessageHeaderLine( raw ) )
+				RP_LockMessageKeep( raw, lineNumber );
+			continue;
+		}
+
+		if ( len > RP_LOCK_MESSAGE_FILE_LINE )
+		{
+			G_LogPrintf( "messages.txt line %d: longer than %d characters, ignored, and it will not be written back\n", lineNumber, RP_LOCK_MESSAGE_FILE_LINE );
+			continue;
+		}
+
+		while ( *p && (unsigned char)*p > ' ' && n < (int)sizeof( name ) - 1 )
+			name[n++] = *p++;
+		name[n] = '\0';
+
+		// the message: the rest of the line, trimmed
+		while ( *p && (unsigned char)*p <= ' ' )
+			p++;
+		text = p;
+		len = (int)strlen( text );
+		while ( len > 0 && (unsigned char)text[len - 1] <= ' ' )
+			text[--len] = '\0';
+
+		if ( !RP_LockNameValid( name ) )
+		{
+			G_LogPrintf( "messages.txt line %d: not understood, kept as written (lines are \"<lock> <message>\", a lock name is 1 to 31 letters, digits, _ or -)\n", lineNumber );
+			RP_LockMessageKeep( raw, lineNumber );
+			continue;
+		}
+
+		problem = RP_LockMessageProblem( text );
+		if ( problem )
+		{
+			G_LogPrintf( "messages.txt line %d: lock %s, message not loaded (%s; kept in the file, commented out)\n", lineNumber, name, problem );
+			RP_LockMessageKeep( va( "# not loaded (%s): %s", problem, raw ), lineNumber );
+			continue;
+		}
+
+		msg = RP_LockMessageFind( name );
+		if ( msg )
+		{
+			G_LogPrintf( "messages.txt line %d: a second message for lock %s; this one is used\n", lineNumber, name );
+		}
+		else
+		{
+			if ( rp_numLockMessages >= RP_LOCK_MAX )
+			{
+				G_LogPrintf( "messages.txt line %d: more than %d messages, lock %s's not loaded (kept in the file, commented out)\n", lineNumber, RP_LOCK_MAX, name );
+				RP_LockMessageKeep( va( "# not loaded (more than %d messages): %s", RP_LOCK_MAX, raw ), lineNumber );
+				continue;
+			}
+			msg = &rp_lockMessages[rp_numLockMessages++];
+			Q_strncpyz( msg->lock, name, sizeof( msg->lock ) );
+		}
+		Q_strncpyz( msg->text, text, sizeof( msg->text ) );
+	}
+
+	fclose( f );
+	G_LogPrintf( "locks: %d lock message(s) for %s\n", rp_numLockMessages, rp_lockMap );
+}
+
+static int RP_LockMessageCompare( const void *a, const void *b )
+{
+	return Q_stricmp( ( (const rpLockMessage_t *)a )->lock, ( (const rpLockMessage_t *)b )->lock );
+}
+
+static qboolean RP_LockMessagesSave( void )
+{
+	FILE *f;
+	int i;
+
+	qsort( rp_lockMessages, rp_numLockMessages, sizeof( rp_lockMessages[0] ), RP_LockMessageCompare );
+
+	zyk_create_dir( va( "locks/%s", rp_lockMap ) );
+
+	f = fopen( va( RP_MOD_FOLDER "/locks/%s/messages.txt", rp_lockMap ), "w" );
+	if ( !f )
+		return qfalse;
+
+	fprintf( f, RP_LOCK_MESSAGE_HEADER "%s: what a player whose account is not on the lock is told instead of \"Locked.\"\n", rp_lockMap );
+	for ( i = 1; rp_lockMessageHeader[i]; i++ )
+		fprintf( f, "%s\n", rp_lockMessageHeader[i] );
+
+	for ( i = 0; i < rp_numLockMessages; i++ )
+		fprintf( f, "%s %s\n", rp_lockMessages[i].lock, rp_lockMessages[i].text );
+
+	if ( rp_lockMessageKeptLen > 0 )
+		fprintf( f, "%s\n%s", RP_LOCK_KEPT_MARK, rp_lockMessageKept );
+
+	fclose( f );
+	return qtrue;
+}
+
+/*
 ==================
 RP_LockAccountLookup
 
@@ -592,6 +939,8 @@ void RP_LockBypass( qboolean on )
 
 static void RP_LockTell( gentity_t *player, const char *name )
 {
+	char text[RP_LOCK_MESSAGE_LENGTH + 1];
+	const rpLockMessage_t *msg;
 	int num = player->s.number;
 
 	if ( num < 0 || num >= MAX_CLIENTS || rp_lockMessageTime[num] > level.time )
@@ -599,10 +948,17 @@ static void RP_LockTell( gentity_t *player, const char *name )
 
 	rp_lockMessageTime[num] = level.time + RP_LOCK_MESSAGE_MSEC;
 
-	if ( player->client->pers.bitvalue & ( 1 << ADM_ENTITYSYSTEM ) )
-		trap->SendServerCommand( num, va( "cp \"Locked.\n^7(lock ^3%s^7)\"", name ) );
+	// GLX_U: [Locks] the lock's own message, checked when it was set or loaded (RP_LockMessageProblem), or "Locked."
+	msg = RP_LockMessageFind( name );
+	if ( msg )
+		RP_LockMessageShown( msg->text, text, sizeof( text ) );
 	else
-		trap->SendServerCommand( num, "cp \"Locked.\"" );
+		Q_strncpyz( text, "Locked.", sizeof( text ) );
+
+	if ( player->client->pers.bitvalue & ( 1 << ADM_ENTITYSYSTEM ) )
+		trap->SendServerCommand( num, va( "cp \"%s\n^7(lock ^3%s^7)\"", text, name ) );
+	else
+		trap->SendServerCommand( num, va( "cp \"%s\"", text ) );
 }
 
 /*
@@ -1109,6 +1465,7 @@ void Cmd_EntLockList_f( gentity_t *ent )
 
 	if ( trap->Argc() >= 2 )
 	{
+		const rpLockMessage_t *msg;
 		rpLock_t *lock;
 		int count;
 
@@ -1121,8 +1478,9 @@ void Cmd_EntLockList_f( gentity_t *ent )
 
 		lock = RP_LockFind( name );
 		count = RP_LockEntityCount( name, ids, sizeof( ids ) );
+		msg = RP_LockMessageFind( name );	// GLX_U: [Locks]
 
-		if ( !lock && !count )
+		if ( !lock && !count && !msg )
 		{
 			trap->SendServerCommand( ent - g_entities, va( "print \"This map has no lock named ^3%s^7, and nothing carries one.\n\"", name ) );
 			return;
@@ -1142,7 +1500,20 @@ void Cmd_EntLockList_f( gentity_t *ent )
 			trap->SendServerCommand( ent - g_entities, va( "print \"\n^3Lock %s^7: ^1no list^7 -- what carries it lets nobody through (only /entuse and /enttrigger).\n\"", name ) );
 		}
 
-		trap->SendServerCommand( ent - g_entities, va( "print \"Carried by %d entit%s%s%s\n\n\"", count, count == 1 ? "y" : "ies", count ? ": " : ".", ids ) );
+		trap->SendServerCommand( ent - g_entities, va( "print \"Carried by %d entit%s%s%s\n\"", count, count == 1 ? "y" : "ies", count ? ": " : ".", ids ) );
+
+		// GLX_U: [Locks] what a player it refuses is told
+		if ( msg )
+		{
+			char shown[RP_LOCK_MESSAGE_LENGTH + 1];
+
+			RP_LockMessageShown( msg->text, shown, sizeof( shown ) );
+			trap->SendServerCommand( ent - g_entities, va( "print \"Message:\n%s\n^7\n\"", shown ) );
+		}
+		else
+		{
+			trap->SendServerCommand( ent - g_entities, "print \"Message: none, a player it refuses is told Locked. (^3/entlockmessage^7 sets one)\n\n\"" );
+		}
 		return;
 	}
 
@@ -1154,9 +1525,15 @@ void Cmd_EntLockList_f( gentity_t *ent )
 	for ( i = 0; i < rp_numLocks; i++ )
 	{
 		int count = RP_LockEntityCount( rp_locks[i].name, NULL, 0 );
+		const rpLockMessage_t *msg = RP_LockMessageFind( rp_locks[i].name );	// GLX_U: [Locks]
+		char preview[64];
 
-		trap->SendServerCommand( ent - g_entities, va( "print \"  ^3%s^7 - %d account(s), carried by %d entit%s\n\"", rp_locks[i].name,
-			rp_locks[i].numAccounts, count, count == 1 ? "y" : "ies" ) );
+		preview[0] = '\0';
+		if ( msg )
+			Com_sprintf( preview, sizeof( preview ), ", message: %.40s%s^7", msg->text, strlen( msg->text ) > 40 ? "..." : "" );
+
+		trap->SendServerCommand( ent - g_entities, va( "print \"  ^3%s^7 - %d account(s), carried by %d entit%s%s\n\"", rp_locks[i].name,
+			rp_locks[i].numAccounts, count, count == 1 ? "y" : "ies", preview ) );
 	}
 
 	// zyk: locks something carries but no list has -- each once (a name is at most 31 characters, and a
@@ -1176,9 +1553,138 @@ void Cmd_EntLockList_f( gentity_t *ent )
 		}
 		if ( carried[0] )
 			RP_LockPrintList( ent, "^1Carried, with no list^7 (they let nobody through): ", carried, ", ", "" );
+
+		// GLX_U: [Locks] messages of names with no list that nothing carries: kept until set back to default
+		carried[0] = '\0';
+		for ( i = 0; i < rp_numLockMessages; i++ )
+		{
+			if ( RP_LockFind( rp_lockMessages[i].lock ) || RP_LockEntityCount( rp_lockMessages[i].lock, NULL, 0 ) )
+				continue;
+			if ( strlen( carried ) + strlen( rp_lockMessages[i].lock ) + 2 < sizeof( carried ) )
+				Q_strcat( carried, sizeof( carried ), va( "%s%s", carried[0] ? " " : "", rp_lockMessages[i].lock ) );
+		}
+		if ( carried[0] )
+			RP_LockPrintList( ent, "^3Messages of locks nothing uses^7 (^3/entlockmessage <lock> default^7 removes one): ", carried, ", ", "" );
 	}
 
 	trap->SendServerCommand( ent - g_entities, "print \"^3/entlocklist <lock>^7 shows one lock's accounts and entities.\n\n\"" );
+}
+
+/*
+==================
+Cmd_EntLockMessage_f
+
+GLX_U: [Locks] /entlockmessage <lock> [message | default]: what a player the lock refuses is told instead of
+"Locked." -- alone, shows it; with words, sets it (the words after the name, joined with single spaces, so
+quotes are not needed; \n starts a new line); with default, removes it. Checked as messages.txt is
+(RP_LockMessageProblem), and only for a lock this map has -- one with a list, one an entity carries, or one
+with a message already -- so a mistyped name is caught. Written to messages.txt at once.
+==================
+*/
+void Cmd_EntLockMessage_f( gentity_t *ent )
+{
+	char name[MAX_STRING_CHARS], word[MAX_STRING_CHARS], text[MAX_STRING_CHARS], shown[RP_LOCK_MESSAGE_LENGTH + 1];
+	rpLockMessage_t *msg;
+	const char *problem;
+	int i;
+
+	if ( !check_admin_command( ent, ADM_ENTITYSYSTEM, qtrue ) )
+		return;
+
+	if ( trap->Argc() < 2 )
+	{
+		trap->SendServerCommand( ent - g_entities, va( "print \"Usage: ^3/entlockmessage <lock> <message>^7 sets what a player that lock refuses is told instead of Locked. (up to %d characters, \\n for a new line, colour codes work), ^3/entlockmessage <lock> default^7 goes back to Locked., ^3/entlockmessage <lock>^7 shows it.\n\"", RP_LOCK_MESSAGE_LENGTH ) );
+		return;
+	}
+
+	trap->Argv( 1, name, sizeof( name ) );
+	if ( !RP_LockNameValid( name ) )
+	{
+		trap->SendServerCommand( ent - g_entities, "print \"A lock name is 1 to 31 letters, digits, _ or -, and not none (that means no lock).\n\"" );
+		return;
+	}
+
+	msg = RP_LockMessageFind( name );
+	if ( !msg && !RP_LockFind( name ) && !RP_LockEntityCount( name, NULL, 0 ) )
+	{
+		trap->SendServerCommand( ent - g_entities, va( "print \"This map has no lock named ^3%s^7: make it with ^3/entlockadd^7 or ^3/entlockset^7 first. ^3/entlocklist^7 lists them.\n\"", name ) );
+		return;
+	}
+	if ( RP_LockFind( name ) )
+		Q_strncpyz( name, RP_LockFind( name )->name, sizeof( name ) );	// as the lock's list spells it
+	else if ( msg )
+		Q_strncpyz( name, msg->lock, sizeof( name ) );
+
+	// /entlockmessage <lock>: show it
+	if ( trap->Argc() == 2 )
+	{
+		if ( msg )
+		{
+			RP_LockMessageShown( msg->text, shown, sizeof( shown ) );
+			trap->SendServerCommand( ent - g_entities, va( "print \"Lock ^3%s^7: a player it refuses is told:\n%s\n^7Stored as: %s\n\"", name, shown, msg->text ) );
+		}
+		else
+		{
+			trap->SendServerCommand( ent - g_entities, va( "print \"Lock ^3%s^7 has no message: a player it refuses is told Locked.\n\"", name ) );
+		}
+		return;
+	}
+
+	// /entlockmessage <lock> default: back to "Locked."
+	trap->Argv( 2, word, sizeof( word ) );
+	if ( trap->Argc() == 3 && !Q_stricmp( word, RP_LOCK_MESSAGE_DEFAULT ) )
+	{
+		if ( !msg )
+		{
+			trap->SendServerCommand( ent - g_entities, va( "print \"Lock ^3%s^7 has no message already: a player it refuses is told Locked.\n\"", name ) );
+			return;
+		}
+
+		RP_LockMessageDelete( msg );
+		if ( !RP_LockMessagesSave() )
+			trap->SendServerCommand( ent - g_entities, "print \"^1The message file could not be written: the change lasts until the map changes.\n\"" );
+		trap->SendServerCommand( ent - g_entities, va( "print \"Lock ^3%s^7: message removed. A player it refuses is told Locked. again.\n\"", name ) );
+		G_LogPrintf( "/entlockmessage %s default by %s\n", name, ent->client->pers.netname );
+		return;
+	}
+
+	// /entlockmessage <lock> <message...>: the words, joined with single spaces
+	text[0] = '\0';
+	for ( i = 2; i < trap->Argc(); i++ )
+	{
+		trap->Argv( i, word, sizeof( word ) );
+		if ( !word[0] )
+			continue;
+		if ( text[0] )
+			Q_strcat( text, sizeof( text ), " " );
+		Q_strcat( text, sizeof( text ), word );
+	}
+
+	problem = RP_LockMessageProblem( text );
+	if ( problem )
+	{
+		trap->SendServerCommand( ent - g_entities, va( "print \"Lock ^3%s^7: message not set: %s.\n\"", name, problem ) );
+		return;
+	}
+
+	if ( !msg )
+	{
+		if ( rp_numLockMessages >= RP_LOCK_MAX )
+		{
+			trap->SendServerCommand( ent - g_entities, va( "print \"This map has %d lock messages already, the most it can have. ^3/entlockmessage <lock> default^7 removes one.\n\"", RP_LOCK_MAX ) );
+			return;
+		}
+		msg = &rp_lockMessages[rp_numLockMessages++];
+		Q_strncpyz( msg->lock, name, sizeof( msg->lock ) );
+	}
+	Q_strncpyz( msg->text, text, sizeof( msg->text ) );
+
+	if ( !RP_LockMessagesSave() )
+		trap->SendServerCommand( ent - g_entities, "print \"^1The message file could not be written: the change lasts until the map changes.\n\"" );
+
+	RP_LockMessageShown( text, shown, sizeof( shown ) );
+	trap->SendServerCommand( ent - g_entities, va( "print \"Lock ^3%s^7: message set. A player it refuses is told:\n%s\n^7\n\"", name, shown ) );
+	G_LogPrintf( "/entlockmessage %s by %s: %s\n", name, ent->client->pers.netname, text );
 }
 
 // DAJ_RP: [Locks] the "lock" value in the entity's key/value record, NULL when it has none

@@ -2854,6 +2854,7 @@ void		RP_LockBypass( qboolean on );
 void		Cmd_EntLockAdd_f( gentity_t *ent );
 void		Cmd_EntLockRemove_f( gentity_t *ent );
 void		Cmd_EntLockList_f( gentity_t *ent );
+void		Cmd_EntLockMessage_f( gentity_t *ent );	// GLX_U: [Locks] g_locks.c
 void		Cmd_EntLockSet_f( gentity_t *ent );
 void		Cmd_EntTrigger_f( gentity_t *ent );
 void	G_UseTargets2( gentity_t *ent, gentity_t *activator, const char *string );

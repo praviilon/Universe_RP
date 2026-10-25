@@ -21750,7 +21750,7 @@ static void zyk_print_lines( gentity_t *ent, const char * const *lines, int coun
 
 void Cmd_EntitiesAndRemaps_f( gentity_t *ent ) {
 	static char entlist_line[512];
-	const char *lines[64];	// 50 now
+	const char *lines[64];	// 51 now
 	int n = 0;
 
 	if (!check_admin_command(ent, ADM_ENTITYSYSTEM, qtrue))
@@ -21798,6 +21798,7 @@ void Cmd_EntitiesAndRemaps_f( gentity_t *ent ) {
 	lines[n++] = "^3/entlockremove <lock> <account> [more accounts] ^7or ^3/entlockremove <lock> all: ^7Takes accounts off the lock, or all of them. What carries a lock with nobody on it lets nobody through.\n";
 	lines[n++] = "^3/entlockset <entity id (optional)> <lock | none>: ^7Puts a lock on the door, lift, button, trigger or any entity you aim at, or that id, or takes it off. The map's own get it by their brush model, kept in the map's lock file. A locked door team is locked whole.\n";
 	lines[n++] = "^3/entlocklist <lock (optional)>: ^7Lists this map's locks, or one lock's accounts and the entities carrying it.\n";
+	lines[n++] = "^3/entlockmessage <lock> <message | default>: ^7Sets what a player that lock refuses is told instead of Locked.: up to 150 characters, \\n for a new line, colour codes work. default goes back to Locked. Without a message it shows the current one.\n";	// GLX_U: [Locks]
 	lines[n++] = "^7A locked entity lets through only logged-in players whose account is on its lock (a vehicle: its pilot's). NPCs never do. Timers and map logic with no player behind them pass, and so do /entuse, /enttrigger and a level 5 Stun Baton, with what they set off, later too. Harmful triggers and target_kill cannot be locked.\n";
 
 	lines[n++] = "^5Other\n";
@@ -26439,6 +26440,7 @@ command_t commands[] = {
 	{ "entload",			Cmd_EntLoad_f,				CMD_LOGGEDIN | CMD_NOINTERMISSION },
 	{ "entlockadd",			Cmd_EntLockAdd_f,			CMD_LOGGEDIN | CMD_NOINTERMISSION },	// DAJ_RP: [Locks] g_locks.c
 	{ "entlocklist",		Cmd_EntLockList_f,			CMD_LOGGEDIN | CMD_NOINTERMISSION },
+	{ "entlockmessage",		Cmd_EntLockMessage_f,		CMD_LOGGEDIN | CMD_NOINTERMISSION },	// GLX_U: [Locks] g_locks.c
 	{ "entlockremove",		Cmd_EntLockRemove_f,		CMD_LOGGEDIN | CMD_NOINTERMISSION },
 	{ "entlockset",			Cmd_EntLockSet_f,			CMD_LOGGEDIN | CMD_NOINTERMISSION },
 	{ "entnear",			Cmd_EntNear_f,				CMD_LOGGEDIN | CMD_NOINTERMISSION },
