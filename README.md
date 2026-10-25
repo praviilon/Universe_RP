@@ -1,12 +1,16 @@
 # Universe RP
 
-Universe RP modernises the Galaxy RP mod developed by Alex, making it natively playable on modern TaystJK engine with its Rend2 or Vulkan renderers and its logical entities system. It also introduces 64-bit mod version, as well as versions for Linux and macOS, and tackles some bugs and issues along the way. Many new features are also gradually added to the mod.
+Universe RP turns Jedi Academy multiplayer into a true sandbox for roleplay communities.
+
+Every player has an account with characters that keep their level, skills, credits, sabers and looks. Chat carries as far as a voice would, with actions, descriptions, shouts, whispers and alien languages. Admins and builders shape the world in game: they place props, NPCs, lights and effects, lock doors to chosen players, and save it all for the next session.
+
+The mod continues GalaxyRP by Alex, rebuilt to run natively on the modern TaystJK engine, with its Rend2 and Vulkan renderers and its logical entities, on Windows, Linux and macOS, 32-bit and 64-bit, Intel and ARM.
 
 ![cover_image](universe_rp_cover.jpg)
 
 <div align="center">
 
-The aim of the mod is to improve on the work which has been done before and introduce many new features that RP community may benefit from.
+The mod is under development and open source, so anybody can contribute to it or build on its code.
 Claude Code is being used to develop the project.
 
 [![version](https://img.shields.io/github/v/release/praviilon/Universe_RP?label=Current%20Version&color=brightgreen)](https://github.com/praviilon/Universe_RP/releases)
@@ -16,6 +20,64 @@ Claude Code is being used to develop the project.
 
 </div>
 
+# Features
+
+### [Characters](https://praviilon.github.io/Universe_RP/features.html#characters)
+- An account system, with characters that keep their level, skills, credits, inventory, sabers and looks
+- Levels and skill points, credits and an item shop
+- An inventory of custom items, character descriptions, and allies (`/allyaim` adds the one you aim at)
+- Account settings that turn features on or off for yourself
+
+### [Roleplay chat](https://praviilon.github.io/Universe_RP/features.html#chat)
+- Chat heard as far as a voice would carry, which declutters the server
+- 34 RP chat modifiers: actions, descriptions, Force actions, shouts, whispers, comlink, thoughts and alien languages, each with its own colour and range. Quoted speech shows in green
+- Dice and coin flips, server news channels, and voice lines heard over the radio (siege voice chat in FFA)
+
+### [Emotes and movement](https://praviilon.github.io/Universe_RP/features.html#emotes)
+- `/emote` for full emotes with their own endings, and `/anim` for more than 1,600 animations, including moves from JA+
+- Paired hugs and kisses (`/wehug`, `/wekiss`)
+- Sit animations drawn on the seat beneath you, and ledge grab
+- A grappling hook, `/autowalk`, and an AFK protection bubble with animations
+
+### [Combat](https://praviilon.github.io/Universe_RP/features.html#combat)
+- Melee grapples (punch, knee throw, head lock), spin kicks and flip kicks
+- A downed state instead of instant death
+- The Force Drain grab
+- Force powers rebalanced at levels 4 and 5, and a balance between gunslingers and Force users
+- Radar HUD in FFA: cloak and mind trick hide players from it, and vehicles can cloak
+
+### [Lightsabers](https://praviilon.github.io/Universe_RP/features.html#sabers)
+- Any colour, by sliders or hex code, with flame, electric and black blades, for players and NPCs
+- Lightsaber holstering, on the hip or the wrist
+- Ignition fine-tuning: draw the saber unlit
+
+### [Looks](https://praviilon.github.io/Universe_RP/features.html#looks)
+- Hats and capes for players and NPCs
+- Any size
+- Force ghost and hologram effects for players and NPCs
+- HD HUD icons and a widescreen HUD
+
+### [Building worlds](https://praviilon.github.io/Universe_RP/features.html#building)
+- An entity system: add, edit, list and remove anything in the map in game, and save it for the next session
+- Client-side Extras menus to spawn MD3 and GLM props (with a 3D preview), place lights and effects, play music or sounds, and spawn NPCs or vehicles
+- Entity boxes shown, and commands to copy, cut and rotate entities
+- More entity classes and a logical entity pool
+- Door and trigger locks, set per entity, with a list of the accounts allowed through
+- Spawner settings: scale NPCs and vehicles on the go, set their team, hats and capes, and XP and credit rewards for defeating them
+- Shader remaps, and better single player map support (Jedi Academy and Jedi Outcast), with votes for SP maps
+
+### [Running a server](https://praviilon.github.io/Universe_RP/features.html#admin)
+- Admin commands, given one by one to each account
+- Server tools, and Melee Battle and Duel Tournament mini-games
+- A news system
+- Hundreds of server cvars, with an [online calculator](https://praviilon.github.io/Universe_RP/calculator.html) for the bit-value ones
+
+### [Platforms](https://praviilon.github.io/Universe_RP/features.html#platforms)
+- Runs natively on TaystJK: Windows (64-bit and 32-bit), Linux (64-bit, 32-bit and ARM64) and macOS (Apple Silicon and Intel)
+- Countless bug fixes and optimisations
+
+And much more: see the [features page](https://praviilon.github.io/Universe_RP/features.html).
+
 # Website
 Features, guides, downloads for your system and server setup are on the mod's website: **[praviilon.github.io/Universe_RP](https://praviilon.github.io/Universe_RP/)**
 
@@ -23,42 +85,6 @@ Features, guides, downloads for your system and server setup are on the mod's we
 - [Download](https://praviilon.github.io/Universe_RP/download.html): the right TaystJK and Universe RP files for your system
 - [Play](https://praviilon.github.io/Universe_RP/play.html) and [Host](https://praviilon.github.io/Universe_RP/host.html): installing, launching with the scripts, running a server
 - [Cvar calculator](https://praviilon.github.io/Universe_RP/calculator.html): bit-value server settings
-
-# Features
-The mod contains these following main features:
-
-- An account system
-- Custom Force powers
-- Rebalance between gunslingers and Force users
-- An item shop
-- A completely revamped chat system, which makes writing much easier, and declutters the server
-- Different distances at which chat can be seen, depending on 22 chat modifiers
-- A news system that admins can use to let people know of major happenings in the galaxy
-- An inventory system for custom items
-- A description system that allows players to see your description
-- A dice system
-- A level system, and skill points system
-- An admin system with admin commands. These can be given one by one to each account
-- Acount settings, which the player can configure to turn on or off some features
-- Melee Battle Mode
-- Duel Tournament Mode
-- Credits, which can be used to buy and sell stuff while roleplaying
-- A skill counter
-- An ally system, which allows a player to add or remove allies
-- An emote system, together with 57 worded emotes, with a further 3000 accessible by id
-- Players can call vote to single player maps
-- Extended Single Player map support in MP (for both JA and JO maps)
-- Siege voice chat in FFA gametype
-- Radar HUD in FFA. Cloaked players and vehicles being hidden on the radar
-- An entity system, which allows players to add, edit, list and remove entities that are in the map
-- Commands to remap shaders in a map
-- RGB Lightsaber colors
-- Hats and capes for players
-- A client-side plugin with menus
-- Many server cvars to customize mod features
-- Countless bugfixes and optimizations
-- Lightsaber holstering
-- And more...
 
 # Building
 The mod actually requires only the game-code files from the build project: `jampgame_`, `cgame_` and `ui_`. MP Engine files and SP files have been disabled for builds. You can follow the **OpenJK** guides for build process:
