@@ -28,6 +28,37 @@
 		}
 	}
 
+	// Feature page: highlight the group in view in the sticky list of groups.
+	var tocLinks = document.querySelectorAll(".toc a[href^='#']");
+	if (tocLinks.length && "IntersectionObserver" in window) {
+		var byId = {};
+		tocLinks.forEach(function (a) {
+			byId[a.getAttribute("href").slice(1)] = a;
+		});
+		var observer = new IntersectionObserver(function (entries) {
+			entries.forEach(function (entry) {
+				if (entry.isIntersecting) {
+					tocLinks.forEach(function (a) { a.classList.remove("active"); });
+					var link = byId[entry.target.id];
+					if (link) {
+						link.classList.add("active");
+						var list = link.closest("ul");
+						if (list && list.scrollWidth > list.clientWidth) {
+							// on a narrow screen, keep the active group's chip in sight
+							list.scrollLeft = link.parentNode.offsetLeft - list.offsetLeft - 16;
+						}
+					}
+				}
+			});
+		}, { rootMargin: "-45% 0px -50% 0px" });
+		Object.keys(byId).forEach(function (id) {
+			var section = document.getElementById(id);
+			if (section) {
+				observer.observe(section);
+			}
+		});
+	}
+
 	// Footer year.
 	document.querySelectorAll("[data-year]").forEach(function (el) {
 		el.textContent = String(new Date().getFullYear());
