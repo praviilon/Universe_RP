@@ -903,3 +903,86 @@ td code, th code { white-space: nowrap; }
 	th, td { padding: 10px 12px; }
 	td code, th code { white-space: normal; word-break: break-word; }
 }
+
+/* ---------- Cvar calculator ---------- */
+
+.visually-hidden {
+	position: absolute !important;
+	width: 1px;
+	height: 1px;
+	overflow: hidden;
+	clip: rect(0 0 0 0);
+	white-space: nowrap;
+}
+.calc { display: grid; gap: 22px; }
+.calc-card { scroll-margin-top: 90px; }
+.calc-head {
+	display: flex;
+	flex-wrap: wrap;
+	justify-content: space-between;
+	align-items: flex-start;
+	gap: 14px 24px;
+	margin-bottom: 16px;
+}
+.calc-title { flex: 1 1 320px; min-width: 0; }
+.calc-title h2 { font-size: 1.15rem; text-transform: none; letter-spacing: 0; margin-bottom: 0.4em; }
+.calc-title h2 code { font-size: 1em; background: none; border: 0; padding: 0; color: #fff; word-break: break-all; }
+.calc-title p { margin: 0; color: #c3cde0; font-size: 0.95rem; }
+.calc-controls { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.calc-value {
+	width: 150px;
+	min-height: 42px;
+	padding: 8px 12px;
+	border: 1px solid var(--line-strong);
+	border-radius: 10px;
+	background: rgba(2, 4, 10, 0.75);
+	color: #fff;
+	font-family: var(--font-mono);
+	font-size: 1rem;
+}
+.calc-value:focus { outline: 2px solid var(--cyan); outline-offset: 2px; }
+.calc-value[aria-invalid="true"] { border-color: #ff8a8a; box-shadow: 0 0 0 1px #ff8a8a; }
+.chip-btn {
+	min-height: 42px;
+	padding: 8px 16px;
+	border: 1px solid var(--line-strong);
+	border-radius: 999px;
+	background: rgba(10, 18, 36, 0.6);
+	color: #fff;
+	font-family: var(--font-body);
+	font-size: 0.9rem;
+	cursor: pointer;
+}
+.chip-btn:hover { border-color: var(--cyan); box-shadow: 0 0 14px rgba(111, 168, 255, 0.25); }
+.calc-presets { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 16px; color: var(--muted); font-size: 0.9rem; }
+.bit-grid {
+	display: grid;
+	grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+	gap: 8px;
+}
+.bit {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	min-height: 44px;
+	padding: 8px 12px;
+	border: 1px solid var(--line);
+	border-radius: 10px;
+	background: rgba(4, 6, 12, 0.45);
+	cursor: pointer;
+	transition: border-color 0.15s ease, background 0.15s ease;
+}
+.bit:hover { border-color: var(--line-strong); }
+.bit input { width: 18px; height: 18px; accent-color: #8fbfff; flex: none; margin: 0; }
+.bit-name { flex: 1; min-width: 0; font-size: 0.93rem; }
+.bit-name small { color: var(--muted); }
+.bit-num { font-family: var(--font-mono); font-size: 0.75rem; color: var(--muted); }
+.bit:has(input:checked) { border-color: var(--cyan); background: rgba(111, 168, 255, 0.14); }
+.calc-line {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	margin-top: 16px;
+	flex-wrap: wrap;
+}
+.calc-line code { flex: 1 1 260px; padding: 10px 12px; font-size: 0.9rem; word-break: break-all; }
