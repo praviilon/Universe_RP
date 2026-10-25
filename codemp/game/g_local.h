@@ -2805,6 +2805,7 @@ const char *RP_EntityRefusalReason( const gentity_t *ent );
 #define RP_SPEAKER_AUDIBLE_MARGIN	512.0f	// GalaxyRP: [Entity System] see SP_target_speaker()
 qboolean RP_SoundSetRadius( const char *name, int *radius );	// GalaxyRP: [Entity System] g_spawn.c
 void RP_SpeakerAudienceFrame( void );	// GalaxyRP: [Entity System] g_main.c
+void RP_SolidBoxFrame( void );			// GLX_U: [Entity System] g_main.c
 void RP_SkyPortalUnflag( void );	// GalaxyRP: [Entity System] g_misc.c
 void RP_ToggleMoverTeamMatch( gentity_t *master );	// GalaxyRP: [SP Maps] g_mover.c
 void RP_ToggleMoverTeamsMatch( void );

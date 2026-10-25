@@ -246,6 +246,45 @@ static QINLINE qboolean CG_VehicleClipCheck(centity_t *ignored, trace_t *trace)
 
 /*
 ====================
+CG_RpSolidBox
+
+GLX_U fix: [Entity System] the box of a solid entity that is not a brush model. The engine packs one into
+s.solid (SV_LinkEntity) that is centred, square in x and y, in whole units and limited in height, which for most
+props is not their real box: the player standing or sitting on one was predicted falling, or sunk into it, where
+the server had him standing, and saw himself flicker. A GLX_U server sends a prop's or md3 mover's real box in
+boneAngles1 (mins) and boneAngles2 (maxs) when the packed one is not it (RP_SolidBoxFrame in game/g_main.c):
+used when they hold a box -- maxs above mins on every axis -- on an entity no bones are set on from the server
+(no boneOrient, no bone index; CG_G2ServerBoneAngles reads them only on those). Otherwise, and from any other
+server, the packed box as before.
+====================
+*/
+static void CG_RpSolidBox( const entityState_t *ent, vec3_t bmins, vec3_t bmaxs )
+{
+	int x, zd, zu;
+
+	if ( ( ent->eType == ET_GENERAL || ent->eType == ET_MOVER ) && !ent->boneOrient &&
+		!ent->boneIndex1 && !ent->boneIndex2 && !ent->boneIndex3 && !ent->boneIndex4 &&
+		ent->boneAngles2[0] > ent->boneAngles1[0] && ent->boneAngles2[1] > ent->boneAngles1[1] &&
+		ent->boneAngles2[2] > ent->boneAngles1[2] )
+	{
+		VectorCopy( ent->boneAngles1, bmins );
+		VectorCopy( ent->boneAngles2, bmaxs );
+		return;
+	}
+
+	// encoded bbox
+	x = (ent->solid & 255);
+	zd = ((ent->solid>>8) & 255);
+	zu = ((ent->solid>>16) & 255) - 32;
+
+	bmins[0] = bmins[1] = -x;
+	bmaxs[0] = bmaxs[1] = x;
+	bmins[2] = -zd;
+	bmaxs[2] = zu;
+}
+
+/*
+====================
 CG_ClipMoveToEntities
 
 ====================
@@ -255,7 +294,7 @@ extern void BG_VehicleAdjustBBoxForOrientation( Vehicle_t *veh, vec3_t origin, v
 										void (*localTrace)(trace_t *results, const vec3_t start, const vec3_t mins, const vec3_t maxs, const vec3_t end, int passEntityNum, int contentMask)); // bg_pmove.c
 static void CG_ClipMoveToEntities ( const vec3_t start, const vec3_t mins, const vec3_t maxs, const vec3_t end,
 							int skipNumber, int mask, trace_t *tr, qboolean g2Check ) {
-	int			i, x, zd, zu;
+	int			i;
 	trace_t		trace, oldTrace;
 	entityState_t	*ent;
 	clipHandle_t 	cmodel;
@@ -290,15 +329,8 @@ static void CG_ClipMoveToEntities ( const vec3_t start, const vec3_t mins, const
 			VectorCopy( cent->lerpAngles, angles );
 			BG_EvaluateTrajectory( &cent->currentState.pos, cg.physicsTime, origin );
 		} else {
-			// encoded bbox
-			x = (ent->solid & 255);
-			zd = ((ent->solid>>8) & 255);
-			zu = ((ent->solid>>16) & 255) - 32;
-
-			bmins[0] = bmins[1] = -x;
-			bmaxs[0] = bmaxs[1] = x;
-			bmins[2] = -zd;
-			bmaxs[2] = zu;
+			// encoded bbox -- GLX_U fix: [Entity System] or the real one the server sent (CG_RpSolidBox)
+			CG_RpSolidBox( ent, bmins, bmaxs );
 
 			if (ent->eType == ET_NPC && ent->NPC_class == CLASS_VEHICLE &&
 				cent->m_pVehicle)

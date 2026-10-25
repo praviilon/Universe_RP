@@ -7973,6 +7973,66 @@ void RP_SpeakerAudienceFrame( void )
 	}
 }
 
+/*
+================
+RP_SolidBoxFrame
+
+GLX_U fix: [Entity System] a client predicts its own player's movement against the solid entities it is sent,
+and of a solid entity that is not a brush model it knows only the box the engine packs into s.solid
+(SV_LinkEntity): one half-width for both x and y, from maxs[0], centred on the origin, in whole units, at most
+255 below the origin and 223 above it. Most props' boxes are not that -- 335 of the 431 md3 models of the base
+game come out more than 4 units off, a crate twice as long as it is wide among them -- so a player standing or
+sitting on one was predicted falling, or sunk into it, where the server had him standing, and his own client
+flickered between the two while everyone else saw him still. Where the packed box is not the real one, the real
+one goes in s.boneAngles1 (mins) and s.boneAngles2 (maxs), and the client predicts with it (CG_RpSolidBox in
+cgame/cg_predict.c). Every client reads those two only for an entity bones are set on from the server -- one
+with boneOrient or a bone index set (the G2 turret, items and NPCs) -- which this leaves alone. Run every frame,
+after everything has moved and before the snapshots are built; a value that does not change is not sent again.
+Only props and md3 movers (ET_GENERAL, ET_MOVER): the server's own collision is not changed.
+================
+*/
+void RP_SolidBoxFrame( void )
+{
+	int e;
+
+	for ( e = MAX_CLIENTS; e < level.num_entities && e < MAX_GENTITIES; e++ )
+	{
+		gentity_t *ent = &g_entities[e];
+		entityState_t *s = &ent->s;
+		qboolean send = qfalse;
+
+		if ( !ent->inuse || ( s->eType != ET_GENERAL && s->eType != ET_MOVER ) ||
+			s->boneOrient || s->boneIndex1 || s->boneIndex2 || s->boneIndex3 || s->boneIndex4 )
+			continue;
+
+		if ( ent->r.linked && !ent->r.bmodel && s->solid && s->solid != SOLID_BMODEL &&
+			ent->r.maxs[0] > ent->r.mins[0] && ent->r.maxs[1] > ent->r.mins[1] && ent->r.maxs[2] > ent->r.mins[2] )
+		{
+			// the box the client gets out of s.solid (CG_ClipMoveToEntities)
+			const float x = (float)( s->solid & 255 );
+			const float zd = (float)( ( s->solid >> 8 ) & 255 );
+			const float zu = (float)( ( ( s->solid >> 16 ) & 255 ) - 32 );
+
+			if ( ent->r.mins[0] != -x || ent->r.mins[1] != -x || ent->r.mins[2] != -zd ||
+				ent->r.maxs[0] != x || ent->r.maxs[1] != x || ent->r.maxs[2] != zu )
+			{
+				send = qtrue;
+			}
+		}
+
+		if ( send )
+		{
+			VectorCopy( ent->r.mins, s->boneAngles1 );
+			VectorCopy( ent->r.maxs, s->boneAngles2 );
+		}
+		else
+		{
+			VectorClear( s->boneAngles1 );
+			VectorClear( s->boneAngles2 );
+		}
+	}
+}
+
 void G_RunFrame( int levelTime ) {
 	int			i;
 	gentity_t	*ent;
@@ -9337,6 +9397,9 @@ void G_RunFrame( int levelTime ) {
 #endif
 	// GalaxyRP: [Entity System] which clients each sound-set speaker is sent to this frame
 	RP_SpeakerAudienceFrame();
+
+	// GLX_U fix: [Entity System] the real box of a solid prop, for its clients' prediction
+	RP_SolidBoxFrame();
 
 	//At the end of the frame, send out the ghoul2 kill queue, if there is one
 	G_SendG2KillQueue();
