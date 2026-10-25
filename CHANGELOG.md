@@ -6,6 +6,7 @@
 
 ### Added
 - Custom lock messages: `/entlockmessage <lock> <message>` sets what a refused player is told instead of "Locked." (up to 150 characters, `\n` for a new line, colour codes work), and `/entlockmessage <lock> default` brings "Locked." back. Messages are saved per map in `locks/<map>/messages.txt`, and bad lines in a hand-edited file are skipped and logged.
+- Head tracking: your head turns to whoever is under your crosshair (up to 1024 units) and stays on them for 3 s after you look away; otherwise it glances at the nearest person, as before, now also while fighting or in an emote. Heads also tilt up or down toward the person (Universe RP client only), and never turn to cloaked, `/admhidden` or Mind Tricking players.
 
 ### Fixed
 - Standing or sitting on a solid prop (MD3 props, GLM props with a box of their own, MD3 movers) no longer makes your own animation flicker while others see you still. Universe RP client only.
