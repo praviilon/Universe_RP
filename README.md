@@ -25,7 +25,7 @@ Claude Code is being used to develop the project.
 ### [Characters](https://praviilon.github.io/Universe_RP/features.html#characters)
 - An account system, with characters that keep their level, skills, credits, inventory, sabers and looks
 - Levels and skill points, credits and an item shop
-- An inventory of custom items, character descriptions, and allies (`/allyaim` adds the one you aim at)
+- An inventory of custom items, per-character descriptions, and allies
 - Account settings that turn features on or off for yourself
 
 ### [Roleplay chat](https://praviilon.github.io/Universe_RP/features.html#chat)
@@ -34,56 +34,57 @@ Claude Code is being used to develop the project.
 - Dice and coin flips, server news channels, and voice lines heard over the radio (siege voice chat in FFA)
 
 ### [Emotes and movement](https://praviilon.github.io/Universe_RP/features.html#emotes)
-- `/emote` for full emotes with their own endings, and `/anim` for more than 1,600 animations, including moves from JA+
-- Paired hugs and kisses (`/wehug`, `/wekiss`)
-- Sit animations drawn on the seat beneath you, and ledge grab
+- Commands to play more than 1,600 animations and custom sounds
+- Paired hugs and kisses
+- Better sit animations, ledge grab, and better player head tracking
 - A grappling hook, `/autowalk`, and an AFK protection bubble with animations
 
 ### [Combat](https://praviilon.github.io/Universe_RP/features.html#combat)
 - Melee grapples (punch, knee throw, head lock), spin kicks and flip kicks
 - A downed state instead of instant death
 - The Force Drain grab
-- Force powers rebalanced at levels 4 and 5, and a balance between gunslingers and Force users
-- Radar HUD in FFA: cloak and mind trick hide players from it, and vehicles can cloak
+- Melee Battle and Duel Tournament mini-games
+- Rebalance between gunslingers and Force users
+- Radar HUD in FFA, cloak and mind trick hide players from it. Vehicles can cloak too
 
 ### [Lightsabers](https://praviilon.github.io/Universe_RP/features.html#sabers)
-- Any colour, by sliders or hex code, with flame, electric and black blades, for players and NPCs
+- RGB colours, adjustable by menu sliders or hex code, with custom blade styles, for players and NPCs
 - Lightsaber holstering, on the hip or the wrist
 - Ignition fine-tuning: draw the saber unlit
 
 ### [Looks](https://praviilon.github.io/Universe_RP/features.html#looks)
 - Hats and capes for players and NPCs
-- Any size
+- Scale yourself, the vehicle you ride or NPC you spawn
 - Force ghost and hologram effects for players and NPCs
 - HD HUD icons and a widescreen HUD
 
 ### [Building worlds](https://praviilon.github.io/Universe_RP/features.html#building)
-- An entity system: add, edit, list and remove anything in the map in game, and save it for the next session
+- An entity system: add, edit, list and remove things on the map, and save it for the next session
 - Client-side Extras menus to spawn MD3 and GLM props (with a 3D preview), place lights and effects, play music or sounds, and spawn NPCs or vehicles
-- Entity boxes shown, and commands to copy, cut and rotate entities
+- Entity bounds shown, and commands to copy, cut and rotate entities
 - More entity classes and a logical entity pool
-- Door and trigger locks, set per entity, with a list of the accounts allowed through
+- Door and trigger locks, set per entity, with a list of the accounts allowed through and custom lock messages
 - Spawner settings: scale NPCs and vehicles on the go, set their team, hats and capes, and XP and credit rewards for defeating them
 - Shader remaps, and better single player map support (Jedi Academy and Jedi Outcast), with votes for SP maps
 
 ### [Running a server](https://praviilon.github.io/Universe_RP/features.html#admin)
 - Admin commands, given one by one to each account
-- Server tools, and Melee Battle and Duel Tournament mini-games
+- Server tools
 - A news system
-- Hundreds of server cvars, with an [online calculator](https://praviilon.github.io/Universe_RP/calculator.html) for the bit-value ones
+- Many customisable server cvars, with an [online calculator](https://praviilon.github.io/Universe_RP/calculator.html) for the bit-value ones
 
 ### [Platforms](https://praviilon.github.io/Universe_RP/features.html#platforms)
-- Runs natively on TaystJK: Windows (64-bit and 32-bit), Linux (64-bit, 32-bit and ARM64) and macOS (Apple Silicon and Intel)
-- Countless bug fixes and optimisations
+- The mod runs natively on TaystJK: Windows (64-bit and 32-bit), Linux (64-bit, 32-bit and ARM64) and macOS (Apple Silicon and Intel)
+- Countless bugfixes and optimisations were done during the mod rebuild
 
-And much more: see the [features page](https://praviilon.github.io/Universe_RP/features.html).
+There is much more to check: see the [features page](https://praviilon.github.io/Universe_RP/features.html).
 
 # Website
 Features, guides, downloads for your system and server setup are on the mod's website: **[praviilon.github.io/Universe_RP](https://praviilon.github.io/Universe_RP/)**
 
 - [Features](https://praviilon.github.io/Universe_RP/features.html): what the mod does and how it works
 - [Download](https://praviilon.github.io/Universe_RP/download.html): the right TaystJK and Universe RP files for your system
-- [Play](https://praviilon.github.io/Universe_RP/play.html) and [Host](https://praviilon.github.io/Universe_RP/host.html): installing, launching with the scripts, running a server
+- [Play](https://praviilon.github.io/Universe_RP/play.html) and [Host](https://praviilon.github.io/Universe_RP/host.html): installation, launching with the scripts, running a server
 - [Cvar calculator](https://praviilon.github.io/Universe_RP/calculator.html): bit-value server settings
 
 # Building
