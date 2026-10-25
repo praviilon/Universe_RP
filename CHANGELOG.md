@@ -7,6 +7,8 @@
 ### Added
 - `/sabercolor` accepts hex colours: `/sabercolor 1 #7A3CFF` (the `#` is optional).
 - NPC files can give sabers a custom colour (`saberColor #RRGGBB` or `saberRGB r g b`), an RGB blade style (`saberBlade classic|flame1|electric1|flame2|electric2`) and black, with `saber2…` keys for the second saber. Shown by the Universe RP client.
+- `/autowalk`: keeps you walking or running hands-free, the way you are holding (forward if no key), so you can type on the move. `/autowalk` again stops it; it also stops when you die, are knocked down (downed or paralyzed), spectate, or the map changes. Universe RP client only.
+- Sit placement: sit and meditate animations are drawn sitting on what is under them (a bench, a step, a seat up to 8 units higher) instead of floating above it or sinking into it. Visual only, shown by the Universe RP client.
 
 ### Changed
 - `/settings 3` is renamed "Ignite Saber when Drawn": OFF now also draws the saber unlit (hilt only, no ignition sound) on every switch to it, not only on spawn.
