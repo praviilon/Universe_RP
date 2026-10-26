@@ -7716,15 +7716,21 @@ chatbox functionality -rww
 #define	CHATBOX_FONT_HEIGHT	20
 
 //utility func, insert a string into a string at the specified
-//place (assuming this will not overflow the buffer)
-void CG_ChatBox_StrInsert(char *buffer, int place, char *str)
+//place
+// GLX_U: [Chat] into a buffer of bufSize, and refused (qfalse) when it would not fit. It used to assume it
+// would: a long chat line's line breaks went on past chatBoxItem_t.string, into the next item and beyond.
+static qboolean CG_ChatBox_StrInsert(char *buffer, int bufSize, int place, const char *str)
 {
 	int insLen = strlen(str);
 	int i = strlen(buffer);
 	int k = 0;
 
-	buffer[i+insLen+1] = 0; //terminate the string at its new length
-	while (i >= place)
+	if (i + insLen + 1 > bufSize || place < 0 || place > i)
+	{
+		return qfalse;
+	}
+
+	while (i >= place) // the terminator moves too
 	{
 		buffer[i+insLen] = buffer[i];
 		i--;
@@ -7737,6 +7743,8 @@ void CG_ChatBox_StrInsert(char *buffer, int place, char *str)
 		i++;
 		k++;
 	}
+
+	return qtrue;
 }
 
 //add chatbox string
@@ -7752,12 +7760,9 @@ void CG_ChatBox_AddString(char *chatStr)
 
 	memset(chat, 0, sizeof(chatBoxItem_t));
 
-	if (strlen(chatStr) > sizeof(chat->string))
-	{ //too long, terminate at proper len.
-		chatStr[sizeof(chat->string)-1] = 0;
-	}
-
-	strcpy(chat->string, chatStr);
+	// GLX_U: [Chat] at most MAX_SAY_TEXT-1 characters, the rest of the item left for the line breaks. This
+	// used to cut chatStr itself, and let a string of exactly sizeof(chat->string) through to strcpy.
+	Q_strncpyz(chat->string, chatStr, MAX_SAY_TEXT);
 	chat->time = cg.time + cg_chatBox.integer;
 
 	chat->lines = 1;
@@ -7792,8 +7797,11 @@ void CG_ChatBox_AddString(char *chatStr)
 					i = j;
 				}
 
+				if (!CG_ChatBox_StrInsert(chat->string, sizeof(chat->string), i, "\n"))
+				{ //GLX_U: [Chat] no room for another break: the rest stays on this line
+					break;
+				}
                 chat->lines++;
-				CG_ChatBox_StrInsert(chat->string, i, "\n");
 				i++;
 				chatLen = 0;
 				lastLinePt = i+1;
@@ -8953,6 +8961,9 @@ void CG_DrawActive( stereoFrame_t stereoView ) {
 
 	// draw status bar and other floating elements
  	CG_Draw2D();
+
+	// GLX_U: [Chat] the chat input box, over all of it (also with cg_draw2D 0)
+	CG_RpChatDraw();
 }
 
 

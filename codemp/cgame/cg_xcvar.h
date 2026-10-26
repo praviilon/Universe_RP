@@ -49,6 +49,8 @@ XCVAR_DEF( cg_centerTime,						"3",					NULL,					CVAR_ARCHIVE )
 XCVAR_DEF( cg_chatBeep,							"1",					NULL,					CVAR_ARCHIVE )
 XCVAR_DEF( cg_chatBox,							"10000",				NULL,					CVAR_ARCHIVE )
 XCVAR_DEF( cg_chatBoxHeight,					"350",					NULL,					CVAR_ARCHIVE )
+// GLX_U: [Chat] 1: the chat keys open the cgame's chat box (cg_rpchat.c); 0: the engine's, as before
+XCVAR_DEF( cg_chatInput,						"1",					NULL,					CVAR_ARCHIVE )
 XCVAR_DEF( cg_crosshairHealth,					"0",					NULL,					CVAR_ARCHIVE )
 XCVAR_DEF( cg_crosshairSize,					"24",					NULL,					CVAR_ARCHIVE )
 XCVAR_DEF( cg_crosshairX,						"0",					NULL,					CVAR_ARCHIVE )

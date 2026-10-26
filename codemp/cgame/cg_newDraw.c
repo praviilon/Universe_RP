@@ -748,6 +748,11 @@ void CG_OwnerDraw(float x, float y, float w, float h, float text_x, float text_y
 void CG_MouseEvent(int x, int y) {
 	int n;
 
+	if ( CG_RpChatActive() )
+	{ // GLX_U: [Chat] the chat box has the keyboard; the mouse does nothing while typing
+		return;
+	}
+
 	/*
 	if ( (cg.predictedPlayerState.pm_type == PM_NORMAL || cg.predictedPlayerState.pm_type == PM_JETPACK || cg.predictedPlayerState.pm_type == PM_FLOAT || cg.predictedPlayerState.pm_type == PM_SPECTATOR) && cg.showScores == qfalse) {
 		trap->Key_SetCatcher(0);
@@ -830,6 +835,12 @@ void CG_EventHandling(int type) {
 
 
 void CG_KeyEvent(int key, qboolean down) {
+
+	if ( CG_RpChatActive() )
+	{ // GLX_U: [Chat] the chat box has the keyboard (cg_rpchat.c)
+		CG_RpChatKey( key, down );
+		return;
+	}
 
 	if (!down) {
 		return;

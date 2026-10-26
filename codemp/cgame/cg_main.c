@@ -2970,6 +2970,10 @@ static void _CG_MouseEvent( int x, int y ) {
 }
 
 static qboolean CG_IncomingConsoleCommand( void ) {
+	// GLX_U: [Chat] the chat keys open the cgame's chat box: messagemode[2-4] runs as /chatmode instead
+	if ( CG_RpChatSwap( cg.sharedBuffer.icc.conCommand, sizeof( cg.sharedBuffer.icc.conCommand ) ) )
+		return qfalse;
+
 	//rww - let mod authors filter client console messages so they can cut them off if they want.
 	//return qtrue if the command is ok. Otherwise, you can set char 0 on the command str to 0 and return
 	//qfalse to not execute anything, or you can fill conCommand in with something valid and return 0

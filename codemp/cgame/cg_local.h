@@ -796,7 +796,7 @@ typedef struct skulltrail_s {
 #define	MAX_CHATBOX_ITEMS		5
 typedef struct chatBoxItem_s
 {
-	char	string[MAX_SAY_TEXT];
+	char	string[MAX_SAY_TEXT + 32];	// GLX_U: [Chat] the line, up to MAX_SAY_TEXT-1, and its line breaks (CG_ChatBox_AddString)
 	int		time;
 	int		lines;
 } chatBoxItem_t;
@@ -1877,6 +1877,13 @@ void CG_RpxFxPass( void );
 qboolean CG_RpxFxPassActive( void );
 void CG_RpxReply( void );
 void CG_Rpx_f( void );
+
+// GLX_U: [Chat] the chat input box -- cg_rpchat.c
+qboolean CG_RpChatActive( void );
+qboolean CG_RpChatSwap( char *conCommand, int size );
+void CG_ChatMode_f( void );
+void CG_RpChatKey( int key, qboolean down );
+void CG_RpChatDraw( void );
 
 void CG_UpdateCvars( void );
 

@@ -520,6 +520,7 @@ static consoleCommand_t	commands[] = {
 	{ "-grapple",					CG_GrappleUp_f },
 	{ "-scores",					CG_ScoresUp_f },
 	{"char",						NULL},
+	{ "chatmode",					CG_ChatMode_f },	// GLX_U: [Chat] the chat input box, cg_rpchat.c
 	{ "autowalk",					CG_AutoWalk_f },	// GLX_U: [AutoWalk]
 	{ "briefing",					CG_SiegeBriefing_f },
 	{ "clientlist",					CG_ClientList_f },
