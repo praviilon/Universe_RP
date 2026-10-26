@@ -1573,6 +1573,7 @@ Ghoul2 Insert End
 	cgs.media.cursor = trap->R_RegisterShaderNoMip( "menu/art/3_cursor2" );
 	cgs.media.sizeCursor = trap->R_RegisterShaderNoMip( "ui/assets/sizecursor.tga" );
 	cgs.media.selectCursor = trap->R_RegisterShaderNoMip( "ui/assets/selectcursor.tga" );
+	cgs.media.rpChatCursor = trap->R_RegisterShaderNoMip( "cursor" );	// GLX_U: [Chat] the ui's own (gfx/menus/cursor1)
 
 	cgs.media.halfShieldModel	= trap->R_RegisterModel ( "models/weaphits/testboom.md3" );
 	cgs.media.halfShieldShader	= trap->R_RegisterShader( "halfShieldShell" );

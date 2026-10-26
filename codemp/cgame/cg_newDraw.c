@@ -749,7 +749,8 @@ void CG_MouseEvent(int x, int y) {
 	int n;
 
 	if ( CG_RpChatActive() )
-	{ // GLX_U: [Chat] the chat box has the keyboard; the mouse does nothing while typing
+	{ // GLX_U: [Chat] the chat box has the keyboard, and the mouse moves its cursor (cg_rpchat.c)
+		CG_RpChatMouse( x, y );
 		return;
 	}
 

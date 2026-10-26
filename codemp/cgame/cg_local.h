@@ -1512,6 +1512,7 @@ typedef struct cgMedia_s {
 	qhandle_t cursor;
 	qhandle_t selectCursor;
 	qhandle_t sizeCursor;
+	qhandle_t rpChatCursor;	// GLX_U: [Chat] the menus' cursor, for the chat box (cg_rpchat.c)
 
 	//weapon icons
 	qhandle_t weaponIcons[WP_NUM_WEAPONS];
@@ -1883,6 +1884,7 @@ qboolean CG_RpChatActive( void );
 qboolean CG_RpChatSwap( char *conCommand, int size );
 void CG_ChatMode_f( void );
 void CG_RpChatKey( int key, qboolean down );
+void CG_RpChatMouse( int dx, int dy );
 void CG_RpChatDraw( void );
 
 void CG_UpdateCvars( void );

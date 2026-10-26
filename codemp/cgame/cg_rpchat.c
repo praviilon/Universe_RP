@@ -26,8 +26,11 @@ that goes on to the next line when a line is full, so the whole message stays in
   /allychat, so the server treats every message exactly as before: RP modifiers, OOC, ally and team
   chat, distances. A long message goes in quoted parts, which the server joins (RpChat_Send). A '"' goes out as '' (which the server colours as a quote, format_text_in_quotes),
   so it counts as two of the RPCHAT_MAX_SENT characters.
-- Not here (yet): paste, a history of sent messages, the Insert key's overwrite mode; and turning
-  the view with the mouse while typing (with the keyboard caught, the mouse goes to the cgame).
+- Mouse. With the keyboard caught, the engine sends the mouse to the cgame too (CL_MouseEvent), so the
+  view can't turn while typing. The box shows the menus' cursor instead, starting in the top-left
+  corner: a click places the text cursor, a drag selects (and a double-click a word, Shift extends),
+  and typing, Backspace or Delete replace or remove the selection.
+- Not here (yet): copy, cut and paste, a history of sent messages, the Insert key's overwrite mode.
 ===========================================================================
 */
 
@@ -48,6 +51,8 @@ that goes on to the next line when a line is full, so the whole message stays in
 #define RPCHAT_SCALE		0.65f			// the received chat's font size
 #define RPCHAT_LINE_HEIGHT	( 20 * RPCHAT_SCALE )	// CHATBOX_FONT_HEIGHT at that size
 #define RPCHAT_MAX_LINES	64
+#define RPCHAT_CURSOR_SIZE	40				// the mouse cursor, as the ui draws it (width ratio-adjusted)
+#define RPCHAT_DOUBLE_CLICK	400				// ms between two clicks on one spot that select a word
 
 typedef enum {
 	RPCHAT_SAY,
@@ -81,6 +86,13 @@ static struct {
 	int				len;
 	int				cursor;
 	int				sentLen;				// len, with every '"' counted twice
+	int				anchor;					// the selection's other end, -1 for none (RpChat_HasSel)
+
+	// the mouse
+	float			mouseX, mouseY;			// the cursor's tip, on the 640x480 screen
+	qboolean		dragging;				// mouse 1 held since a click in the box
+	int				lastClickTime;			// for a double-click
+	int				lastClickPos;
 
 	// the layout, redone after every change
 	qboolean		dirty;
@@ -100,6 +112,14 @@ static void RpChat_Close( void )
 	rpChat.active = qfalse;
 	rpChat.len = rpChat.cursor = rpChat.sentLen = 0;
 	rpChat.text[0] = '\0';
+	rpChat.anchor = -1;
+	rpChat.dragging = qfalse;
+	rpChat.lastClickTime = 0;
+}
+
+static qboolean RpChat_HasSel( void )
+{
+	return (qboolean)( rpChat.anchor >= 0 && rpChat.anchor != rpChat.cursor );
 }
 
 /*
@@ -221,7 +241,10 @@ void CG_ChatMode_f( void )
 		Com_sprintf( rpChat.prompt, sizeof( rpChat.prompt ), "^%c%s ", rpChatModes[mode].colour, label );
 
 	if ( !rpChat.active )
+	{
 		RpChat_Close();	// empty text
+		rpChat.mouseX = rpChat.mouseY = 0;	// the mouse cursor starts in the top-left corner, off the view and the text
+	}
 
 	rpChat.active = qtrue;
 	rpChat.mode = (rpChatMode_t)mode;
@@ -249,6 +272,7 @@ static void RpChat_Insert( int ch )
 	rpChat.cursor++;
 	rpChat.len++;
 	rpChat.sentLen += cost;
+	rpChat.anchor = -1;
 	rpChat.dirty = qtrue;
 }
 
@@ -260,7 +284,41 @@ static void RpChat_Delete( int at )
 	rpChat.sentLen -= ( rpChat.text[at] == '"' ) ? 2 : 1;
 	memmove( rpChat.text + at, rpChat.text + at + 1, rpChat.len - at );
 	rpChat.len--;
+	rpChat.anchor = -1;
 	rpChat.dirty = qtrue;
+}
+
+// the selection removed, the text cursor where it began. An end between '^' and its colour character
+// takes the whole code, so no stray half of one is left.
+static void RpChat_DeleteSel( void )
+{
+	int a = Q_min( rpChat.anchor, rpChat.cursor ), b = Q_max( rpChat.anchor, rpChat.cursor ), i;
+
+	if ( a > 0 && a < rpChat.len && Q_IsColorString( &rpChat.text[a - 1] ) )
+		a--;
+	if ( b > 0 && b < rpChat.len && Q_IsColorString( &rpChat.text[b - 1] ) )
+		b++;
+
+	for ( i = a; i < b; i++ )
+		rpChat.sentLen -= ( rpChat.text[i] == '"' ) ? 2 : 1;
+	memmove( rpChat.text + a, rpChat.text + b, rpChat.len - b + 1 );
+	rpChat.len -= b - a;
+	rpChat.cursor = a;
+	rpChat.anchor = -1;
+	rpChat.dirty = qtrue;
+}
+
+// the text cursor to pos; with select, the selection runs from where it was (or from its anchor)
+static void RpChat_MoveTo( int pos, qboolean select )
+{
+	if ( select )
+	{
+		if ( !RpChat_HasSel() )
+			rpChat.anchor = rpChat.cursor;
+	}
+	else
+		rpChat.anchor = -1;
+	rpChat.cursor = pos;
 }
 
 /*
@@ -325,18 +383,63 @@ static void RpChat_Send( void )
 	trap->SendClientCommand( cmd );
 }
 
+static int RpChat_PosAt( float x, float y );
+
+// mouse 1 down: place the text cursor, extend the selection with Shift, select a word on a double-click
+static void RpChat_Click( qboolean shift )
+{
+	int pos = RpChat_PosAt( rpChat.mouseX, rpChat.mouseY );
+	int now = trap->Milliseconds();
+
+	if ( shift )
+	{
+		RpChat_MoveTo( pos, qtrue );
+		rpChat.dragging = qtrue;
+		rpChat.lastClickTime = 0;
+		return;
+	}
+
+	if ( rpChat.lastClickTime && now - rpChat.lastClickTime < RPCHAT_DOUBLE_CLICK && pos == rpChat.lastClickPos )
+	{ // the word around it: the run of characters between spaces
+		int a = pos, b = pos;
+
+		while ( a > 0 && rpChat.text[a - 1] != ' ' )
+			a--;
+		while ( b < rpChat.len && rpChat.text[b] != ' ' )
+			b++;
+
+		rpChat.anchor = a;
+		rpChat.cursor = b;	// on a space, a == b: just placed
+		rpChat.dragging = qfalse;
+		rpChat.lastClickTime = 0;
+		return;
+	}
+
+	rpChat.anchor = rpChat.cursor = pos;
+	rpChat.dragging = qtrue;
+	rpChat.lastClickTime = now ? now : 1;
+	rpChat.lastClickPos = pos;
+}
+
 /*
 ================
 CG_RpChatKey
 
 From CG_KeyEvent while the box is open. Characters as Field_CharEvent takes them, keys as
-Field_KeyDownEvent and Message_Key do.
+Field_KeyDownEvent and Message_Key do. With a selection, typing replaces it, Backspace and Delete remove
+it, and the arrows, Home and End drop it -- or, with Shift held, extend it.
 ================
 */
 void CG_RpChatKey( int key, qboolean down )
 {
+	qboolean shift;
+
 	if ( !down )
+	{
+		if ( key == A_MOUSE1 )
+			rpChat.dragging = qfalse;
 		return;
+	}
 
 	if ( key & K_CHAR_FLAG )
 	{
@@ -344,20 +447,28 @@ void CG_RpChatKey( int key, qboolean down )
 
 		if ( ch == 'h' - 'a' + 1 )
 		{ // backspace
-			if ( rpChat.cursor > 0 )
+			if ( RpChat_HasSel() )
+				RpChat_DeleteSel();
+			else if ( rpChat.cursor > 0 )
 			{
 				rpChat.cursor--;
 				RpChat_Delete( rpChat.cursor );
 			}
 		}
 		else if ( ch == 'a' - 'a' + 1 )
-			rpChat.cursor = 0;
+			RpChat_MoveTo( 0, qfalse );
 		else if ( ch == 'e' - 'a' + 1 )
-			rpChat.cursor = rpChat.len;
+			RpChat_MoveTo( rpChat.len, qfalse );
 		else if ( ch >= 32 && ch != 127 && ch <= 255 )
+		{
+			if ( RpChat_HasSel() )
+				RpChat_DeleteSel();
 			RpChat_Insert( ch );
+		}
 		return;
 	}
+
+	shift = (qboolean)( trap->Key_IsDown( A_SHIFT ) || trap->Key_IsDown( A_SHIFT2 ) );
 
 	switch ( key )
 	{
@@ -368,21 +479,31 @@ void CG_RpChatKey( int key, qboolean down )
 		trap->Key_SetCatcher( trap->Key_GetCatcher() & ~KEYCATCH_CGAME );
 		break;
 	case A_DELETE:
-		RpChat_Delete( rpChat.cursor );
+		if ( RpChat_HasSel() )
+			RpChat_DeleteSel();
+		else
+			RpChat_Delete( rpChat.cursor );
 		break;
 	case A_CURSOR_LEFT:
-		if ( rpChat.cursor > 0 )
-			rpChat.cursor--;
+		if ( !shift && RpChat_HasSel() )
+			RpChat_MoveTo( Q_min( rpChat.anchor, rpChat.cursor ), qfalse );
+		else
+			RpChat_MoveTo( rpChat.cursor > 0 ? rpChat.cursor - 1 : 0, shift );
 		break;
 	case A_CURSOR_RIGHT:
-		if ( rpChat.cursor < rpChat.len )
-			rpChat.cursor++;
+		if ( !shift && RpChat_HasSel() )
+			RpChat_MoveTo( Q_max( rpChat.anchor, rpChat.cursor ), qfalse );
+		else
+			RpChat_MoveTo( rpChat.cursor < rpChat.len ? rpChat.cursor + 1 : rpChat.len, shift );
 		break;
 	case A_HOME:
-		rpChat.cursor = 0;
+		RpChat_MoveTo( 0, shift );
 		break;
 	case A_END:
-		rpChat.cursor = rpChat.len;
+		RpChat_MoveTo( rpChat.len, shift );
+		break;
+	case A_MOUSE1:
+		RpChat_Click( shift );
 		break;
 	default:
 		break;
@@ -474,6 +595,92 @@ static void RpChat_Layout( void )
 	rpChat.dirty = qfalse;
 }
 
+// the prompt's width, the line width and the layout, up to date
+static void RpChat_Refresh( void )
+{
+	int width = RpChat_LineWidth();
+
+	rpChat.promptWidth = CG_Text_Width( rpChat.prompt, RPCHAT_SCALE, FONT_SMALL );
+	if ( width != rpChat.lineWidth )
+	{ // first frame, or cl_ratioFix changed: wrap again
+		rpChat.lineWidth = width;
+		rpChat.dirty = qtrue;
+	}
+	if ( rpChat.dirty )
+		RpChat_Layout();
+}
+
+/*
+================
+RpChat_PosAt
+
+The text position nearest a point on the screen: the line under it (the first above the box, the last
+below it), then the gap between two characters nearest across. A line broken after a space ends before
+that space, so its end stays on it. Never between '^' and its colour character.
+================
+*/
+static int RpChat_PosAt( float x, float y )
+{
+	int l, from, to, last, p, best;
+	float xs, bestDist = 1e9f;
+
+	RpChat_Refresh();
+
+	l = (int)floorf( ( y - RPCHAT_Y ) / RPCHAT_LINE_HEIGHT );
+	if ( l < 0 )
+		l = 0;
+	else if ( l > rpChat.numLines - 1 )
+		l = rpChat.numLines - 1;
+
+	from = rpChat.lineStart[l];
+	to = rpChat.lineStart[l + 1];
+	last = to;
+	if ( l < rpChat.numLines - 1 && to > from && rpChat.text[to - 1] == ' ' )
+		last = to - 1;
+
+	xs = RPCHAT_X + ( l ? 0 : rpChat.promptWidth );
+	best = from;
+	for ( p = from; p <= last; p++ )
+	{
+		float dist = fabsf( xs + RpChat_Width( from, p ) - x );
+
+		if ( dist <= bestDist )
+		{ // on a tie (a colour code takes no width), the later: after the code, in its colour
+			bestDist = dist;
+			best = p;
+		}
+	}
+
+	if ( best > 0 && best < rpChat.len && Q_IsColorString( &rpChat.text[best - 1] ) )
+		best--;
+	return best;
+}
+
+/*
+================
+CG_RpChatMouse
+
+From CG_MouseEvent while the box is open: moves its cursor by as much as the menus' would, and with
+mouse 1 held since a click, the text cursor with it (the selection).
+================
+*/
+void CG_RpChatMouse( int dx, int dy )
+{
+	if ( !rpChat.active )
+		return;
+
+	rpChat.mouseX = Com_Clamp( 0, SCREEN_WIDTH, rpChat.mouseX + dx );
+	rpChat.mouseY = Com_Clamp( 0, SCREEN_HEIGHT, rpChat.mouseY + dy );
+
+	if ( rpChat.dragging )
+	{
+		if ( !trap->Key_IsDown( A_MOUSE1 ) )
+			rpChat.dragging = qfalse;	// its release went elsewhere
+		else
+			rpChat.cursor = RpChat_PosAt( rpChat.mouseX, rpChat.mouseY );
+	}
+}
+
 // the colour in force where a line starts: the channel's, as the message will show in chat (G_SayTo
 // puts it before the message), or the last colour code before it
 static char RpChat_ColourAt( int pos )
@@ -514,15 +721,28 @@ void CG_RpChatDraw( void )
 		return;
 	}
 
-	rpChat.promptWidth = CG_Text_Width( rpChat.prompt, RPCHAT_SCALE, FONT_SMALL );
-	l = RpChat_LineWidth();
-	if ( l != rpChat.lineWidth )
-	{ // first frame, or cl_ratioFix changed: wrap again
-		rpChat.lineWidth = l;
-		rpChat.dirty = qtrue;
+	RpChat_Refresh();
+
+	if ( RpChat_HasSel() )
+	{ // the selection's highlight, behind the text, line by line
+		static const vec4_t selColour = { 0.25f, 0.45f, 0.9f, 0.45f };
+		int a = Q_min( rpChat.anchor, rpChat.cursor ), b = Q_max( rpChat.anchor, rpChat.cursor );
+
+		for ( l = 0; l < rpChat.numLines; l++ )
+		{
+			int from = rpChat.lineStart[l], to = rpChat.lineStart[l + 1];
+			float x = RPCHAT_X + ( l ? 0 : rpChat.promptWidth );
+			int x1, x2;
+
+			if ( b <= from || a >= to )
+				continue;
+
+			x1 = RpChat_Width( from, Q_max( a, from ) );
+			x2 = RpChat_Width( from, Q_min( b, to ) );
+			if ( x2 > x1 )
+				CG_FillRect( x + x1, y + l * RPCHAT_LINE_HEIGHT, x2 - x1, RPCHAT_LINE_HEIGHT, selColour );
+		}
 	}
-	if ( rpChat.dirty )
-		RpChat_Layout();
 
 	CG_Text_Paint( RPCHAT_X, y, RPCHAT_SCALE, colorWhite, rpChat.prompt, 0, 0, ITEM_TEXTSTYLE_OUTLINED, FONT_SMALL );
 
@@ -552,4 +772,8 @@ void CG_RpChatDraw( void )
 
 		CG_Text_Paint( x, y + caretLine * RPCHAT_LINE_HEIGHT, RPCHAT_SCALE, colorWhite, "_", 0, 0, ITEM_TEXTSTYLE_OUTLINED, FONT_SMALL );
 	}
+
+	// the mouse cursor, last: its tip is the point
+	trap->R_SetColor( NULL );
+	CG_DrawPic( rpChat.mouseX, rpChat.mouseY, RATIO_W( RPCHAT_CURSOR_SIZE ), RPCHAT_CURSOR_SIZE, cgs.media.rpChatCursor );
 }
