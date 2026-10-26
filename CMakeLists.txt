@@ -21,8 +21,9 @@ set(CMAKE_OSX_DEPLOYMENT_TARGET "10.9" CACHE STRING "Minimum OS X deployment ver
 
 set(InOpenJK ON)
 
-set(ProjectName "GalaxyRP" CACHE STRING "OpenJK")
-project(${ProjectName})
+# GLX_U: [Branding] the CMake project, i.e. the Visual Studio solution's name (UniverseRP.sln). A plain name, not a
+# cache option: the old "ProjectName" cache entry kept GalaxyRP in every build folder configured before.
+project(UniverseRP)
 
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
 
