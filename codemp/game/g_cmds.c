@@ -15101,16 +15101,23 @@ static void RP_AllyBreak(gentity_t *a, gentity_t *b, const char *why)
 	}
 }
 
-// GLX_U: [Ally] what /allyadd, /allyremove and /allyaim share: the Duel Tournament refusal (qtrue: refused, and
+// GLX_U: [Ally] what /allyadd, /allyremove and /allyaim share: the mini-game refusal (qtrue: refused, and
 // told), then adding or removing one client with the checks, the radar update and both players' messages
 static qboolean RP_AllyBlocked( gentity_t *ent, const char *verb )
 {
+	const char *minigame;
+
 	// GalaxyRP fix: [Guardian] a guardian_mode>0 guard blocking /allyadd during a boss battle used
 	// to be here. guardian_mode is permanently 0 now, so it was unreachable.
 
-	if (level.duel_tournament_mode > 0 && level.duel_players[ent->s.number] != -1)
-	{ // zyk: cant add or remove allies while in Duel Tournament
-		trap->SendServerCommand(ent->s.number, va("print \"You cannot %s allies while in a Duel Tournament.\n\"", verb));
+	// zyk: cant add or remove allies while in Duel Tournament
+	// GLX_U: [Ally] nor in a Melee Battle (zyk_minigame_name(): on either roster, sign-up to end). Joining one
+	// drops the allies among those signed up (RP_AllyBreak), but a fighter could then ally another one, whose
+	// hits G_Damage() refuses -- a pact inside a free-for-all.
+	minigame = zyk_minigame_name(ent);
+	if (minigame)
+	{
+		trap->SendServerCommand(ent->s.number, va("print \"You cannot %s allies while in a %s.\n\"", verb, minigame));
 		return qtrue;
 	}
 	return qfalse;
