@@ -24,20 +24,20 @@ Claude Code is being used to develop the project.
 
 ### [Characters](https://praviilon.github.io/Universe_RP/features.html#characters)
 - An account system, with characters that keep their level, skills, credits, inventory, sabers and looks
-- Levels and skill points, credits and an item shop
+- XP and skill points, credits and an item shop
 - An inventory of custom items, per-character descriptions, and allies
 - Account settings that turn features on or off for yourself
 
 ### [Roleplay chat](https://praviilon.github.io/Universe_RP/features.html#chat)
 - Chat heard as far as a voice would carry, which declutters the server
-- 34 RP chat modifiers: actions, descriptions, Force actions, shouts, whispers, comlink, thoughts and alien languages, each with its own colour and range. Quoted speech shows in green
+- 34 RP chat modifiers: actions, descriptions, shouts, whispers, comlink, thoughts and alien languages, each with its own colour and range. Quoted speech shows in green
 - Dice and coin flips, server news channels, and voice lines heard over the radio (siege voice chat in FFA)
-- A multi-line chat box in the chat's own font, up to 480 characters, supporting all chat types
+- A multi-line chat box in the chat's own font, supporting all chat types and text selection
 
 ### [Emotes and movement](https://praviilon.github.io/Universe_RP/features.html#emotes)
 - Commands to play more than 1,600 animations and custom sounds
 - Paired hugs and kisses
-- Better sit animations, ledge grab, and better player head tracking
+- Better sit animations, ledge grab, and improved player head tracking
 - A grappling hook, `/autowalk`, and an AFK protection bubble with animations
 
 ### [Combat](https://praviilon.github.io/Universe_RP/features.html#combat)
@@ -55,7 +55,7 @@ Claude Code is being used to develop the project.
 
 ### [Looks](https://praviilon.github.io/Universe_RP/features.html#looks)
 - Hats and capes for players and NPCs
-- Scale yourself, the vehicle you ride or NPC you spawn
+- Scale yourself, the vehicle you ride or your NPC companion
 - Force ghost and hologram effects for players and NPCs
 - HD HUD icons and a widescreen HUD
 
