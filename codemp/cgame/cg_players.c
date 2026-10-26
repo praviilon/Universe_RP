@@ -10434,11 +10434,25 @@ static void CG_RpPlaceHolsteredSabers( centity_t *cent, clientInfo_t *ci, const 
 {
 	static const char *bones[MAX_SABERS] = { "rfemurX", "lfemurX" };
 	int i;
+	vec3_t placeAngles;
 
 	hilts->placed = qtrue;
 	hilts->count = 0;
 
-	CG_RpPlaceCosmetics( cent, ci, body, rootAngles, hilts );	// GLX_U: [Cosmetics] whatever the hilts do
+	// GLX_U: [Cosmetics] held by a monster, rootAngles are the hand's (BG_AttachToRancor in CG_Player: yaw, pitch and
+	// roll) while the body is still drawn by legs.axis (its own yaw, upright): a hat, cape or hilt placed by rootAngles
+	// swung off it by the hand's pitch and roll. Placed by the body as drawn instead -- what the stock saber code does
+	// for the blades (vectoangles( legs.axis[0], rootAngles )), which is why it only showed without the saber out.
+	if ( cent->currentState.eFlags2 & EF2_HELD_BY_MONSTER )
+	{
+		vectoangles( body->axis[0], placeAngles );
+	}
+	else
+	{
+		VectorCopy( rootAngles, placeAngles );
+	}
+
+	CG_RpPlaceCosmetics( cent, ci, body, placeAngles, hilts );	// GLX_U: [Cosmetics] whatever the hilts do
 
 	if ( !cg_holsteredSabers.integer
 		|| !( cent->currentState.eFlags2 & EF2_RP_SABER_CARRIED )
@@ -10488,7 +10502,7 @@ static void CG_RpPlaceHolsteredSabers( centity_t *cent, clientInfo_t *ci, const 
 			continue;
 		}
 
-		trap->G2API_GetBoltMatrix( cent->ghoul2, 0, bolt, &matrix, rootAngles, body->origin, cg.time, cgs.gameModels, cent->modelScale );
+		trap->G2API_GetBoltMatrix( cent->ghoul2, 0, bolt, &matrix, placeAngles, body->origin, cg.time, cgs.gameModels, cent->modelScale );
 		BG_GiveMeVectorFromMatrix( &matrix, ORIGIN, org );
 		BG_GiveMeVectorFromMatrix( &matrix, POSITIVE_X, ax0 );
 		BG_GiveMeVectorFromMatrix( &matrix, POSITIVE_Y, ax1 );
