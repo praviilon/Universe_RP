@@ -32,6 +32,7 @@ Claude Code is being used to develop the project.
 - Chat heard as far as a voice would carry, which declutters the server
 - 34 RP chat modifiers: actions, descriptions, Force actions, shouts, whispers, comlink, thoughts and alien languages, each with its own colour and range. Quoted speech shows in green
 - Dice and coin flips, server news channels, and voice lines heard over the radio (siege voice chat in FFA)
+- A multi-line chat box in the chat's own font, up to 480 characters, supporting all chat types
 
 ### [Emotes and movement](https://praviilon.github.io/Universe_RP/features.html#emotes)
 - Commands to play more than 1,600 animations and custom sounds
