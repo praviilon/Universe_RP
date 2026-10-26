@@ -7,7 +7,7 @@
 ### Added
 - Custom lock messages: `/entlockmessage <lock> <message>` sets what a refused player is told instead of "Locked." (up to 150 characters, `\n` for a new line, colour codes work), and `/entlockmessage <lock> default` brings "Locked." back. Messages are saved per map in `locks/<map>/messages.txt`, and bad lines in a hand-edited file are skipped and logged.
 - Head tracking: your head turns to whoever is under your crosshair (up to 1024 units) and stays on them for 3 s after you look away; otherwise it glances at the nearest person, as before, now also while fighting or in an emote. Heads also tilt up or down toward the person (Universe RP client only), and never turn to cloaked, `/admhidden` or Mind Tricking players.
-- New chat box: the chat keys open a small box at the top left, in the chat's own font, that wraps onto new lines as you type (up to 480 characters) and supports every chat type and RP modifier. `/chatmode ooc` and `/chatmode ally` give OOC and ally chat keys of their own (e.g. `bind u "chatmode ooc"`), and `cg_chatInput 0` brings back the old box. Universe RP client only.
+- New chat box: the chat keys open a box at the top left, in the chat's own font, that wraps onto new lines as you type (up to 480 characters) and supports every chat type and RP modifier. Mouse can be used to select text or place the cursor to make edits. `/chatmode ooc` and `/chatmode ally` give OOC and ally chat keys of their own (e.g. `bind u "chatmode ooc"`), and `cg_chatInput 0` brings back the old box. Universe RP client only.
 
 ### Changed
 - `/allyadd`, `/allyaim` and `/allyremove` are now also blocked while you are signed up for a Melee Battle, as in the Duel Tournament.
