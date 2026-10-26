@@ -42,8 +42,10 @@ that goes on to the next line when a line is full, so the whole message stays in
 
 #define RPCHAT_X			30				// the received chat's left edge (CG_ChatBox_DrawStrings)
 #define RPCHAT_Y			16
-#define RPCHAT_WIDTH		550				// and its line width (CHATBOX_CUTOFF_LEN)
-#define RPCHAT_SCALE		0.65f			// and font size
+#define RPCHAT_RADAR_LEFT	520				// the radar's left edge before RATIO_RX (RADAR_X in cg_draw.c)
+#define RPCHAT_GAP			5				// lines end this far before the radar (RpChat_LineWidth)
+#define RPCHAT_MAX_RIGHT	560				// and never past this: the powerup icons start at ~570 on every screen
+#define RPCHAT_SCALE		0.65f			// the received chat's font size
 #define RPCHAT_LINE_HEIGHT	( 20 * RPCHAT_SCALE )	// CHATBOX_FONT_HEIGHT at that size
 #define RPCHAT_MAX_LINES	64
 
@@ -83,6 +85,7 @@ static struct {
 	// the layout, redone after every change
 	qboolean		dirty;
 	int				promptWidth;
+	int				lineWidth;				// RpChat_LineWidth, as last laid out
 	int				numLines;
 	int				lineStart[RPCHAT_MAX_LINES + 1];	// lineStart[numLines] == len
 } rpChat;
@@ -226,6 +229,12 @@ void CG_ChatMode_f( void )
 	rpChat.dirty = qtrue;
 
 	trap->Key_SetCatcher( trap->Key_GetCatcher() | KEYCATCH_CGAME );
+
+	// typed in the console: close it, so the player types straight into the box. The cgame can't
+	// drop the console's keyboard itself (the engine keeps KEYCATCH_CONSOLE), so the console key's own
+	// command does it. Binds never get here with the console up: none run while it's open.
+	if ( trap->Key_GetCatcher() & KEYCATCH_CONSOLE )
+		trap->SendConsoleCommand( "toggleconsole\n" );
 }
 
 static void RpChat_Insert( int ch )
@@ -396,16 +405,34 @@ static int RpChat_Width( int from, int to )
 
 /*
 ================
+RpChat_LineWidth
+
+A line's width: up to just before the radar, which the widescreen HUD pins to the right edge
+(RATIO_RX, by cl_ratioFix and the screen's shape), so 4:3 gets shorter lines than 16:9. Capped where
+the powerup icons start, which aren't moved, for 21:9 and wider.
+================
+*/
+static int RpChat_LineWidth( void )
+{
+	float right = RATIO_RX( RPCHAT_RADAR_LEFT ) - RPCHAT_GAP;
+
+	if ( right > RPCHAT_MAX_RIGHT )
+		right = RPCHAT_MAX_RIGHT;
+	return (int)right - RPCHAT_X;
+}
+
+/*
+================
 RpChat_Layout
 
-Where each line starts. A line is RPCHAT_WIDTH wide, the first less the prompt, and is broken after
+Where each line starts. A line is rpChat.lineWidth wide, the first less the prompt, and is broken after
 its last space; a word longer than a line is broken where it runs out, but never inside a colour code.
 ================
 */
 static void RpChat_Layout( void )
 {
 	int start = 0, i = 0;
-	int avail = RPCHAT_WIDTH - rpChat.promptWidth;
+	int avail = rpChat.lineWidth - rpChat.promptWidth;
 
 	rpChat.numLines = 1;
 	rpChat.lineStart[0] = 0;
@@ -436,7 +463,7 @@ static void RpChat_Layout( void )
 
 			rpChat.lineStart[rpChat.numLines++] = next;
 			start = next;
-			avail = RPCHAT_WIDTH;
+			avail = rpChat.lineWidth;
 			i = start;
 			continue;
 		}
@@ -488,6 +515,12 @@ void CG_RpChatDraw( void )
 	}
 
 	rpChat.promptWidth = CG_Text_Width( rpChat.prompt, RPCHAT_SCALE, FONT_SMALL );
+	l = RpChat_LineWidth();
+	if ( l != rpChat.lineWidth )
+	{ // first frame, or cl_ratioFix changed: wrap again
+		rpChat.lineWidth = l;
+		rpChat.dirty = qtrue;
+	}
 	if ( rpChat.dirty )
 		RpChat_Layout();
 
