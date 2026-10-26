@@ -5561,6 +5561,7 @@ instead, every frame, in this order:
      valid target, within RP_LOOK_AIM_RANGE and in sight;
   3. the nearest valid target in sight within RP_LOOK_NEAR_RADIUS (the old rule, unchanged);
   4. nobody.
+Nobody during a paired animation (a melee grapple, a Drain grab, a hug or kiss), which aims the heads itself.
 Never while held by a monster: the Rancor sets the look target to itself and clears it on release,
 and G_HeldByMonster(), cg_view.c and BG_AttachToRancor() all read it, so nothing here touches it
 then -- and the remembered target is forgotten, so it does not come back after the release.
@@ -5654,6 +5655,14 @@ void RP_PlayerLookThink( gentity_t *self )
 
 	if ( PM_InKnockDown( &client->ps ) )
 	{
+		return;
+	}
+
+	if ( BG_InGrappleMove( client->ps.torsoAnim ) || BG_InGrappleMove( client->ps.legsAnim )
+		|| ( client->ps.forceHandExtend == HANDEXTEND_DODGE && BG_InCoupleEmote( client->ps.forceDodgeAnim ) ) )
+	{ // a paired animation -- a melee grapple or its grab and miss, a Drain grab, /wehug, /wekiss and the slap:
+	  // it already points the heads at each other, and a look target's turn and tilt went on top of it (the
+	  // kissed or thrown player leaning back up to 35 degrees). The head follows the animation instead.
 		return;
 	}
 

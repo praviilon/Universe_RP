@@ -3247,6 +3247,19 @@ static void RP_DrainGrabPlaceVictim( gentity_t *self, gentity_t *victim )
 	SetClientViewAngle(victim, ang);
 }
 
+// GLX_U: [Drain Grab] the caster's view is held level for the whole grab (yaw kept), as the victim's and a melee
+// grappler's are: it is frozen while he holds (BG_InGrappleMove), and the spine takes 3/4 of its pitch, so whatever he
+// grabbed looking at -- usually down at the victim -- left him hunched (or leaning back) for up to 10 s
+static void RP_DrainGrabLevelView( gentity_t *self )
+{
+	vec3_t ang;
+
+	if (self->client->ps.viewangles[PITCH] == 0.0f)
+		return;
+	VectorSet(ang, 0, self->client->ps.viewangles[YAW], 0);
+	SetClientViewAngle(self, ang);
+}
+
 // at Drain start: a logged-in Drain 4/5 caster on the ground, someone grabbable within reach straight ahead
 static gentity_t *RP_DrainGrabFindVictim( gentity_t *self )
 {
@@ -3290,6 +3303,7 @@ static void RP_DrainGrabBegin( gentity_t *self, gentity_t *victim )
 		self->client->ps.weaponTime = RP_DRAIN_GRAB_REFRESH;
 	VectorClear(self->client->ps.velocity);
 	RP_DrainGrabSaberOff(self);
+	RP_DrainGrabLevelView(self);
 
 	RP_DrainGrabHoldAnim(victim, BOTH_FORCE_DRAIN_GRABBED);
 	RP_DrainGrabSaberOff(victim);
@@ -3358,6 +3372,7 @@ static void RP_DrainGrabUpdate( gentity_t *self )
 		self->client->ps.weaponTime = RP_DRAIN_GRAB_REFRESH;
 	}
 	RP_DrainGrabSaberOff(self);
+	RP_DrainGrabLevelView(self);
 
 	// the victim
 	RP_DrainGrabHoldAnim(victim, BOTH_FORCE_DRAIN_GRABBED);
