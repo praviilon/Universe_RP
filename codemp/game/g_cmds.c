@@ -13746,6 +13746,12 @@ void Cmd_ListAccount_f( gentity_t *ent ) {
 ^3/ignorelist: ^7Lists ignored players.\n\
 ^3/voice_cmd <name>: ^7Says a voice command in your character's voice; allies (your team in team gametypes) hear it over the radio. ^3/voice_cmd ^7alone lists the names.\n\
 \n\"");
+				// GLX_U: [Chat] the chat box (cg_rpchat.c), in a block of its own: in the one above it would
+				// take that block too near the 1022 bytes SV_SendServerCommand carries
+				trap->SendServerCommand(ent - g_entities, "print \"^3--------Chat Box--------\n\
+^3/chatmode <say|team|ooc|ally|tell|attacker>: ^7Opens the chat box for that chat type. Bind it to a key: ^3/bind u chatmode ooc\n\
+^3/cg_chatInput 0: ^7Brings back the old chat box.\n\
+\n\"");
 				trap->SendServerCommand(ent - g_entities, "print \"^3--------RP Chat Modifiers--------\n\
 ^7Type a modifier at the start of a chat box message: ^3/me draws a blaster.\n\
 ^7Modifiers work on normal speech only - the chat box, or ^3/say^7.\n\
