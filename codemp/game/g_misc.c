@@ -1705,9 +1705,10 @@ model (g_misc_model.cpp), with these added:
 				name with no extension, and '\' read as '/'. A map's entity whose file the server does not have,
 				or that is not a .glm, is logged and removed; the Entity System refuses one
 "skin"			the skin file next to the model: "test" is <the model's folder>/model_test.skin. No key, "" or
-				"default" is the model's own (a model without one shows model_default.skin from its folder);
-				a skin whose file is not on the server shows that too, and says so (logged, and to the admin
-				who made it). Players need the DAJ_RP client for a skin of their own -- see CG_General()
+				"default" is the model's own: model_default.skin from its folder when the server has one (GLX_U),
+				else the textures the model names itself; a skin whose file is not on the server shows that too,
+				and says so (logged, and to the admin who made it). Players need the DAJ_RP client for a skin of
+				their own -- see CG_General()
 "angles"		as usual
 "mins"/"maxs"	its box, default -16 -16 -16 / 16 16 16: what the entity commands aim at and place, and, with
 				SOLID, what it blocks
@@ -1837,42 +1838,76 @@ static const char *RP_GhoulRadiusKey( int *radius, qboolean *given )
 	return NULL;
 }
 
+// "<the model's folder>/model_<name>.skin" for the model at path, into file: 0 when it is built, 1 when it
+// does not fit file (left empty), 2 when it is built but longer than a skin entry can carry ('@' and the
+// path, in a model slot of MAX_QPATH)
+static int RP_GhoulSkinFile( const char *path, const char *name, char *file, int fileSize )
+{
+	const char *slash = strrchr( path, '/' );
+	int folderLen = slash ? (int)( slash - path ) + 1 : 0;	// with the '/'
+
+	file[0] = '\0';
+	if ( folderLen + 6 + (int)strlen( name ) + 5 >= fileSize )
+		return 1;
+	Com_sprintf( file, fileSize, "%.*smodel_%s.skin", folderLen, path, name );
+	return ( (int)strlen( file ) + 1 < MAX_QPATH ) ? 0 : 2;
+}
+
 // the skin entry the "skin" key registers for the model at path -- "@" and the skin file's path, which the
 // client's code before DAJ_RP's skips as it skips a saber name -- or "" for none. Returns why a skin that
 // was asked for is not used, or NULL.
+// GLX_U fix: [SP Maps] with no skin of its own (no key, "", "default", or one whose file is not there), the
+// model's folder's model_default.skin when the server has it -- the skin the GLM Props preview shows
+// (RPX_GlmMake, ui_rpextras.c) and that a vehicle or NPC of the model wears. The client applied it only to a
+// model that names no textures at all (G2API_SkinlessModel, CG_General), so a model naming them wrongly --
+// bare file names, as the BSG vehicle pack's -- was drawn with the default image. Without that file, still
+// "": the textures the model names itself, as a map_objects prop has.
 static const char *RP_GhoulSkin( const char *path, char *entry, int entrySize )
 {
 	char *skin = NULL;
 	char file[MAX_QPATH * 2];
-	const char *slash;
-	int i, folderLen;
+	const char *problem = NULL;
+	int i;
 
 	entry[0] = '\0';
 
-	if ( !G_SpawnString( "skin", "", &skin ) || !skin || !skin[0] || !Q_stricmp( skin, "default" ) )
-		return NULL;
-
-	for ( i = 0; skin[i]; i++ )
+	if ( G_SpawnString( "skin", "", &skin ) && skin && skin[0] && Q_stricmp( skin, "default" ) )
 	{
-		const char c = skin[i];
+		for ( i = 0; skin[i]; i++ )
+		{
+			const char c = skin[i];
 
-		if ( !( ( c >= 'a' && c <= 'z' ) || ( c >= 'A' && c <= 'Z' ) || ( c >= '0' && c <= '9' ) || c == '_' || c == '-' ) )
-			return "the skin key is not a skin name (letters, digits, '_' and '-' only)";
+			if ( !( ( c >= 'a' && c <= 'z' ) || ( c >= 'A' && c <= 'Z' ) || ( c >= '0' && c <= '9' ) || c == '_' || c == '-' ) )
+			{
+				problem = "the skin key is not a skin name (letters, digits, '_' and '-' only)";
+				break;
+			}
+		}
+
+		if ( !problem )
+		{
+			const int built = RP_GhoulSkinFile( path, skin, file, sizeof( file ) );
+
+			if ( built == 1 )
+				problem = va( "skin %s makes too long a path", skin );
+			else if ( built == 2 || (int)strlen( file ) + 1 >= entrySize )
+				problem = va( "skin file %s has too long a path (at most %d characters)", RP_ShownText( file ), MAX_QPATH - 2 );
+			else if ( !RP_FileExists( file ) )
+				problem = va( "skin file %s is not on the server", RP_ShownText( file ) );
+			else
+			{
+				Com_sprintf( entry, entrySize, "@%s", file );
+				return NULL;
+			}
+		}
 	}
 
-	slash = strrchr( path, '/' );
-	folderLen = slash ? (int)( slash - path ) + 1 : 0;	// with the '/'
-	if ( folderLen + 6 + i + 5 >= (int)sizeof( file ) )
-		return va( "skin %s makes too long a path", skin );
-
-	Com_sprintf( file, sizeof( file ), "%.*smodel_%s.skin", folderLen, path, skin );
-	if ( (int)strlen( file ) + 1 >= MAX_QPATH || (int)strlen( file ) + 1 >= entrySize )
-		return va( "skin file %s has too long a path (at most %d characters)", RP_ShownText( file ), MAX_QPATH - 2 );
-	if ( !RP_FileExists( file ) )
-		return va( "skin file %s is not on the server", RP_ShownText( file ) );
-
-	Com_sprintf( entry, entrySize, "@%s", file );
-	return NULL;
+	if ( RP_GhoulSkinFile( path, "default", file, sizeof( file ) ) == 0 && (int)strlen( file ) + 1 < entrySize &&
+		RP_FileExists( file ) )
+	{
+		Com_sprintf( entry, entrySize, "@%s", file );
+	}
+	return problem;
 }
 
 const char *RP_GhoulSpawnProblem( gentity_t *ent, char *path, int pathSize, char *skinEntry, int skinSize )
@@ -2009,8 +2044,8 @@ void SP_misc_model_ghoul( gentity_t *ent )
 		if ( esMade )
 			Q_strncpyz( level.rp_spawn_note, va( "%s: the model's default skin is shown.", problem ), sizeof( level.rp_spawn_note ) );
 	}
-	else if ( skinEntry[0] )
-	{
+	if ( skinEntry[0] )
+	{ // the one asked for, or model_default.skin (RP_GhoulSkin)
 		ent->s.modelindex2 = RP_EntityModelIndex( ent, skinEntry );
 	}
 

@@ -937,7 +937,7 @@ static const char *RPX_GlmSpawnFramesProblem( void ) {
 }
 
 // GLX_U: [Extras] the GLM preview's instance of path, with the skin the game shows a misc_model_ghoul
-// without one: model_default.skin from its folder, when there is one (CG_General in cg_ents.c)
+// without one: model_default.skin from its folder, when there is one (RP_GhoulSkin in game/g_misc.c)
 static qboolean RPX_GlmSetSkin( const char *file ) {
 	qhandle_t h;
 
