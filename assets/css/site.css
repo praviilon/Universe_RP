@@ -998,6 +998,7 @@ td code, th code { white-space: nowrap; }
 @media (max-width: 980px) { .gallery-grid { grid-template-columns: repeat(2, 1fr); } }
 @media (max-width: 560px) { .gallery-grid { grid-template-columns: 1fr; } }
 .gallery-grid > * { min-width: 0; }
+.group-head + .gallery-grid { margin-top: 24px; }
 .shot {
 	display: block;
 	position: relative;
