@@ -28,7 +28,7 @@ static qboolean rpLuaStoreReady = qfalse;
 const char *rpLuaEventNames[RPLE_COUNT] = {
 	"init", "shutdown", "frame", "client_begin", "client_disconnect", "chat",
 	"player_death", "login", "logout", "character_select", "level_up", "entity_used",
-	"npc_death"
+	"npc_death", "dialog_answer"
 };
 
 /*

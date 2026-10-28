@@ -220,6 +220,48 @@ void RP_Lua_EventAccount( gentity_t *ent, const char *event, int number )
 	RP_Lua_FireEvent( ev, RP_Lua_FillAccount, &c );
 }
 
+// dialog_answer: what a player answered in a target_dialog, or why it closed without an answer (g_dialog.c)
+typedef struct {
+	gentity_t	*player;
+	const char	*dialogName, *option, *reason;
+	int			dialogNum, choice;
+} rpLuaDialogCtx_t;
+
+static void RP_Lua_FillDialog( lua_State *L, void *ctx )
+{
+	rpLuaDialogCtx_t *c = (rpLuaDialogCtx_t *)ctx;
+
+	RP_LuaApi_PushPlayer( L, c->player - g_entities );
+	lua_setfield( L, -2, "player" );
+	lua_pushstring( L, c->dialogName ? c->dialogName : "" );
+	lua_setfield( L, -2, "dialog" );
+	lua_newtable( L );
+	lua_pushinteger( L, c->dialogNum );
+	lua_setfield( L, -2, "number" );
+	lua_pushstring( L, "target_dialog" );
+	lua_setfield( L, -2, "classname" );
+	lua_setfield( L, -2, "entity" );
+	if ( c->choice > 0 )
+	{
+		lua_pushinteger( L, c->choice );
+		lua_setfield( L, -2, "choice" );
+		lua_pushstring( L, c->option ? c->option : "" );
+		lua_setfield( L, -2, "option" );
+	}
+	lua_pushstring( L, c->reason ? c->reason : "" );
+	lua_setfield( L, -2, "reason" );
+}
+
+void RP_Lua_EventDialog( gentity_t *player, const char *dialogName, int dialogNum, int choice, const char *option, const char *reason )
+{
+	rpLuaDialogCtx_t c;
+
+	if ( !player || !player->client || player - g_entities >= MAX_CLIENTS || ( player->r.svFlags & SVF_BOT ) )
+		return;
+	c.player = player; c.dialogName = dialogName; c.dialogNum = dialogNum; c.choice = choice; c.option = option; c.reason = reason;
+	RP_Lua_FireEvent( RPLE_DIALOG_ANSWER, RP_Lua_FillDialog, &c );
+}
+
 /*
 ==================
 RP_Lua_Command

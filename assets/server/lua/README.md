@@ -107,6 +107,7 @@ Events.on("chat", function(e) ... end)   -- one handler per event; a second call
 | `level_up` | `player`, `account`, `level` |
 | `entity_used` | `targetname`, `entity` (`number`, `classname`), `activator` (a player, or nil) — only for targetnames the plugin watches, and never for a use a script made |
 | `npc_death` | `entity` (the handle), `npc_type`, `killer` (a player, or nil), `mod` — only for NPCs this plugin spawned |
+| `dialog_answer` | `player`, `dialog` (the `target_dialog`'s targetname), `entity` (`number`, `classname`), `choice` (the number the player chose, or nil), `option` (its text, or nil), `reason` (`answered`, or `cancelled`, `timeout`, `away`, `died`, `left`, `replaced`, `gone`) — told after the option did its work; nothing a script does changes it |
 
 ### Players
 

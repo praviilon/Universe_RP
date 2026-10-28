@@ -28,6 +28,7 @@ void RP_Lua_EventUsed( struct gentity_s *self, struct gentity_s *activator );
 void RP_Lua_EventAccount( struct gentity_s *ent, const char *event, int number );	// login, logout, character_select, level_up
 qboolean RP_Lua_Command( struct gentity_s *ent, const char *cmd );
 void RP_Lua_CharacterRemoved( int charId );
+void RP_Lua_EventDialog( struct gentity_s *player, const char *dialogName, int dialogNum, int choice, const char *option, const char *reason );	// g_dialog.c: an answer, or why it closed
 void Cmd_Scripts_f( struct gentity_s *ent );
 void Svcmd_Lua_f( void );
 void Svcmd_LuaReload_f( void );
@@ -49,4 +50,5 @@ extern int rp_luaInCall;		// a script call is on the stack: what must never happ
 #define RP_LUA_EVENT_ACCOUNT( e, n, x )	do { if ( rp_luaActive ) RP_Lua_EventAccount( e, n, x ); } while ( 0 )
 #define RP_LUA_COMMAND( e, c )			( rp_luaActive ? RP_Lua_Command( e, c ) : qfalse )
 #define RP_LUA_CHAR_REMOVED( id )		do { if ( rp_luaActive ) RP_Lua_CharacterRemoved( id ); } while ( 0 )
+#define RP_LUA_EVENT_DIALOG( p, n, num, c, o, r )	do { if ( rp_luaActive ) RP_Lua_EventDialog( p, n, num, c, o, r ); } while ( 0 )
 #define RP_LUA_IN_CALL()				( rp_luaInCall != 0 )

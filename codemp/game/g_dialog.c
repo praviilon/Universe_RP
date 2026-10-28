@@ -378,6 +378,8 @@ static void RP_DialogClose( int clientNum, rpDialogReason_t why )
 	G_LogPrintf( "dialog %d closed for %s^7: %s\n", id, player->client->pers.netname, rpDialogReasonText[why] );
 	if ( e && ( why == RPDLG_CANCELLED || why == RPDLG_TIMEOUT || why == RPDLG_AWAY ) && e->target && e->target[0] )
 		G_UseTargets( e, player );
+	if ( why != RPDLG_ANSWERED )	// an answer raises its own, after its option fired (Cmd_Dialog_f)
+		RP_LUA_EVENT_DIALOG( player, e && e->targetname ? e->targetname : "", e ? e->s.number : -1, 0, NULL, rpDialogReasonText[why] );
 }
 
 static void RP_DialogOpen( gentity_t *self, gentity_t *player )
@@ -449,8 +451,8 @@ void Cmd_Dialog_f( gentity_t *ent )
 {
 	rpDialogOpen_t *o = RP_DialogOf( ent->s.number );
 	gentity_t *e;
-	char arg[16], go[MAX_QPATH];
-	int n, id;
+	char arg[16], go[MAX_QPATH], option[65], name[MAX_QPATH];
+	int n, id, num;
 
 	if ( !o || !o->id || !( e = RP_DialogEntity( o ) ) )
 	{
@@ -486,10 +488,14 @@ void Cmd_Dialog_f( gentity_t *ent )
 	}
 	trap->SendServerCommand( ent->s.number, va( "print \"^3> ^7%s\n\"", o->def->option[o->shown[n - 1]] ) );
 	Q_strncpyz( go, o->def->go[o->shown[n - 1]], sizeof( go ) );
-	G_LogPrintf( "dialog %d: %s^7 chose %d (%s)\n", o->id, ent->client->pers.netname, n, o->def->option[o->shown[n - 1]] );
+	Q_strncpyz( option, o->def->option[o->shown[n - 1]], sizeof( option ) );
+	Q_strncpyz( name, e->targetname ? e->targetname : "", sizeof( name ) );
+	num = e->s.number;
+	G_LogPrintf( "dialog %d: %s^7 chose %d (%s)\n", o->id, ent->client->pers.netname, n, option );
 	RP_DialogClose( ent->s.number, RPDLG_ANSWERED );
 	if ( go[0] )
 		G_UseTargets2( e, ent, go );	// as a button press: the player is the activator, the chain runs through GlobalUse
+	RP_LUA_EVENT_DIALOG( ent, name, num, n, option, "answered" );	// GLX_U: [Lua] told after the option did its work
 }
 
 /*

@@ -104,6 +104,32 @@ int main( void )
 	{ char big[300]; memset( big, 'W', 255 ); big[255] = 0; t_key( "title", "WWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWW" ); t_key( "message", big ); { int i; for ( i = 1; i <= 6; i++ ) { t_key( va( "option%d", i ), "WWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWW" ); } }
 	  { int dm = spawn_dialog( "max", NULL, 0 ); clear_sent(); GlobalUse( &g_entities[dm], &g_entities[1], &g_entities[1] ); CHECK( strlen( t_sent[1][0] ) < 1022 && strlen( t_sent[1][1] ) < 1022, "the longest dialogue fits a server command: %d and %d", (int)strlen( t_sent[1][0] ), (int)strlen( t_sent[1][1] ) ); } }
 
+	// --- the Lua notification: dialog_answer for an answer (after the option fired) and for every other end
+	t_init( 8 ); t_player( 0, "Alice", qtrue, 7 ); t_player( 1, "Bob", qtrue, 8 ); g_entities[0].client->pers.enterTime = 100;
+	t_write_plugin( "dl", "L = {} Events.on('dialog_answer', function(e) L[#L+1] = e.dialog .. ' ' .. e.entity.number .. ' ' .. tostring(e.choice) .. ' ' .. tostring(e.option) .. ' ' .. e.reason .. ' ' .. (e.player.name or '?') end)\n" );
+	t_start( "dl" ); { rpLuaPlugin_t *pl = RP_Lua_Find( "dl" ); CHECK( pl && pl->L, "plugin loaded" );
+	  door = t_mapEntity( "func_door", "door2", NULL ); t_key( "message", "Open?" ); t_key( "option1", "Yes please" ); t_key( "go1", "door2" ); t_key( "option2", "No" ); t_key( "timeout", "5" ); t_key( "range", "100" );
+	  d = spawn_dialog( "gate", "bye2", 0 ); { int bye2 = t_mapEntity( "target_print", "bye2", NULL ); (void)bye2; }
+	  // an answer: the event comes after the door was used
+	  GlobalUse( &g_entities[d], &g_entities[0], &g_entities[0] ); dialog_cmd( 0, "dialog 1" );
+	  { lua_State *L = pl->L; lua_getglobal( L, "L" ); lua_rawgeti( L, -1, 1 ); CHECK( lua_tostring( L, -1 ) && !strcmp( lua_tostring( L, -1 ), va( "gate %d 1 Yes please answered Alice", d ) ) && t_usedCount[door] == 1, "answer event: %s", lua_tostring( L, -1 ) ); lua_pop( L, 2 ); }
+	  // cancel, timeout, away, replaced, left: choice nil, the reason
+	  GlobalUse( &g_entities[d], &g_entities[0], &g_entities[0] ); dialog_cmd( 0, "dialog 0" );
+	  GlobalUse( &g_entities[d], &g_entities[0], &g_entities[0] ); frames( 5500 );
+	  GlobalUse( &g_entities[d], &g_entities[0], &g_entities[0] ); g_entities[0].client->ps.origin[0] = 500; frames( 500 ); g_entities[0].client->ps.origin[0] = 0;
+	  GlobalUse( &g_entities[d], &g_entities[0], &g_entities[0] ); GlobalUse( &g_entities[d], &g_entities[0], &g_entities[0] ); dialog_cmd( 0, "dialog 2" );
+	  GlobalUse( &g_entities[d], &g_entities[0], &g_entities[0] ); RP_DialogPlayerGone( 0, qtrue );
+	  { lua_State *L = pl->L; const char *tails[] = { "nil nil cancelled Alice", "nil nil timeout Alice", "nil nil away Alice", "nil nil replaced Alice", "2 No answered Alice", "nil nil left Alice" }; char exp[6][64]; int k;
+	    for ( k = 0; k < 6; k++ ) Com_sprintf( exp[k], sizeof( exp[k] ), "gate %d %s", d, tails[k] );
+	    lua_getglobal( L, "L" ); CHECK( (int)lua_rawlen( L, -1 ) == 7, "7 events: %d", (int)lua_rawlen( L, -1 ) );
+	    for ( k = 0; k < 6; k++ ) { lua_rawgeti( L, -1, k + 2 ); CHECK( lua_tostring( L, -1 ) && !strcmp( lua_tostring( L, -1 ), exp[k] ), "event %d: %s (wanted %s)", k + 2, lua_tostring( L, -1 ) ? lua_tostring( L, -1 ) : "nil", exp[k] ); lua_pop( L, 1 ); } lua_pop( L, 1 ); }
+	  CHECK( t_usedCount[door] == 1 && pl->errorsTotal == 0, "the door opened once, no script errors (%d)", pl->errorsTotal );
+	  // a bot's use raises nothing (it gets no dialogue); the entity gone
+	  g_entities[2].inuse = qtrue; g_entities[2].client->pers.connected = CON_CONNECTED; g_entities[2].r.svFlags |= SVF_BOT; GlobalUse( &g_entities[d], &g_entities[2], &g_entities[2] );
+	  GlobalUse( &g_entities[d], &g_entities[1], &g_entities[1] ); { rpDialogDef_t *def = g_entities[d].rpDialogDef; g_entities[d].rpDialogDef = NULL; frames( 500 ); g_entities[d].rpDialogDef = def; }
+	  { lua_State *L = pl->L; lua_getglobal( L, "L" ); CHECK( (int)lua_rawlen( L, -1 ) == 8, "the bot raised nothing, the gone one did: %d", (int)lua_rawlen( L, -1 ) ); lua_rawgeti( L, -1, 8 ); CHECK( lua_tostring( L, -1 ) && strstr( lua_tostring( L, -1 ), "gone Bob" ), "gone: %s", lua_tostring( L, -1 ) ); lua_pop( L, 2 ); }
+	  RP_LUA_SHUTDOWN(); }
+
 	printf( fails ? "%d FAILED\n" : "t_dialog: ALL OK\n", fails );
 	return fails ? 1 : 0;
 }
