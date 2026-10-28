@@ -52,6 +52,8 @@ static const shape_t shapes[] = {
 	{ "vehtypes",	"for i = 1, 100000 do World.vehicle(({'swoop','jedi','novehfile','nosuch','atst'})[i % 5 + 1], {x=0,y=0,z=0}) end" },
 	{ "vehspawnrm",	"for i = 1, 100000 do local h = World.vehicle('tauntaun', {x=0,y=0,z=0}) if h then World.remove(h) World.remove(h) end end" },
 	{ "vehnpc",		"for i = 1, 100000 do World.npc('xwing', {x=0,y=0,z=0}) end" },
+	{ "npcopts",	"local t = {'player', 'enemy', 'ghost', 'holo', 'x', 5, true, {}, 'fedora', 'none'} for i = 1, 100000 do pcall(World.npc, 'jedi', {x=0,y=0,z=0}, nil, {team=t[i%10+1], effect=t[(i*3)%10+1], health=i*7, scale=i%600, frozen=(i%2==0), noai=t[(i*7)%10+1], hat=t[(i*5)%10+1], cape=t[i%10+1]}) end" },
+	{ "vehopts",	"local t = {'player', 'enemy', 'x', 5, true, {}} for i = 1, 100000 do pcall(World.vehicle, 'swoop', {x=0,y=0,z=0}, nil, {team=t[i%6+1], scale=i%600, health=(i%3==0) and 5 or nil}) end" },
 	{ "npcreward",	"for i = 1, 100000 do World.npc('jedi', {x=0,y=0,z=0}, nil, {credits=100000, xp=100}) end" },
 	{ "pay200",		"local p = Players.get(0) for i = 1, 100000 do World.use('pay200', p) end" },
 	{ "print200",	"local p = Players.get(0) for i = 1, 100000 do World.use('print200', p) end" },

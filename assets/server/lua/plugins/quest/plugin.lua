@@ -6,7 +6,8 @@
 local setup = {
 	map        = "mp/ffa5",                                 -- only on this map
 	npc        = { type = "jedi", origin = { x = 0, y = 0, z = 64 }, angles = { x = 0, y = 90, z = 0 },
-	               credits = 200, xp = 10 },                -- paid to the player who defeats the guard
+	               credits = 200, xp = 10,                  -- paid to the player who defeats the guard
+	               team = "enemy", health = 300 },          -- /npc kill lua.quest.guard removes it
 	crate      = { origin = { x = 128, y = 0, z = 32 }, model = "models/map_objects/imp_mine/crate.md3" },
 	vehicle    = { type = "swoop", origin = { x = -128, y = 0, z = 32 }, angles = { x = 0, y = 90, z = 0 } },
 	button     = "quest_button",                            -- a map or entity-system button's targetname
@@ -22,7 +23,7 @@ local function place()
 	if World.mapname() ~= setup.map then return end
 	local why
 	guard, why = World.npc(setup.npc.type, setup.npc.origin, setup.npc.angles,
-		{ name = "guard", credits = setup.npc.credits, xp = setup.npc.xp })
+		{ name = "guard", credits = setup.npc.credits, xp = setup.npc.xp, team = setup.npc.team, health = setup.npc.health })
 	if not guard then Log.info("no guard: " .. tostring(why)) end
 	crate, why = World.prop("misc_model_breakable", setup.crate.origin, nil, { model = setup.crate.model, health = 100 }, { name = "crate" })
 	if not crate then Log.info("no crate: " .. tostring(why)) end
@@ -68,7 +69,7 @@ Events.on("npc_death", function(e)
 		Timer.after(setup.respawn_ms, function()
 			if guard and guard:valid() then World.remove(guard) end  -- the body, if it is still there
 			local g, why = World.npc(setup.npc.type, setup.npc.origin, setup.npc.angles,
-				{ name = "guard", credits = setup.npc.credits, xp = setup.npc.xp })
+				{ name = "guard", credits = setup.npc.credits, xp = setup.npc.xp, team = setup.npc.team, health = setup.npc.health })
 			guard = g
 			if not g then Log.info("no guard: " .. tostring(why)) end
 		end)

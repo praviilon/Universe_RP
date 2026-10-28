@@ -130,6 +130,12 @@ gentity_t *NPC_Spawn_Do( gentity_t *spawner ) { gentity_t *npc; int vt = s_VehTy
 	if ( spawner->classname && !Q_stricmp( spawner->classname, "NPC_Vehicle" ) && vt <= VH_NONE ) { G_FreeEntity( spawner ); return NULL; }	// no vehicle file: the real one frees the spawner too
 	npc = s_SpawnSlot(); if ( !npc ) return NULL; npc->client = calloc( 1, sizeof( gclient_t ) ); npc->NPC = calloc( 1, sizeof( gNPC_t ) ); npc->classname = "NPC"; npc->NPC_type = spawner->NPC_type; npc->targetname = spawner->NPC_targetname; VectorCopy( spawner->s.origin, npc->r.currentOrigin ); npc->health = 100; npc->use = (void *)1; t_npcsAlive++;
 	if ( !( spawner->classname && !Q_stricmp( spawner->classname, "NPC_Vehicle" ) ) ) { npc->rpRewardCredits = spawner->rpRewardCredits; npc->rpRewardXP = spawner->rpRewardXP; }	// as the real one: never to a vehicle
+	// the spawner keys, as NPC_Spawn_Do and NPC_Begin apply them (NPC_spawn.c): health as max and current, team after the
+	// type's default, effect/freeze/CINEMATIC/hat/cape never on a vehicle, scale on both
+	if ( spawner->health ) npc->health = spawner->health; npc->client->ps.stats[STAT_MAX_HEALTH] = npc->health;
+	npc->client->playerTeam = ( spawner->rpSpawnerTeam > 0 ) ? spawner->rpSpawnerTeam - 1 : NPCTEAM_ENEMY;
+	npc->rpNpcScale = spawner->rpNpcScale;
+	if ( !( spawner->classname && !Q_stricmp( spawner->classname, "NPC_Vehicle" ) ) ) { npc->client->pers.phase_mode = spawner->rpSpawnerEffect; npc->NPC->rpFrozen = spawner->rpSpawnerFreeze; if ( spawner->spawnflags & 32 ) npc->NPC->behaviorState = BS_CINEMATIC; npc->rpNpcCosmetic[0] = spawner->rpNpcCosmetic[0]; npc->rpNpcCosmetic[1] = spawner->rpNpcCosmetic[1]; npc->spawnflags = spawner->spawnflags; }
 	if ( spawner->classname && !Q_stricmp( spawner->classname, "NPC_Vehicle" ) ) { npc->m_pVehicle = calloc( 1, sizeof( Vehicle_t ) ); s_vehInfo[vt].type = vt; npc->m_pVehicle->m_pVehicleInfo = &s_vehInfo[vt]; npc->NPC->behaviorState = BS_DEFAULT; t_vehiclesAlive++; }
 	return npc; }
 void RP_SpawnedRemove( gentity_t *e ) { e->takedamage = qfalse; e->health = 0; e->targetname = NULL; e->think = G_FreeEntity; e->nextthink = level.time + 100; t_removedSilently++; }
@@ -148,6 +154,11 @@ void GlobalUse( gentity_t *self, gentity_t *other, gentity_t *activator )
 	t_useDepth--;
 	RP_LUA_EVENT_USED( self, activator );
 }
+// the validators World.npc and World.vehicle call, with the real ones' rules (NPC_spawn.c, bg_misc.c)
+int RP_NpcTeamFromName( const char *name ) { if ( !name || !name[0] ) return -1; if ( !Q_stricmp( name, "player" ) || !Q_stricmp( name, "NPCTEAM_PLAYER" ) ) return NPCTEAM_PLAYER; if ( !Q_stricmp( name, "enemy" ) || !Q_stricmp( name, "NPCTEAM_ENEMY" ) ) return NPCTEAM_ENEMY; if ( !Q_stricmp( name, "neutral" ) || !Q_stricmp( name, "NPCTEAM_NEUTRAL" ) ) return NPCTEAM_NEUTRAL; if ( !Q_stricmp( name, "free" ) || !Q_stricmp( name, "NPCTEAM_FREE" ) ) return NPCTEAM_FREE; return -2; }
+int RP_NpcEffectFromName( const char *name ) { if ( !name || !name[0] ) return RP_PHASE_NONE; if ( !Q_stricmp( name, "holo" ) ) return RP_PHASE_HOLO; if ( !Q_stricmp( name, "ghost" ) ) return RP_PHASE_GHOST; if ( !Q_stricmp( name, "walkthrough" ) ) return RP_PHASE_NONSOLID; return -1; }
+int BG_RpCosmeticId( int slot, const char *name ) { static const char *hats[] = { "fedora", "tophat" }, *capes[] = { "royalcape", "vadercape" }; const char **l = slot == RP_COSMETIC_HAT ? hats : capes; int i; if ( !name || !name[0] ) return 0; for ( i = 0; i < 2; i++ ) if ( !Q_stricmp( l[i], name ) ) return i + 1; return 0; }
+qboolean RP_NpcIsFrozen( const gentity_t *ent ) { return ( ent && ent->NPC && ent->NPC->rpFrozen ) ? qtrue : qfalse; }
 // a stand-in target_reward: the real target_reward_use's shape (g_target.c) -- a player activator, the per-player
 // record (ONCE_EACH), then RP_PayReward's own order: eligible, RP_LUA_DB_WRITE_OK before anything is given, the
 // console line, the log line with the plugin when a script call set it off; then its target

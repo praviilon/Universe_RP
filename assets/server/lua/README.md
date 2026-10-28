@@ -166,7 +166,7 @@ local h = Timer.every(60000, fn)   -- also Timer.after(ms, fn); Timer.cancel(h)
 World.use("door1", p)            -- every entity named door1, used as a button would with p as activator
 World.prop("misc_model_breakable", {x=0,y=0,z=0}, {x=0,y=90,z=0}, {model="models/x.md3", health=50}, {name="crate"})
 World.npc("jedi", {x=0,y=0,z=0}, {x=0,y=90,z=0}, {name="guard", credits=500, xp=20})
-World.vehicle("swoop", {x=0,y=0,z=0}, {x=0,y=90,z=0}, {name="bike1"})
+World.vehicle("swoop", {x=0,y=0,z=0}, {x=0,y=90,z=0}, {name="bike1", team="player", scale=120})
 World.remove(h)                  -- queued: the entity goes at the end of the frame
 Effect.play("env/small_fire", origin, angles)
 Sound.play("sound/x.wav", origin)
@@ -197,10 +197,25 @@ entity's name. `/entsave` leaves script entities out; `/entremove`,
 `/entedit` and `/entload` treat them as any other, and the handle goes
 stale then. A dead NPC counts as alive until its body is gone or removed.
 
-`World.npc` may give its NPC a kill reward: `credits` (0 to 100000) and `xp`
-(0 to 100), as an `npc_spawner`'s `npccredits` and `npcxp`. The player who
-kills it is paid, the same way as for an admin's spawner; another value is
-an error. Vehicles never pay.
+`World.npc` and `World.vehicle` take the options an admin's spawner takes,
+set when the NPC or vehicle spawns (not changed afterwards: admins keep
+`/npc team`, `/npc effect` and `/npc freeze` on it, as on any NPC):
+
+| Option | Takes | Spawner key it matches | Vehicle |
+|---|---|---|---|
+| `name` | letters, digits, `_` | targetname `lua.<plugin>.<name>` | yes |
+| `credits`, `xp` | 0–100000, 0–100: paid to the player who kills it | `npccredits`, `npcxp` | no |
+| `health` | 1–100000: its maximum and starting health | `health` | no (the vehicle file's armor) |
+| `team` | `player`, `enemy`, `neutral`, `free` | `npcteam` (`/npc team`) | yes |
+| `effect` | `holo`, `ghost`, `walkthrough` | `npceffect` (`/npc effect`) | no |
+| `frozen` | `true`: a statue that can still be hurt | `npcfreeze` (`/npc freeze`) | no |
+| `noai` | `true`: stands and picks no fights, but still blocks and dodges | spawnflag CINEMATIC | no |
+| `scale` | 20–500 percent | `npcscale` | yes |
+| `hat`, `cape` | a name from the cosmetic lists, or `none` | `npchat`, `npccape` | no |
+
+A wrong value, or an option a vehicle does not take, is an error and nothing
+spawns. An admin kills a script's NPC by its name with
+`/npc kill lua.<plugin>.<name>`.
 
 `World.vehicle` places a vehicle of any type (speeders, swoops, animals,
 fighters, walkers) as a map's `NPC_Vehicle` spawner would: it stands still
@@ -212,8 +227,9 @@ vehicles, and `World.remove` of one somebody rides is refused with
 `false, "someone is riding it"`.
 
 Handles: `h.number`, `h.classname`, `h.origin`, `h.targetname`,
-`h.health`, `h.npc_type`; for an NPC `h.credits` and `h.xp` (what killing
-it pays, 0 once paid); for a vehicle also `h.vehicle_type` (`walker`,
+`h.health`, `h.npc_type`; for an NPC or vehicle `h.max_health`, `h.team`,
+`h.scale` (100 when none), `h.effect` (or nil), `h.frozen`, and for an NPC
+`h.credits` and `h.xp` (what killing it pays, 0 once paid); for a vehicle also `h.vehicle_type` (`walker`,
 `fighter`, `speeder`, `animal`, `flier`), `h.pilot` (the player riding it,
 or nil) and `h.passengers` (how many ride behind the pilot); `h:valid()`.
 Two handles to the same entity are equal. Unloading, reloading or disabling

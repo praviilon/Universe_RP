@@ -8,9 +8,9 @@ bucket the messages use: a plugin acts at a player's pace.
                                           locks, depth and chain limits as for a button; no admin bypass;
                                           rewards pay and dialogues open, as for a button
   World.prop( class, origin, angles, keys ) the /entadd sequence, for the Entity System's exempt classes
-  World.npc( type, origin, angles, opts ) a spawner and NPC_Spawn_Do(), as /npc spawn; opts may give it a
-                                          kill reward (credits, xp), as a spawner's npccredits/npcxp
-  World.vehicle( type, origin, angles, opts ) the same for a vehicle, as a map's NPC_Vehicle spawner
+  World.npc( type, origin, angles, opts ) a spawner and NPC_Spawn_Do(), as /npc spawn; opts are an npc_spawner's
+                                          keys (kill reward, health, team, effect, freeze, CINEMATIC, scale, hat, cape)
+  World.vehicle( type, origin, angles, opts ) the same for a vehicle, as a map's NPC_Vehicle spawner (team, scale)
   World.remove( handle )                  queued: freed at the end of the frame, never inside a call
   Effect.play( name, origin, angles )     G_PlayEffectID() of an effect already registered
   Sound.play( name, origin )              G_SoundAtLoc() of a sound already registered
@@ -24,6 +24,7 @@ vehicle would throw its riders off, and kill them on a vehicle whose file has ki
 ===========================================================================
 */
 #include "rp_lua_local.h"
+#include "../../codemp/game/b_local.h"	// SFB_CINEMATIC: World.npc's noai option
 
 extern void zyk_main_set_entity_field( gentity_t *ent, char *key, char *value );	// g_spawn.c
 extern void zyk_main_spawn_entity( gentity_t *ent );
@@ -339,6 +340,31 @@ static int RP_LuaWorld_EntityIndex( lua_State *L )
 		lua_pushstring( L, ent->targetname ? ent->targetname : "" );
 	else if ( !strcmp( key, "health" ) )
 		lua_pushinteger( L, ent->health );
+	else if ( ( !strcmp( key, "team" ) || !strcmp( key, "effect" ) || !strcmp( key, "frozen" ) || !strcmp( key, "scale" )
+		|| !strcmp( key, "max_health" ) ) && !( ent->client && ent->s.number >= MAX_CLIENTS ) )
+		lua_pushnil( L );	// NPCs and vehicles only: nil for a prop
+	else if ( !strcmp( key, "team" ) )
+	{ // the side it is on now (/npc team may have changed it)
+		static const char *const teams[] = { "free", "enemy", "player", "neutral" };
+		const int t = ent->client->playerTeam;
+
+		if ( t >= NPCTEAM_FREE && t <= NPCTEAM_NEUTRAL )
+			lua_pushstring( L, teams[t] );
+		else
+			lua_pushnil( L );
+	}
+	else if ( !strcmp( key, "effect" ) )
+	{ // the /npc effect it shows, or nil
+		const int m = ent->client->pers.phase_mode;
+
+		lua_pushstring( L, m == RP_PHASE_HOLO ? "holo" : m == RP_PHASE_GHOST ? "ghost" : m == RP_PHASE_NONSOLID ? "walkthrough" : NULL );
+	}
+	else if ( !strcmp( key, "frozen" ) )
+		lua_pushboolean( L, RP_NpcIsFrozen( ent ) );
+	else if ( !strcmp( key, "scale" ) )
+		lua_pushinteger( L, ent->rpNpcScale > 0 ? ent->rpNpcScale : 100 );
+	else if ( !strcmp( key, "max_health" ) )
+		lua_pushinteger( L, ent->client->ps.stats[STAT_MAX_HEALTH] );
 	else if ( !strcmp( key, "credits" ) || !strcmp( key, "xp" ) )
 	{ // an NPC's kill reward, 0 once paid (a vehicle never has one); nil for a prop
 		if ( ent->client && ent->s.number >= MAX_CLIENTS )
@@ -461,25 +487,123 @@ static qboolean RP_LuaWorld_NameOk( const char *name )
 	return qtrue;
 }
 
-// opts.<key>: a kill reward, a whole number from 0 to max (0 when absent), as /entadd allows npccredits/npcxp
-static int RP_LuaWorld_OptReward( lua_State *L, int idx, const char *key, int max )
+/*
+==================
+The spawn options of World.npc and World.vehicle (opts, the 4th argument): what an npc_spawner's or NPC_Vehicle's
+keys give the NPC or vehicle it makes, checked as /entadd checks those keys. A wrong value is an argument error.
+==================
+*/
+// opts.<key> pushed, or qfalse (nothing pushed) when there are no opts or no such key
+static qboolean RP_LuaWorld_OptGet( lua_State *L, int idx, const char *key )
 {
-	lua_Integer v;
-	int isInt;
-
 	if ( lua_isnoneornil( L, idx ) )
-		return 0;
+		return qfalse;
 	lua_getfield( L, idx, key );
 	if ( lua_isnil( L, -1 ) )
 	{
 		lua_pop( L, 1 );
-		return 0;
+		return qfalse;
 	}
+	return qtrue;
+}
+
+// opts.<key>: a whole number from min to max; def when absent
+static int RP_LuaWorld_OptInt( lua_State *L, int idx, const char *key, int min, int max, int def )
+{
+	lua_Integer v;
+	int isInt;
+
+	if ( !RP_LuaWorld_OptGet( L, idx, key ) )
+		return def;
 	v = lua_tointegerx( L, -1, &isInt );
-	if ( !isInt || lua_type( L, -1 ) != LUA_TNUMBER || v < 0 || v > max )
-		luaL_error( L, "%s is a whole number from 0 to %d", key, max );
+	if ( !isInt || lua_type( L, -1 ) != LUA_TNUMBER || v < min || v > max )
+		luaL_error( L, "%s is a whole number from %d to %d", key, min, max );
 	lua_pop( L, 1 );
 	return (int)v;
+}
+
+// opts.<key>: true or false; qfalse when absent
+static qboolean RP_LuaWorld_OptBool( lua_State *L, int idx, const char *key )
+{
+	qboolean v;
+
+	if ( !RP_LuaWorld_OptGet( L, idx, key ) )
+		return qfalse;
+	if ( !lua_isboolean( L, -1 ) )
+		luaL_error( L, "%s is true or false", key );
+	v = lua_toboolean( L, -1 ) ? qtrue : qfalse;
+	lua_pop( L, 1 );
+	return v;
+}
+
+// opts.<key>: a word, copied into out; qfalse when absent
+static qboolean RP_LuaWorld_OptWord( lua_State *L, int idx, const char *key, char *out, int outSize, const char *takes )
+{
+	if ( !RP_LuaWorld_OptGet( L, idx, key ) )
+		return qfalse;
+	if ( lua_type( L, -1 ) != LUA_TSTRING || !lua_tostring( L, -1 )[0] || strlen( lua_tostring( L, -1 ) ) >= (size_t)outSize )
+		luaL_error( L, "%s is %s", key, takes );
+	Q_strncpyz( out, lua_tostring( L, -1 ), outSize );
+	lua_pop( L, 1 );
+	return qtrue;
+}
+
+// opts.team: the words /npc team and "npcteam" take; -1 when absent (RP_NpcTeamFromName(), NPC_spawn.c)
+static int RP_LuaWorld_OptTeam( lua_State *L, int idx )
+{
+	char word[64];
+	int team;
+
+	if ( !RP_LuaWorld_OptWord( L, idx, "team", word, sizeof( word ), "player, enemy, neutral or free" ) )
+		return -1;
+	team = RP_NpcTeamFromName( word );
+	if ( team < 0 )
+		luaL_error( L, "team is player, enemy, neutral or free" );
+	return team;
+}
+
+// opts.effect: the words /npc effect and "npceffect" take; RP_PHASE_NONE when absent (RP_NpcEffectFromName())
+static int RP_LuaWorld_OptEffect( lua_State *L, int idx )
+{
+	char word[64];
+	int effect;
+
+	if ( !RP_LuaWorld_OptWord( L, idx, "effect", word, sizeof( word ), "holo, ghost or walkthrough" ) )
+		return RP_PHASE_NONE;
+	effect = RP_NpcEffectFromName( word );
+	if ( effect <= RP_PHASE_NONE )
+		luaL_error( L, "effect is holo, ghost or walkthrough" );
+	return effect;
+}
+
+// opts.hat / opts.cape: a name from that cosmetic list, or "none"; 0 for none or absent (BG_RpCosmeticId(), as
+// /entadd checks "npchat" and "npccape")
+static int RP_LuaWorld_OptCosmetic( lua_State *L, int idx, const char *key, int slot )
+{
+	char word[64];
+	int id;
+
+	if ( !RP_LuaWorld_OptWord( L, idx, key, word, sizeof( word ), "a name from its list, or \"none\"" ) )
+		return 0;
+	if ( !Q_stricmp( word, "none" ) )
+		return 0;
+	id = BG_RpCosmeticId( slot, word );
+	if ( !id )
+		luaL_error( L, "%s %s is not on the %s list", key, word, key );
+	return id;
+}
+
+// the options a vehicle takes none of, as /entadd refuses those keys on an NPC_Vehicle
+static void RP_LuaWorld_OptNotForVehicle( lua_State *L, int idx )
+{
+	static const char *const keys[] = { "health", "effect", "frozen", "noai", "hat", "cape", "credits", "xp", NULL };
+	int i;
+
+	for ( i = 0; keys[i]; i++ )
+	{
+		if ( RP_LuaWorld_OptGet( L, idx, keys[i] ) )
+			luaL_error( L, "%s is not for a vehicle", keys[i] );
+	}
 }
 
 // opts.name -> "lua.<plugin>.<name>" in out, or out empty when there is none; an error for a bad one
@@ -750,15 +874,24 @@ static int RP_LuaWorld_Npc( lua_State *L )
 	vec3_t origin, angles;
 	char targetname[MAX_QPATH];
 	gentity_t *spawner, *npc;
-	int credits, xp;
+	int credits, xp, health, team, effect, scale, hat, cape;
+	qboolean frozen, noai;
 
 	if ( !type[0] || strlen( type ) >= 64 )
 		return luaL_error( L, "an NPC type is 1 to 63 characters" );
 	RP_LuaWorld_Vec( L, 2, origin, "origin" );
 	RP_LuaWorld_Angles( L, 3, angles );
 	RP_LuaWorld_Targetname( L, 4, targetname, sizeof( targetname ) );
-	credits = RP_LuaWorld_OptReward( L, 4, "credits", RP_REWARD_MAX_CREDITS );
-	xp = RP_LuaWorld_OptReward( L, 4, "xp", RP_REWARD_MAX_XP );
+	credits = RP_LuaWorld_OptInt( L, 4, "credits", 0, RP_REWARD_MAX_CREDITS, 0 );
+	xp = RP_LuaWorld_OptInt( L, 4, "xp", 0, RP_REWARD_MAX_XP, 0 );
+	health = RP_LuaWorld_OptInt( L, 4, "health", 1, RP_LUA_NPC_HEALTH_MAX, 0 );
+	team = RP_LuaWorld_OptTeam( L, 4 );
+	effect = RP_LuaWorld_OptEffect( L, 4 );
+	frozen = RP_LuaWorld_OptBool( L, 4, "frozen" );
+	noai = RP_LuaWorld_OptBool( L, 4, "noai" );
+	scale = RP_LuaWorld_OptInt( L, 4, "scale", RP_NPC_SCALE_MIN, RP_NPC_SCALE_MAX, 0 );
+	hat = RP_LuaWorld_OptCosmetic( L, 4, "hat", RP_COSMETIC_HAT );
+	cape = RP_LuaWorld_OptCosmetic( L, 4, "cape", RP_COSMETIC_CAPE );
 	if ( !RP_NpcTypeKnown( type ) )
 		return RP_LuaWorld_Refuse( L, "unknown NPC type" );
 	if ( RP_NpcTypeIsVehicle( type ) )
@@ -791,6 +924,17 @@ static int RP_LuaWorld_Npc( lua_State *L )
 	spawner->delay = 0;
 	spawner->rpRewardCredits = credits;	// NPC_Spawn_Do copies them to the NPC; player_die pays its killer
 	spawner->rpRewardXP = xp;
+	// the npc_spawner keys, as SP_NPC_spawner reads them: health, npcteam, npceffect, npcfreeze, the CINEMATIC
+	// spawnflag, npcscale, npchat, npccape -- NPC_Spawn_Do and NPC_Begin apply them as for any spawner
+	spawner->health = health;
+	spawner->rpSpawnerTeam = ( team >= 0 ) ? team + 1 : 0;
+	spawner->rpSpawnerEffect = effect;
+	spawner->rpSpawnerFreeze = frozen;
+	if ( noai )
+		spawner->spawnflags |= SFB_CINEMATIC;
+	spawner->rpNpcScale = scale;
+	spawner->rpNpcCosmetic[RP_COSMETIC_HAT] = hat;
+	spawner->rpNpcCosmetic[RP_COSMETIC_CAPE] = cape;
 	RP_NpcPrecacheByType( type );
 
 	npc = NPC_Spawn_Do( spawner );
@@ -822,12 +966,16 @@ static int RP_LuaWorld_Vehicle( lua_State *L )
 	vec3_t origin, angles;
 	char targetname[MAX_QPATH];
 	gentity_t *spawner, *veh;
+	int team, scale;
 
 	if ( !type[0] || strlen( type ) >= 64 )
 		return luaL_error( L, "a vehicle type is 1 to 63 characters" );
 	RP_LuaWorld_Vec( L, 2, origin, "origin" );
 	RP_LuaWorld_Angles( L, 3, angles );
 	RP_LuaWorld_Targetname( L, 4, targetname, sizeof( targetname ) );
+	RP_LuaWorld_OptNotForVehicle( L, 4 );
+	team = RP_LuaWorld_OptTeam( L, 4 );
+	scale = RP_LuaWorld_OptInt( L, 4, "scale", RP_NPC_SCALE_MIN, RP_NPC_SCALE_MAX, 0 );
 	if ( !RP_NpcTypeKnown( type ) || !RP_NpcTypeIsVehicle( type ) )
 		return RP_LuaWorld_Refuse( L, "not a vehicle type" );
 	if ( RP_LuaWorld_CountVehicles( p ) >= RP_LUA_MAX_VEHICLES )
@@ -859,6 +1007,8 @@ static int RP_LuaWorld_Vehicle( lua_State *L )
 		spawner->NPC_targetname = G_NewString( targetname );
 	spawner->count = 1;
 	spawner->delay = 0;
+	spawner->rpSpawnerTeam = ( team >= 0 ) ? team + 1 : 0;	// "npcteam" and "npcscale", as SP_NPC_Vehicle reads them
+	spawner->rpNpcScale = scale;
 
 	veh = NPC_Spawn_Do( spawner );
 	if ( !veh )

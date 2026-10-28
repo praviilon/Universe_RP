@@ -199,6 +199,53 @@ int main( void )
 	{ int before = t_removedSilently; RP_Lua_QueueOp( "np", RPLOP_UNLOAD ); t_frame( 50 ); CHECK( t_removedSilently - before == RP_LUA_MAX_NPCS, "unload removed every NPC: %d", t_removedSilently - before ); } t_frame( 100 ); t_runThinks(); CHECK( t_npcsAlive == 0, "all gone" );
 	RP_LUA_SHUTDOWN();
 
+	// --- the spawn options of World.npc and World.vehicle: set on the spawner, read back on the handle; a wrong value is
+	// an error with nothing spawned and no token spent; a vehicle takes team and scale only
+	t_init( 8 ); t_player( 0, "Alice", qtrue, 7 );
+	t_write_plugin( "op", "local function v(s) if s == 'true' then return true elseif s == 'false' then return false elseif tonumber(s) then return tonumber(s) elseif s == 'tbl' then return {} end return s end\n"
+		"Commands.add('full', function(p) local h = World.npc('jedi', {x=0,y=0,z=0}, nil, {name='j', health=500, team='player', effect='ghost', frozen=true, noai=true, scale=150, hat='fedora', cape='royalcape'})\n"
+		"  NUM = h.number TEAM = h.team EFF = h.effect FR = h.frozen SC = h.scale MH = h.max_health HP = h.health TN = h.targetname end)\n"
+		"Commands.add('plain', function(p) local h = World.npc('jedi', {x=0,y=0,z=0}) NUM = h.number TEAM = h.team EFF = tostring(h.effect) FR = h.frozen SC = h.scale MH = h.max_health end)\n"
+		"Commands.add('one', function(p, a) local h, why = World.npc('jedi', {x=0,y=0,z=0}, nil, {[a[1]] = v(a[2])}) NUM = h and h.number or -1 end)\n"
+		"Commands.add('bad', function(p, a) OK2, E = pcall(World.npc, 'jedi', {x=0,y=0,z=0}, nil, {[a[1]] = v(a[2])}) E = tostring(E) end)\n"
+		"Commands.add('veh', function(p, a) local h = World.vehicle('swoop', {x=0,y=0,z=0}, nil, {team='enemy', scale=120}) NUM = h.number TEAM = h.team SC = h.scale EFF = tostring(h.effect) FR = h.frozen end)\n"
+		"Commands.add('vbad', function(p, a) OK2, E = pcall(World.vehicle, 'swoop', {x=0,y=0,z=0}, nil, {[a[1]] = v(a[2])}) E = tostring(E) end)\n"
+		"Commands.add('propf', function(p) local h = World.prop('misc_model_breakable', {x=0,y=0,z=0}, nil, {model='models/x.md3'}) T2 = tostring(h.team) S2 = tostring(h.scale) F2 = tostring(h.frozen) end)\n" );
+	t_start( "op" ); p = RP_Lua_Find( "op" );
+	refill( p ); run( p, "full" ); { gentity_t *n = &g_entities[get_int( p, "NUM" )];
+	  CHECK( !strcmp( get_str( p, "TEAM" ), "player" ) && !strcmp( get_str( p, "EFF" ), "ghost" ) && get_int( p, "FR" ) == 1 && get_int( p, "SC" ) == 150 && get_int( p, "MH" ) == 500 && get_int( p, "HP" ) == 500,
+		"every option read back: %s %s %d %d %d %d", get_str( p, "TEAM" ), get_str( p, "EFF" ), get_int( p, "FR" ), get_int( p, "SC" ), get_int( p, "MH" ), get_int( p, "HP" ) );
+	  CHECK( n->client->playerTeam == NPCTEAM_PLAYER && n->client->pers.phase_mode == RP_PHASE_GHOST && n->NPC->rpFrozen && n->NPC->behaviorState == BS_CINEMATIC && n->rpNpcScale == 150 && n->rpNpcCosmetic[RP_COSMETIC_HAT] == 1 && n->rpNpcCosmetic[RP_COSMETIC_CAPE] == 1 && ( n->spawnflags & 32 ),
+		"the spawner carried them all to the NPC" );
+	  CHECK( !strcmp( get_str( p, "TN" ), "lua.op.j" ), "the name keeps its prefix: %s", get_str( p, "TN" ) ); }
+	refill( p ); run( p, "plain" ); { gentity_t *n = &g_entities[get_int( p, "NUM" )];
+	  CHECK( !strcmp( get_str( p, "TEAM" ), "enemy" ) && !strcmp( get_str( p, "EFF" ), "nil" ) && get_int( p, "FR" ) == 0 && get_int( p, "SC" ) == 100 && get_int( p, "MH" ) == 100, "no options: the type's own (%s, %s, %d, %d, %d)", get_str( p, "TEAM" ), get_str( p, "EFF" ), get_int( p, "FR" ), get_int( p, "SC" ), get_int( p, "MH" ) );
+	  CHECK( n->NPC->behaviorState != BS_CINEMATIC && !n->NPC->rpFrozen && n->client->pers.phase_mode == RP_PHASE_NONE && !n->rpNpcCosmetic[0] && !n->rpNpcCosmetic[1] && !( n->spawnflags & 32 ), "and nothing set on it" ); }
+	refill( p ); run( p, "one health 1" ); CHECK( get_int( p, "NUM" ) > 0 && g_entities[get_int( p, "NUM" )].health == 1, "health 1" );
+	refill( p ); run( p, "one health 100000" ); CHECK( g_entities[get_int( p, "NUM" )].health == 100000, "health 100000" );
+	refill( p ); run( p, "one team NPCTEAM_NEUTRAL" ); CHECK( g_entities[get_int( p, "NUM" )].client->playerTeam == NPCTEAM_NEUTRAL, "the full team names too" );
+	refill( p ); run( p, "one hat none" ); CHECK( get_int( p, "NUM" ) > 0 && g_entities[get_int( p, "NUM" )].rpNpcCosmetic[0] == 0, "hat none" );
+	refill( p ); run( p, "one frozen false" ); CHECK( get_int( p, "NUM" ) > 0 && !g_entities[get_int( p, "NUM" )].NPC->rpFrozen, "frozen false" );
+	{ int spawns = p->npcSpawns, tokens; struct { const char *cmd, *msg; } bad[] = {
+		{ "bad health 0", "health is a whole number from 1 to 100000" }, { "bad health 100001", "health is a whole number from 1 to 100000" },
+		{ "bad health 2.5", "health is a whole number" }, { "bad health str", "health is a whole number" },
+		{ "bad team blue", "team is player, enemy, neutral or free" }, { "bad team 5", "team is player, enemy, neutral or free" },
+		{ "bad effect hidden", "effect is holo, ghost or walkthrough" }, { "bad effect tbl", "effect is holo, ghost or walkthrough" },
+		{ "bad frozen 1", "frozen is true or false" }, { "bad noai yes", "noai is true or false" },
+		{ "bad scale 19", "scale is a whole number from 20 to 500" }, { "bad scale 501", "scale is a whole number from 20 to 500" },
+		{ "bad hat crown2", "hat crown2 is not on the hat list" }, { "bad cape fedora", "cape fedora is not on the cape list" },
+		{ "vbad health 50", "health is not for a vehicle" }, { "vbad effect ghost", "effect is not for a vehicle" }, { "vbad frozen true", "frozen is not for a vehicle" },
+		{ "vbad noai true", "noai is not for a vehicle" }, { "vbad hat fedora", "hat is not for a vehicle" }, { "vbad cape royalcape", "cape is not for a vehicle" },
+		{ "vbad credits 5", "credits is not for a vehicle" }, { "vbad xp 5", "xp is not for a vehicle" },
+		{ "vbad team green", "team is player, enemy, neutral or free" }, { "vbad scale 600", "scale is a whole number from 20 to 500" } }; int k;
+	  refill( p ); tokens = p->tokens;
+	  for ( k = 0; k < (int)ARRAY_LEN( bad ); k++ ) { run( p, bad[k].cmd ); CHECK( get_int( p, "OK2" ) == 0 && strstr( get_str( p, "E" ), bad[k].msg ), "%s: %s", bad[k].cmd, get_str( p, "E" ) ); }
+	  CHECK( p->npcSpawns == spawns && p->vehicleSpawns == 0 && p->tokens == tokens, "nothing spawned, no token spent (%d %d %d)", p->npcSpawns, p->vehicleSpawns, p->tokens ); }
+	refill( p ); run( p, "veh" ); { gentity_t *n = &g_entities[get_int( p, "NUM" )];
+	  CHECK( !strcmp( get_str( p, "TEAM" ), "enemy" ) && get_int( p, "SC" ) == 120 && !strcmp( get_str( p, "EFF" ), "nil" ) && get_int( p, "FR" ) == 0 && n->m_pVehicle && n->rpNpcScale == 120, "a vehicle: team and scale (%s %d)", get_str( p, "TEAM" ), get_int( p, "SC" ) ); }
+	refill( p ); run( p, "propf" ); CHECK( !strcmp( get_str( p, "T2" ), "nil" ) && !strcmp( get_str( p, "S2" ), "nil" ) && !strcmp( get_str( p, "F2" ), "nil" ), "a prop has none of them" );
+	RP_LUA_SHUTDOWN(); t_frame( 100 ); t_runThinks();
+
 	// --- World.vehicle: every type, the spawner, the G_VehicleSpawn tail, caps, remove refused while ridden,
 	// release at a close, the sweep, the server-wide cap counting released ones
 	t_init( 8 ); t_player( 0, "Alice", qtrue, 7 ); t_player( 1, "Bob", qtrue, 8 );
