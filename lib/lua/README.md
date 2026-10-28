@@ -24,7 +24,7 @@ opened by any script, whatever a later bug does:
 
 ## Changed from the release
 
-**Only `luaconf.h`** (the file Lua's authors mean for configuration), three
+**`luaconf.h`** (the file Lua's authors mean for configuration), three
 limits, each in a block marked `GLX_U`:
 
 | Define | Release | Here | Why |
@@ -33,5 +33,14 @@ limits, each in a block marked `GLX_U`:
 | `LUAI_MAXCCALLS` | 200 | 100 | C recursion depth (nested pcalls, metamethods, pattern matching) |
 | `LUA_MAXCAPTURES` | 32 | 16 | captures per pattern |
 
-Every `.c` file is byte-identical to the release. When upgrading, replace
-every file, then re-apply the three `luaconf.h` blocks.
+**`lstrlib.c`**, four lines marked `GLX_U`: `MatchState` counts its match
+steps, and every 1024 of them `match()` calls `RP_Lua_MatchCheck()`
+(`rp_lua_core.c`), which raises "ran too long" once the call's deadline is
+past. A backtracking pattern over a long subject (`('a'):rep(200000):find('.-.-.-.-x')`)
+runs for hours without a single VM instruction, so the count hook alone
+cannot stop it; this is the one C-side loop in the kept libraries that is
+unbounded by the input's size.
+
+Every other `.c` file is byte-identical to the release. When upgrading,
+replace every file, then re-apply the `luaconf.h` blocks and the `lstrlib.c`
+lines (`grep GLX_U`).

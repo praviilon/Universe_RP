@@ -3544,3 +3544,5 @@ void G_RegisterCvars( void );
 void G_UpdateCvars( void );
 
 extern gameImport_t *trap;
+
+#include "../../galaxyrp/game/rp_lua.h" // GLX_U: [Lua] the scripting hooks (one compare each when off)

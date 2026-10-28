@@ -568,6 +568,9 @@ svcmd_t svcmds[] = {
 	{ "game_memory",				Svcmd_GameMem_f,					qfalse },
 	{ "giveadmin",					Svcmd_GiveAdmin_f,					qfalse },
 	{ "listip",						Svcmd_ListIP_f,						qfalse },
+	{ "lua",						Svcmd_Lua_f,						qfalse },	// GLX_U: [Lua] rp_lua_admin.c
+	{ "lua_list",					Svcmd_LuaList_f,					qfalse },
+	{ "lua_reload",					Svcmd_LuaReload_f,					qfalse },
 	{ "removeip",					Svcmd_RemoveIP_f,					qfalse },
 	{ "say",						Svcmd_Say_f,						qtrue },
 	{ "toggleallowvote",			Svcmd_ToggleAllowVote_f,			qfalse },

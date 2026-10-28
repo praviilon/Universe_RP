@@ -1,0 +1,159 @@
+/*
+===========================================================================
+GLX_U: [Lua] shared by the rp_lua_*.c files only. The limits are here with the reason for each; the
+three cvars (rp_lua, rp_lua_plugins, rp_lua_memkb) are in g_xcvar.h.
+===========================================================================
+*/
+#pragma once
+
+#include "../../codemp/game/g_local.h"
+#include "lua.h"
+#include "lauxlib.h"
+#include "lualib.h"
+#include "rp_lua.h"
+
+#define RP_LUA_MAX_PLUGINS		16
+#define RP_LUA_NAME_LEN			32		// a plugin folder name
+#define RP_LUA_CALL_MS			10		// one script call on the real clock, then "ran too long"
+#define RP_LUA_CALL_INSTRUCTIONS 1000000	// and its instruction cap, counted 1000 at a time
+#define RP_LUA_HOOK_COUNT		100	// the count hook runs every this many VM instructions
+#define RP_LUA_PLUGIN_FRAME_MS	20		// all of a plugin's calls in one frame; timers past it wait
+#define RP_LUA_FRAME_MS			50		// all plugins in one frame
+#define RP_LUA_MAX_ERRORS		20		// errors in RP_LUA_ERROR_WINDOW_MS that switch a plugin off
+#define RP_LUA_ERROR_WINDOW_MS	60000
+#define RP_LUA_NOTICE_MS		30000	// an error reaches online Scripts admins at most this often per plugin
+#define RP_LUA_TEXT_MAX			900		// a message or log line (the engine's reliable command is 1024)
+#define RP_LUA_TOKENS			4		// the command bucket: a player sends one reliable command per
+										// sv_floodProtect ms; a plugin gets the same rate with this burst
+#define RP_LUA_SENDS_PER_SEC	4		// script commands to one player per second, all plugins together
+#define RP_LUA_BROADCAST_PER_TOKEN 8	// recipients one token buys in Msg.broadcast
+#define RP_LUA_MAX_TIMERS		32		// live timers per plugin
+#define RP_LUA_TIMER_MIN_MS		50
+#define RP_LUA_MAX_WATCHES		32		// watched targetnames per plugin
+#define RP_LUA_MAX_WATCHES_ALL	256
+#define RP_LUA_MAX_COMMANDS		16		// script commands per plugin
+#define RP_LUA_CMD_NAME_MAX		24
+#define RP_LUA_CMD_HELP_MAX		96
+#define RP_LUA_MAX_ARGS			16
+#define RP_LUA_EVENT_FRAME_MS	50		// the frame event's period
+#define RP_LUA_KEY_MAX			64		// storage
+#define RP_LUA_VALUE_MAX		4096
+#define RP_LUA_STORE_MAX		( 1024 * 1024 )	// per plugin, keys and values together
+#define RP_LUA_STORE_FLUSH_MS	30000
+#define RP_LUA_STORE_FLUSH_ROWS	64		// rows written per frame of a flush
+#define RP_LUA_PENDING_MAX		2048	// pending writes per plugin (bounded by RP_LUA_STORE_MAX anyway)
+#define RP_LUA_RADIUS_MAX		8192.0f
+
+typedef enum {
+	RPLE_INIT, RPLE_SHUTDOWN, RPLE_FRAME, RPLE_CLIENT_BEGIN, RPLE_CLIENT_DISCONNECT, RPLE_CHAT,
+	RPLE_PLAYER_DEATH, RPLE_LOGIN, RPLE_LOGOUT, RPLE_CHARACTER_SELECT, RPLE_LEVEL_UP, RPLE_ENTITY_USED,
+	RPLE_COUNT
+} rpLuaEvent_t;
+
+extern const char *rpLuaEventNames[RPLE_COUNT];
+
+typedef struct {
+	int			id;
+	int			due;		// level.time
+	int			interval;	// 0: once
+	int			ref;		// registry ref of the function
+} rpLuaTimer_t;
+
+typedef struct {
+	char		key[RP_LUA_KEY_MAX + 1];
+	int			charId;		// 0: a plugin key
+	char		*value;		// NULL: a delete
+	int			valueLen;
+} rpLuaPending_t;
+
+typedef enum { RPLOP_NONE, RPLOP_DISABLE, RPLOP_UNLOAD, RPLOP_RELOAD } rpLuaOp_t;
+
+typedef struct rpLuaPlugin_s {
+	char			name[RP_LUA_NAME_LEN + 1];
+	qboolean		inUse;		// slot taken
+	qboolean		disabled;	// state closed after errors or /scripts disable; name kept
+	lua_State		*L;
+
+	// memory
+	size_t			memUsed, memPeak;
+
+	// the call in progress
+	int				deadline;		// Milliseconds
+	int				instructions;
+	qboolean		inCall;
+
+	// budget
+	int				tokens;
+	int				tokenRefill;	// level.time of the next token
+	int				frameMsLeft;
+	int				errorTimes[RP_LUA_MAX_ERRORS];
+	int				errorHead;
+	int				lastNotice;
+
+	// what the script registered
+	int				handlers[RPLE_COUNT];	// registry refs, LUA_NOREF for none
+	rpLuaTimer_t	timers[RP_LUA_MAX_TIMERS];
+	int				numTimers, nextTimerId;
+	char			watches[RP_LUA_MAX_WATCHES][MAX_QPATH];
+	int				numWatches;
+	int				frameDue;		// level.time of the next frame event
+	char			cmdNames[RP_LUA_MAX_COMMANDS][RP_LUA_CMD_NAME_MAX + 1];
+	char			cmdHelp[RP_LUA_MAX_COMMANDS][RP_LUA_CMD_HELP_MAX + 1];
+	int				cmdRefs[RP_LUA_MAX_COMMANDS];
+	int				numCommands;
+
+	// storage
+	rpLuaPending_t	*pending;
+	int				numPending;
+	size_t			storeBytes;		// as in lua.db plus pending
+	int				lastFlush;
+	int				flushCursor;	// pending index a slice flush got to (-1: no flush running)
+
+	// queued for the end of the frame
+	rpLuaOp_t		pendingOp;
+
+	// stats
+	int				calls, callMs, errorsTotal, refusedTokens, refusedRecipients, deferredTimers, sent;
+} rpLuaPlugin_t;
+
+extern rpLuaPlugin_t rpLuaPlugins[RP_LUA_MAX_PLUGINS];
+extern int rpLuaFrameMsLeft;
+extern int rpLuaGen[MAX_CLIENTS];
+extern rpLuaPlugin_t *rpLuaCurrent;	// the plugin whose call runs, for the API
+
+// core
+rpLuaPlugin_t *RP_Lua_Find( const char *name );
+qboolean RP_Lua_Call( rpLuaPlugin_t *p, int nargs, int nresults );
+void RP_Lua_MatchCheck( lua_State *L );	// lstrlib.c calls it (GLX_U)
+void RP_Lua_Error( rpLuaPlugin_t *p, const char *msg );
+qboolean RP_Lua_QueueOp( const char *name, rpLuaOp_t op );
+qboolean RP_Lua_QueueLoad( const char *name );
+qboolean RP_Lua_ValidName( const char *name );
+void RP_Lua_FireEvent( rpLuaEvent_t ev, void (*fill)( lua_State *L, void *ctx ), void *ctx );
+void RP_Lua_RefillTokens( rpLuaPlugin_t *p );
+qboolean RP_Lua_OpenScratch( rpLuaPlugin_t *p, const char *name );
+void RP_Lua_CloseScratch( rpLuaPlugin_t *p );
+
+// api
+void RP_LuaApi_Open( rpLuaPlugin_t *p );
+void RP_LuaApi_Reset( void );
+void RP_LuaApi_PushPlayer( lua_State *L, int clientNum );
+qboolean RP_LuaApi_PlayerArg( lua_State *L, int idx, int *clientNum );
+void RP_LuaApi_RunTimers( rpLuaPlugin_t *p );
+void RP_LuaApi_ClosePlugin( rpLuaPlugin_t *p );
+qboolean RP_LuaApi_TakeToken( rpLuaPlugin_t *p, int n );
+qboolean RP_LuaApi_SendRoom( int clientNum );
+void RP_LuaApi_Sent( int clientNum );
+
+// store
+qboolean RP_LuaStore_Open( void );
+void RP_LuaStore_Close( void );
+void RP_LuaStore_PluginInit( rpLuaPlugin_t *p );
+void RP_LuaStore_PluginClose( rpLuaPlugin_t *p );	// flushes everything
+void RP_LuaStore_Frame( rpLuaPlugin_t *p );
+void RP_LuaStore_OpenLib( rpLuaPlugin_t *p );
+void RP_LuaStore_CharacterRemoved( int charId );
+void RP_LuaStore_SweepOrphans( void );
+
+// admin
+void RP_LuaAdmin_Notice( rpLuaPlugin_t *p, const char *text );

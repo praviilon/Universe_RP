@@ -2930,6 +2930,7 @@ char *ClientConnect( int clientNum, qboolean firstTime, qboolean isBot ) {
 
 	client->pers.connected = CON_CONNECTING;
 	client->pers.connectTime = level.time;
+	RP_LUA_GEN( clientNum );	// GLX_U: [Lua] a new player in the slot: old script handles to it go stale
 
 	// zyk: initializing player_statuses value
 	client->pers.player_statuses = 0;
@@ -3451,6 +3452,8 @@ void ClientBegin( int clientNum, qboolean allowTeamReset ) {
 		ent->client->pers.training_stored_damageScale[i] = 0;
 		ent->client->pers.training_stored_damageScale2[i] = 0;
 	}
+
+	RP_LUA_EVENT_BEGIN( ent );	// GLX_U: [Lua] client_begin, after the game's own work
 }
 
 static qboolean AllForceDisabled(int force)
@@ -4840,6 +4843,9 @@ void ClientDisconnect( int clientNum ) {
 	if ( !ent->client || ent->client->pers.connected == CON_DISCONNECTED ) {
 		return;
 	}
+
+	RP_LUA_EVENT_DISCONNECT( ent );	// GLX_U: [Lua] client_disconnect, while the player can still be read; then the handles go stale
+	RP_LUA_GEN( clientNum );
 
 	// GalaxyRP: [SP Maps] security / goodie keys leave with the player
 	RP_ClearKeys( ent );

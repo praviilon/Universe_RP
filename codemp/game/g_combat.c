@@ -3226,6 +3226,8 @@ extern void RunEmplacedWeapon( gentity_t *ent, usercmd_t **ucmd );
 			}
 		}
 	}
+
+	RP_LUA_EVENT_DEATH( self, attacker, meansOfDeath );	// GLX_U: [Lua] player_death, after everything the death did
 }
 
 

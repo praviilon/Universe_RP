@@ -2118,6 +2118,8 @@ void GlobalUse(gentity_t *self, gentity_t *other, gentity_t *activator)
 	level.rp_use_chain++;
 	self->use(self, other, activator);
 	level.rp_use_depth--;
+
+	RP_LUA_EVENT_USED( self, activator );	// GLX_U: [Lua] entity_used for watched targetnames, after the use; it changes nothing
 }
 
 void G_UseTargets2( gentity_t *ent, gentity_t *activator, const char *string ) {

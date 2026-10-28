@@ -947,8 +947,22 @@ const admin_command_description_t admin_commands[ADM_NUM_CMDS] = {
 	{ "Play Music",				ADM_MUSIC				},
 	{ "Instant Revive",			ADM_GETUP				},
 	{ "Weather",				ADM_WEATHER				},
-	{ "Player effects",			ADM_PHASE				}
+	{ "Player effects",			ADM_PHASE				},
+	{ "Scripts",				ADM_SCRIPTS				}	// GLX_U: [Lua] /scripts
 };
+
+// GLX_U: [Lua] for rp_lua_*.c, which cannot see the table: a power's bit by its title, -1 for none
+int RP_AdminBitByTitle( const char *title )
+{
+	int i;
+
+	for ( i = 0; i < ADM_NUM_CMDS; i++ )
+	{
+		if ( !Q_stricmp( admin_commands[i].title, title ) )
+			return admin_commands[i].number;
+	}
+	return -1;
+}
 
 qboolean check_admin_command(gentity_t* ent, int admin_command, qboolean with_message) {
 	if (!(ent->client->pers.bitvalue & (1 << admin_command)))
@@ -6719,6 +6733,8 @@ void remove_character(gentity_t* ent, char char_name[MAX_STRING_CHARS], sqlite3*
 	}
 	trap->SendServerCommand(ent - g_entities, va("cp \"^2Character %s ^2has been removed.\n\"", char_name));
 
+	RP_LUA_CHAR_REMOVED( charID );	// GLX_U: [Lua] its stored script data goes with it
+
 	return;
 }
 
@@ -7312,6 +7328,7 @@ void Cmd_Login_F(gentity_t * ent)
 
 	trap->SendServerCommand(ent - g_entities, "print \"^2You have sucessfully logged in.\n\"");
 	trap->SendServerCommand(ent - g_entities, "cp \"^2You have sucessfully logged in.\n\"");
+	RP_LUA_EVENT_ACCOUNT( ent, "login", 0 );	// GLX_U: [Lua]
 
 	sqlite3_close(db);
 
@@ -7432,6 +7449,7 @@ void Cmd_Char_f(gentity_t *ent) {
 
 			Cmd_ZykChars_f(ent);
 			Cmd_GalaxyRpUi_f(ent);
+			RP_LUA_EVENT_ACCOUNT( ent, "character_select", ent->client->pers.CharID );	// GLX_U: [Lua]
 
 			return;
 
@@ -9544,6 +9562,8 @@ void G_Say( gentity_t *ent, gentity_t *target, int mode, const char *chatText ) 
 	int ooc_flag = 0;
 	char ooc_text[700] = "";
 	
+	const int rpLuaMode = mode;	// GLX_U: [Lua] the mode as typed, for the chat event below
+
 	// [Alex]: SAY_OOC exists to set this flag. Then it's treated as SAY_ALL, but altered in OOC format.
 	if ( mode == SAY_OOC ) {
 		ooc_flag = 1;
@@ -9620,6 +9640,7 @@ void G_Say( gentity_t *ent, gentity_t *target, int mode, const char *chatText ) 
 
 			// [Alex]: Log chat to the server log.
 			G_LogPrintf("%s: %s: %s\n", chat_modifiers[best_match_index].chat_modifier, ent->client->pers.netname, text);
+			RP_LUA_EVENT_CHAT( ent, NULL, rpLuaMode, chatText );	// GLX_U: [Lua] the chat event, also for /me-style modifiers (this branch sends and returns)
 
 			for (j = 0; j < level.maxclients; j++) {
 
@@ -9695,6 +9716,7 @@ void G_Say( gentity_t *ent, gentity_t *target, int mode, const char *chatText ) 
 	}
 
 	if ( target ) {
+		RP_LUA_EVENT_CHAT( ent, target, rpLuaMode, chatText );	// GLX_U: [Lua] tells
 		G_SayTo( ent, target, mode, color, name, text, locMsg );
 		return;
 	}
@@ -9703,6 +9725,8 @@ void G_Say( gentity_t *ent, gentity_t *target, int mode, const char *chatText ) 
 	if ( dedicated.integer ) {
 		trap->Print( "%s%s\n", name, text);
 	}
+
+	RP_LUA_EVENT_CHAT( ent, NULL, rpLuaMode, chatText );	// GLX_U: [Lua] the chat event: the message as typed, once it is going out
 
 	// send it to all the appropriate clients, within the desired distance
 	for (j = 0; j < level.maxclients; j++) {
@@ -13029,6 +13053,8 @@ void Cmd_LogoutAccount_f( gentity_t *ent ) {
 	{
 		Weapon_HookFree( ent->client->hook );
 	}
+
+	RP_LUA_EVENT_ACCOUNT( ent, "logout", 0 );	// GLX_U: [Lua] while the account can still be read
 
 	save_account(ent, qtrue);
 
@@ -20345,6 +20371,11 @@ Run ^3/admweather ^7on its own to see the current weather, or ^3/admweather list
 All four let the player pass through other players and NPCs. The ghost and hologram also change how they look and hide them from the radar; a hidden player is not drawn at all and is off the radar too, though Force Sight still sees them. The same command again turns it off, and each one replaces the others.\n\
 Damage and targeting are not affected. The ghost and hologram look is only seen by players with the " RP_MOD_NAME " client; hidden works for everyone.\n\n\"");
 		}
+		else if (command_number == ADM_SCRIPTS)
+		{
+			// GLX_U: [Lua]
+			trap->SendServerCommand(ent - g_entities, "print \"\nThis flag enables ^3/scripts^7: the server's Lua plugins (^3list^7, ^3stats^7, ^3help^7, ^3load^7, ^3unload^7, ^3reload^7, ^3enable^7, ^3disable^7). A plugin that errors tells admins with this flag, at most once every 30 seconds.\n\n\"");
+		}
 		else
 		{
 			// GalaxyRP fix: [Admin] the numeric-help chain above had no fallback for an
@@ -21172,6 +21203,8 @@ void increase_level(gentity_t* ent, qboolean admin_rp_mode, int number_of_levels
 	{
 		trap->SendServerCommand(ent - g_entities, va("chat \"^3You have reached maximum level!\n\""));
 	}
+
+	RP_LUA_EVENT_ACCOUNT( ent, "level_up", ent->client->pers.level );	// GLX_U: [Lua]
 }
 
 /*
@@ -26540,6 +26573,7 @@ command_t commands[] = {
 	// menu is told why instead of the chat line CMD_LOGGEDIN prints
 	{ "rpxlist",			Cmd_RpxList_f,				0 },
 	{ "scale",				Cmd_Scale_f,				CMD_LOGGEDIN | CMD_NOINTERMISSION },
+	{ "scripts",			Cmd_Scripts_f,				CMD_LOGGEDIN | CMD_NOINTERMISSION },	// GLX_U: [Lua] rp_lua_admin.c
 	{ "silence",			Cmd_Silence_f,				CMD_LOGGEDIN | CMD_NOINTERMISSION },
 	{ "skilldown",			Cmd_RpModeDown_f,			CMD_LOGGEDIN | CMD_NOINTERMISSION },
 	{ "skillup",			Cmd_RpModeUp_f,				CMD_LOGGEDIN | CMD_NOINTERMISSION },
@@ -26583,6 +26617,12 @@ command_t commands[] = {
 };
 static const size_t numCommands = ARRAY_LEN( commands );
 
+// GLX_U: [Lua] a plugin may not take a built-in command's name (rp_lua_api.c)
+qboolean RP_IsBuiltInCommand( const char *name )
+{
+	return Q_LinearSearch( name, commands, numCommands, sizeof( commands[0] ), cmdcmp ) ? qtrue : qfalse;
+}
+
 void ClientCommand( int clientNum ) {
 	gentity_t	*ent = NULL;
 	char		cmd[MAX_TOKEN_CHARS] = {0};
@@ -26604,6 +26644,8 @@ void ClientCommand( int clientNum ) {
 	command = (command_t *)Q_LinearSearch( cmd, commands, numCommands, sizeof( commands[0] ), cmdcmp );
 	if ( !command )
 	{
+		if ( RP_LUA_COMMAND( ent, cmd ) )	// GLX_U: [Lua] a plugin's command, only for names no built-in has
+			return;
 		trap->SendServerCommand( clientNum, va( "print \"Unknown command %s\n\"", cmd ) );
 		return;
 	}

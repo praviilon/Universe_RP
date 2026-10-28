@@ -106,6 +106,9 @@ typedef enum {
 	// GalaxyRP: [Phase] "Player effects": /admwalkthrough and /admhidden, and /ghost and /holo on other players (GLX_U) -- appended for the same reason as above
 	// (bit 28, bit value 268435456). Two bits remain before the sign bit.
 	ADM_PHASE,
+	// GLX_U: [Lua] "Scripts": /scripts (load, unload, reload, stats) and the error notices -- appended for the same
+	// reason (bit 29, bit value 536870912). One bit remains before the sign bit.
+	ADM_SCRIPTS,
 	ADM_NUM_CMDS
 
 } zyk_admin_t;

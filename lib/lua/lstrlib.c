@@ -361,6 +361,7 @@ typedef struct MatchState {
   const char *p_end;  /* end ('\0') of pattern */
   lua_State *L;
   int matchdepth;  /* control for recursive depth (to avoid C stack overflow) */
+  unsigned int steps;  /* GLX_U: [Lua] match steps, for the mod's time check */
   unsigned char level;  /* total number of captures (finished or unfinished) */
   struct {
     const char *init;
@@ -371,6 +372,11 @@ typedef struct MatchState {
 
 /* recursive function */
 static const char *match (MatchState *ms, const char *s, const char *p);
+
+/* GLX_U: [Lua] the mod's time budget reaches into pattern matching: a backtracking pattern over a
+** long subject runs no VM instruction, so the count hook never sees it. Every 1024 match steps the
+** mod checks its deadline and raises an error when it is past (rp_lua_core.c). */
+extern void RP_Lua_MatchCheck (lua_State *L);
 
 
 /* maximum recursion depth for 'match' */
@@ -570,6 +576,8 @@ static const char *match_capture (MatchState *ms, const char *s, int l) {
 static const char *match (MatchState *ms, const char *s, const char *p) {
   if (l_unlikely(ms->matchdepth-- == 0))
     luaL_error(ms->L, "pattern too complex");
+  if (l_unlikely((++ms->steps & 1023u) == 0))  /* GLX_U */
+    RP_Lua_MatchCheck(ms->L);
   init: /* using goto to optimize tail recursion */
   if (p != ms->p_end) {  /* end of pattern? */
     switch (*p) {
@@ -765,6 +773,7 @@ static void prepstate (MatchState *ms, lua_State *L,
 
 static void reprepstate (MatchState *ms) {
   ms->matchdepth = MAXCCALLS;
+  ms->steps = 0;  /* GLX_U */
   ms->level = 0;
 }
 

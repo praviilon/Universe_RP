@@ -1,0 +1,49 @@
+/*
+===========================================================================
+GLX_U: [Lua] server-side scripting -- what the game code sees.
+
+Plugins (lua/plugins/<name>/plugin.lua in the mod folder, loose files only) run in a Lua state of their
+own, told what happens through the events below, and able to answer only with messages, commands,
+timers and stored data. Nothing a P1 script does changes the world: the design (and why) is in the
+project's Lua v2 plan. Every hook here is one compare when rp_lua is 0 or no plugin is loaded, and none
+of them changes what the game does -- except RP_LUA_COMMAND, which answers a command no built-in has.
+===========================================================================
+*/
+#pragma once
+
+struct gentity_s;
+
+extern int rp_luaActive;	// plugins loaded (0: every hook returns at once)
+
+void RP_Lua_Init( void );
+void RP_Lua_Shutdown( void );
+void RP_Lua_Frame( void );
+void RP_Lua_Generation( int clientNum );
+void RP_Lua_EventBegin( struct gentity_s *ent );
+void RP_Lua_EventDisconnect( struct gentity_s *ent );
+void RP_Lua_EventChat( struct gentity_s *ent, struct gentity_s *target, int mode, const char *text );	// target: tells only
+void RP_Lua_EventDeath( struct gentity_s *victim, struct gentity_s *attacker, int mod );
+void RP_Lua_EventUsed( struct gentity_s *self, struct gentity_s *activator );
+void RP_Lua_EventAccount( struct gentity_s *ent, const char *event, int number );	// login, logout, character_select, level_up
+qboolean RP_Lua_Command( struct gentity_s *ent, const char *cmd );
+void RP_Lua_CharacterRemoved( int charId );
+void Cmd_Scripts_f( struct gentity_s *ent );
+void Svcmd_Lua_f( void );
+void Svcmd_LuaReload_f( void );
+void Svcmd_LuaList_f( void );
+int RP_AdminBitByTitle( const char *title );	// g_cmds.c: an admin power's bit by its /adminlist title, -1 for none
+qboolean RP_IsBuiltInCommand( const char *name );	// g_cmds.c: the name is in commands[]
+extern int rp_luaWatchCount;	// targetnames any plugin watches (RP_LUA_EVENT_USED's first test)
+
+#define RP_LUA_INIT()					do { if ( rp_lua.integer ) RP_Lua_Init(); } while ( 0 )
+#define RP_LUA_SHUTDOWN()				do { if ( rp_lua.integer ) RP_Lua_Shutdown(); } while ( 0 )
+#define RP_LUA_FRAME()					do { if ( rp_lua.integer ) RP_Lua_Frame(); } while ( 0 )
+#define RP_LUA_GEN( n )					do { if ( rp_lua.integer ) RP_Lua_Generation( n ); } while ( 0 )
+#define RP_LUA_EVENT_BEGIN( e )			do { if ( rp_luaActive ) RP_Lua_EventBegin( e ); } while ( 0 )
+#define RP_LUA_EVENT_DISCONNECT( e )	do { if ( rp_luaActive ) RP_Lua_EventDisconnect( e ); } while ( 0 )
+#define RP_LUA_EVENT_CHAT( e, tg, m, t )	do { if ( rp_luaActive ) RP_Lua_EventChat( e, tg, m, t ); } while ( 0 )
+#define RP_LUA_EVENT_DEATH( v, a, m )	do { if ( rp_luaActive ) RP_Lua_EventDeath( v, a, m ); } while ( 0 )
+#define RP_LUA_EVENT_USED( s, a )		do { if ( rp_luaWatchCount > 0 && (s)->targetname ) RP_Lua_EventUsed( s, a ); } while ( 0 )
+#define RP_LUA_EVENT_ACCOUNT( e, n, x )	do { if ( rp_luaActive ) RP_Lua_EventAccount( e, n, x ); } while ( 0 )
+#define RP_LUA_COMMAND( e, c )			( rp_luaActive ? RP_Lua_Command( e, c ) : qfalse )
+#define RP_LUA_CHAR_REMOVED( id )		do { if ( rp_luaActive ) RP_Lua_CharacterRemoved( id ); } while ( 0 )

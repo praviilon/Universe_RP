@@ -3365,6 +3365,8 @@ void G_InitGame( int levelTime, int randomSeed, int restart ) {
 	//alex: create tables required for storing stuff, and also create admin account. ONLY if those do not already exist.
 	InitializeGalaxyRpTables(qtrue);
 
+	RP_LUA_INIT();	// GLX_U: [Lua] the plugins, after the map's entities and the tables
+
 	// GalaxyRP fix: [Configstrings] every configstring the map and the mod register has now been
 	// written, so count the gamestate once and start the running estimate from the truth. Without
 	// this the estimate would begin at zero and the budget check in G_FindConfigstringIndex would
@@ -3390,6 +3392,8 @@ extern void save_account(gentity_t *ent, qboolean save_char_file);
 void G_ShutdownGame( int restart ) {
 	int i = 0;
 	gentity_t *ent;
+
+	RP_LUA_SHUTDOWN();	// GLX_U: [Lua] shutdown events and the stored data, before anything is torn down
 
 //	trap->Print ("==== ShutdownGame ====\n");
 
@@ -9429,6 +9433,8 @@ void G_RunFrame( int levelTime ) {
 		iTimer_GameChecks,
 		iTimer_Queues);
 #endif
+
+	RP_LUA_FRAME();	// GLX_U: [Lua] timers, flushes and the queued loads and unloads, last
 
 	g_LastFrameTime = level.time;
 }
