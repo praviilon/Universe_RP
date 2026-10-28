@@ -217,6 +217,69 @@ set(MPGameUiFiles
 source_group("ui" FILES ${MPGameUiFiles})
 set(MPGameFiles ${MPGameFiles} ${MPGameUiFiles})
 
+# GLX_U: [Lua] the vendored Lua 5.4.9 core and the libraries the sandbox opens -- see lib/lua/README.md
+# for what is left out and why. The game module only: neither client module gets a script engine.
+set(LuaDir "${CMAKE_SOURCE_DIR}/lib/lua")
+set(MPGameLuaFiles
+	"${LuaDir}/lapi.c"
+	"${LuaDir}/lauxlib.c"
+	"${LuaDir}/lbaselib.c"
+	"${LuaDir}/lcode.c"
+	"${LuaDir}/lcorolib.c"
+	"${LuaDir}/lctype.c"
+	"${LuaDir}/ldebug.c"
+	"${LuaDir}/ldo.c"
+	"${LuaDir}/ldump.c"
+	"${LuaDir}/lfunc.c"
+	"${LuaDir}/lgc.c"
+	"${LuaDir}/llex.c"
+	"${LuaDir}/lmathlib.c"
+	"${LuaDir}/lmem.c"
+	"${LuaDir}/lobject.c"
+	"${LuaDir}/lopcodes.c"
+	"${LuaDir}/lparser.c"
+	"${LuaDir}/lstate.c"
+	"${LuaDir}/lstring.c"
+	"${LuaDir}/lstrlib.c"
+	"${LuaDir}/ltable.c"
+	"${LuaDir}/ltablib.c"
+	"${LuaDir}/ltm.c"
+	"${LuaDir}/lundump.c"
+	"${LuaDir}/lutf8lib.c"
+	"${LuaDir}/lvm.c"
+	"${LuaDir}/lzio.c"
+	"${LuaDir}/lapi.h"
+	"${LuaDir}/lauxlib.h"
+	"${LuaDir}/lcode.h"
+	"${LuaDir}/lctype.h"
+	"${LuaDir}/ldebug.h"
+	"${LuaDir}/ldo.h"
+	"${LuaDir}/lfunc.h"
+	"${LuaDir}/lgc.h"
+	"${LuaDir}/ljumptab.h"
+	"${LuaDir}/llex.h"
+	"${LuaDir}/llimits.h"
+	"${LuaDir}/lmem.h"
+	"${LuaDir}/lobject.h"
+	"${LuaDir}/lopcodes.h"
+	"${LuaDir}/lopnames.h"
+	"${LuaDir}/lparser.h"
+	"${LuaDir}/lprefix.h"
+	"${LuaDir}/lstate.h"
+	"${LuaDir}/lstring.h"
+	"${LuaDir}/ltable.h"
+	"${LuaDir}/ltm.h"
+	"${LuaDir}/lua.h"
+	"${LuaDir}/luaconf.h"
+	"${LuaDir}/lualib.h"
+	"${LuaDir}/lundump.h"
+	"${LuaDir}/lvm.h"
+	"${LuaDir}/lzio.h"
+	)
+source_group("lua" FILES ${MPGameLuaFiles})
+set(MPGameFiles ${MPGameFiles} ${MPGameLuaFiles})
+set(MPGameIncludeDirectories ${MPGameIncludeDirectories} "${LuaDir}")
+
 add_library(${MPGame} SHARED ${MPGameFiles})
 
 if(NOT MSVC)
