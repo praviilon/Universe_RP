@@ -22,6 +22,7 @@ int t_tick = 0;				// frozen clock: ms added on every read (a deterministic "slo
 int t_argc; char t_argv[64][256];
 int t_floodProtect = 1;
 int t_paidCredits[MAX_CLIENTS], t_payouts, t_rewardOnceEach[MAX_ENTITIESTOTAL][MAX_CLIENTS];	// the stand-in target_reward
+int t_musicChanges;	// the stand-in target_play_music
 qboolean t_builtin = qfalse;
 
 void t_worldReset( void );
@@ -60,7 +61,7 @@ void t_init( int maxclients )
 	for ( i = 0; i < MAX_CLIENTS; i++ ) { g_entities[i].client = &g_clients_store[i]; }
 	rp_lua.integer = 1; rp_lua_memkb.integer = 512; Q_strncpyz( rp_lua_plugins.string, "", sizeof( rp_lua_plugins.string ) );
 	t_logLen = 0; t_log[0] = 0; t_console[0] = 0; memset( t_nsent, 0, sizeof( t_nsent ) );
-	t_payouts = 0; memset( t_paidCredits, 0, sizeof( t_paidCredits ) ); memset( t_rewardOnceEach, 0, sizeof( t_rewardOnceEach ) );
+	t_payouts = 0; t_musicChanges = 0; memset( t_paidCredits, 0, sizeof( t_paidCredits ) ); memset( t_rewardOnceEach, 0, sizeof( t_rewardOnceEach ) );
 	t_worldReset();
 	RP_Lua_TrapGuardInstall();	// as G_InitGame: the game module's commands go through the guarded copy
 }
@@ -93,7 +94,8 @@ int t_npcsAlive;
 qboolean t_npcRefuse = qfalse;	// NPC_Spawn_Do returns NULL
 int t_removedSilently;
 
-static const char *s_exempt[] = { "misc_model_breakable", "misc_model_ghoul", "fx_runner", "target_speaker", "weapon_blaster", "ammo_blaster", "item_medpac", "misc_exploding_crate", NULL };
+static const char *s_exempt[] = { "misc_model_breakable", "misc_model_ghoul", "fx_runner", "target_speaker", "weapon_blaster", "ammo_blaster", "item_medpac", "misc_exploding_crate",
+	"target_dialog", "target_reward", "target_flag", "target_play_music", NULL };
 qboolean RP_MapExemptClass( const char *classname ) { int i; for ( i = 0; s_exempt[i]; i++ ) if ( !Q_stricmp( classname, s_exempt[i] ) ) return qtrue; return qfalse; }
 static const char *s_vector[] = { "origin", "angles", "angles2", "mins", "maxs", "trdelta", "color", "offcolor", "modelscale_vec", "spinangles", "tint", NULL };
 qboolean RP_EntityVectorKey( const char *key ) { int i; for ( i = 0; s_vector[i]; i++ ) if ( !Q_stricmp( key, s_vector[i] ) ) return qtrue; return qfalse; }
@@ -121,7 +123,12 @@ void zyk_main_set_entity_field( gentity_t *ent, char *key, char *value ) { int n
 static const char *s_RecordValue( int n, const char *key ) { int i; for ( i = 0; i < t_recordCount[n]; i++ ) if ( !Q_stricmp( t_record[n][i][0], key ) ) return t_record[n][i][1]; return NULL; }
 int t_freedRidden;	// G_FreeEntity on a vehicle someone rides: what must never happen (EjectAll)
 void G_FreeEntity( gentity_t *ed ) { int n = ed->s.number; if ( n >= MAX_CLIENTS ) t_freed++; if ( ed->m_pVehicle ) { if ( ed->m_pVehicle->m_pPilot || ed->m_pVehicle->m_iNumPassengers ) t_freedRidden++; free( ed->m_pVehicle ); t_vehiclesAlive--; } if ( ed->NPC ) free( ed->NPC ); if ( ed->client && n >= MAX_CLIENTS && ( ed->client < g_clients_store || ed->client >= g_clients_store + MAX_CLIENTS ) ) { free( ed->client ); t_npcsAlive--; } memset( ed, 0, sizeof( *ed ) ); ed->s.number = n; ed->classname = "freed"; t_recordCount[n] = 0; t_freeSlots++; }
-void zyk_main_spawn_entity( gentity_t *ent ) { int n = ent->s.number; const char *v; if ( !ent->inuse ) return; level.rp_spawn_refusal[0] = 0; ent->classname = G_NewString( s_RecordValue( n, "classname" ) ); if ( ( v = s_RecordValue( n, "targetname" ) ) ) ent->targetname = G_NewString( v ); if ( ( v = s_RecordValue( n, "origin" ) ) ) sscanf( v, "%f %f %f", &ent->r.currentOrigin[0], &ent->r.currentOrigin[1], &ent->r.currentOrigin[2] ); if ( ( v = s_RecordValue( n, "health" ) ) ) ent->health = atoi( v ); ent->use = (void *)1; if ( t_spawnRefuse ) { Q_strncpyz( level.rp_spawn_refusal, "the server does not have that model", sizeof( level.rp_spawn_refusal ) ); G_FreeEntity( ent ); } }
+static void s_RewardUse( gentity_t *self, gentity_t *other, gentity_t *activator ); static void s_MusicUse( gentity_t *self, gentity_t *other, gentity_t *activator ); void t_spawnReal( gentity_t *ent );
+void zyk_main_spawn_entity( gentity_t *ent ) { int n = ent->s.number; const char *v; if ( !ent->inuse ) return; level.rp_spawn_refusal[0] = 0; ent->classname = G_NewString( s_RecordValue( n, "classname" ) ); if ( ( v = s_RecordValue( n, "targetname" ) ) ) ent->targetname = G_NewString( v ); if ( ( v = s_RecordValue( n, "origin" ) ) ) sscanf( v, "%f %f %f", &ent->r.currentOrigin[0], &ent->r.currentOrigin[1], &ent->r.currentOrigin[2] ); if ( ( v = s_RecordValue( n, "health" ) ) ) ent->health = atoi( v ); if ( ( v = s_RecordValue( n, "target" ) ) ) ent->target = G_NewString( v ); if ( ( v = s_RecordValue( n, "spawnflags" ) ) ) ent->spawnflags = atoi( v ); ent->use = (void *)1;
+	if ( !strcmp( ent->classname, "target_reward" ) ) { ent->use = s_RewardUse; ent->rpRewardCredits = ( v = s_RecordValue( n, "credits" ) ) ? atoi( v ) : 0; ent->rpRewardXP = ( v = s_RecordValue( n, "xp" ) ) ? atoi( v ) : 0; }
+	else if ( !strcmp( ent->classname, "target_play_music" ) ) { ent->use = s_MusicUse; ent->message = ( v = s_RecordValue( n, "music" ) ) ? G_NewString( v ) : NULL; }
+	else if ( !strcmp( ent->classname, "target_dialog" ) || !strcmp( ent->classname, "target_flag" ) ) { t_spawnReal( ent ); }
+	if ( t_spawnRefuse ) { Q_strncpyz( level.rp_spawn_refusal, "the server does not have that model", sizeof( level.rp_spawn_refusal ) ); G_FreeEntity( ent ); } }
 int RP_FreeEntityChildren( gentity_t *maker ) { (void)maker; return 0; }
 qboolean RP_EntityIsCharacter( const gentity_t *e ) { return ( e && e->client ) ? qtrue : qfalse; }
 void G_SetOrigin( gentity_t *ent, vec3_t origin ) { VectorCopy( origin, ent->r.currentOrigin ); VectorCopy( origin, ent->s.origin ); }
@@ -159,6 +166,13 @@ int RP_NpcTeamFromName( const char *name ) { if ( !name || !name[0] ) return -1;
 int RP_NpcEffectFromName( const char *name ) { if ( !name || !name[0] ) return RP_PHASE_NONE; if ( !Q_stricmp( name, "holo" ) ) return RP_PHASE_HOLO; if ( !Q_stricmp( name, "ghost" ) ) return RP_PHASE_GHOST; if ( !Q_stricmp( name, "walkthrough" ) ) return RP_PHASE_NONSOLID; return -1; }
 int BG_RpCosmeticId( int slot, const char *name ) { static const char *hats[] = { "fedora", "tophat" }, *capes[] = { "royalcape", "vadercape" }; const char **l = slot == RP_COSMETIC_HAT ? hats : capes; int i; if ( !name || !name[0] ) return 0; for ( i = 0; i < 2; i++ ) if ( !Q_stricmp( l[i], name ) ) return i + 1; return 0; }
 qboolean RP_NpcIsFrozen( const gentity_t *ent ) { return ( ent && ent->NPC && ent->NPC->rpFrozen ) ? qtrue : qfalse; }
+const char *t_recordValue( int n, const char *key ) { return s_RecordValue( n, key ); }
+// a stand-in target_play_music: target_play_music_use's shape -- the "cs" the change sends every client needs room in
+// every client's budget when a script call set it off (G4), then the change
+static void s_MusicUse( gentity_t *self, gentity_t *other, gentity_t *activator ) { (void)other; (void)activator; if ( !RP_LUA_BROADCAST_ROOM( 1 ) ) return; t_musicChanges++; (void)self; }
+#ifndef T_REAL_DIALOG
+void t_spawnReal( gentity_t *ent ) { (void)ent; }	// t_dialog links the real g_dialog.c and spawns them for real
+#endif
 // a stand-in target_reward: the real target_reward_use's shape (g_target.c) -- a player activator, the per-player
 // record (ONCE_EACH), then RP_PayReward's own order: eligible, RP_LUA_DB_WRITE_OK before anything is given, the
 // console line, the log line with the plugin when a script call set it off; then its target

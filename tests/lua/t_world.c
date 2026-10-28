@@ -130,7 +130,11 @@ int main( void )
 	  CHECK( t_recordCount[n] == 6 && !strcmp( t_record[n][0][0], "classname" ) && !strcmp( t_record[n][3][0], "targetname" ), "record: %d pairs, %s %s", t_recordCount[n], t_record[n][0][0], t_record[n][3][0] ); }
 	CHECK( p->tokens == RP_LUA_TOKENS - 1 && p->propSpawns == 1, "a token and a spawn counted" );
 	run( p, "bad func_door model x" ); CHECK( get_int( p, "OK2" ) == 0 && strstr( get_str( p, "E" ), "not a class" ), "func_door refused: %s", get_str( p, "E" ) );
-	run( p, "bad misc_model_ghoul target door1" ); CHECK( get_int( p, "OK2" ) == 0 && strstr( get_str( p, "E" ), "not allowed" ), "target refused: %s", get_str( p, "E" ) );
+	run( p, "bad misc_model_ghoul target door.1" ); CHECK( get_int( p, "OK2" ) == 0 && strstr( get_str( p, "E" ), "'target' is a name of one of this plugin's entities" ), "a link to a dotted name refused: %s", get_str( p, "E" ) );
+	run( p, "bad misc_model_ghoul paintarget a_very_long_name_that_cannot_fit_in_a_targetname_with_the_prefix" ); CHECK( strstr( get_str( p, "E" ), "'paintarget' is a name" ), "a link too long refused" );
+	run( p, "bad misc_model_ghoul script_targetname x" ); CHECK( strstr( get_str( p, "E" ), "not allowed" ), "script_targetname refused" );
+	run( p, "bad misc_model_ghoul npc_targetname x" ); CHECK( strstr( get_str( p, "E" ), "not allowed" ), "npc_targetname refused" );
+	run( p, "bad misc_model_ghoul team x" ); CHECK( strstr( get_str( p, "E" ), "not allowed" ), "team refused" );
 	run( p, "bad misc_model_ghoul rpLock x" ); CHECK( strstr( get_str( p, "E" ), "not allowed" ), "rpLock refused" );
 	run( p, "bad misc_model_ghoul npcxp 5" ); CHECK( strstr( get_str( p, "E" ), "not allowed" ), "npcxp refused" );
 	run( p, "bad misc_model_ghoul targetname x" ); CHECK( strstr( get_str( p, "E" ), "not allowed" ), "targetname key refused" );
@@ -198,6 +202,43 @@ int main( void )
 	// unload takes them all, silently, after shutdown
 	{ int before = t_removedSilently; RP_Lua_QueueOp( "np", RPLOP_UNLOAD ); t_frame( 50 ); CHECK( t_removedSilently - before == RP_LUA_MAX_NPCS, "unload removed every NPC: %d", t_removedSilently - before ); } t_frame( 100 ); t_runThinks(); CHECK( t_npcsAlive == 0, "all gone" );
 	RP_LUA_SHUTDOWN();
+
+	// --- the quest classes: a plugin's own dialogue, reward, flag and music; every link key a plain name of its own,
+	// stored with the prefix, so an option fires only the plugin's own entities; the dialogue cap; G4 on the music
+	t_init( 8 ); t_player( 0, "Alice", qtrue, 7 ); t_player( 1, "Bob", qtrue, 8 );
+	t_write_plugin( "qp", "H = {} Commands.add('make', function(p, a) local h, why = World.prop(a[1], {x=0,y=0,z=0}, nil, KEYS, {name=a[2]}) if h then H[#H+1] = h NUM = h.number TN = h.targetname OK = true else OK = false WHY = why end end)\n"
+		"Commands.add('keys', function(p, a) KEYS = {} for i = 1, #a, 2 do KEYS[a[i]] = a[i+1] end end)\n"
+		"Commands.add('usex', function(p, a) U, S = World.use(a[1], p) if U == false then WHY = S end end)\n"
+		"Commands.add('badk', function(p, a) OK2, E = pcall(World.prop, a[1], {x=0,y=0,z=0}, nil, {[a[2]] = a[3]}) E = tostring(E) end)\n" );
+	t_start( "qp" ); p = RP_Lua_Find( "qp" );
+	refill( p ); run( p, "keys credits 50 xp 2 target after spawnflags 1" ); run( p, "make target_reward pay" );
+	{ int pay = get_int( p, "NUM" ); CHECK( get_int( p, "OK" ) == 1 && !strcmp( get_str( p, "TN" ), "lua.qp.pay" ) && g_entities[pay].rpRewardCredits == 50 && !strcmp( g_entities[pay].target, "lua.qp.after" ) && g_entities[pay].rpLuaPlugin, "a reward: named, its target prefixed (%s)", g_entities[pay].target ? g_entities[pay].target : "-" );
+	  run( p, "keys message x" ); run( p, "make target_speaker after" ); { int after = get_int( p, "NUM" );
+	    run( p, "keys flag quest_done target pay" ); run( p, "make target_flag done" ); { int fl = get_int( p, "NUM" ); CHECK( !strcmp( t_recordValue( fl, "flag" ), "quest_done" ) && !strcmp( g_entities[fl].target, "lua.qp.pay" ), "a flag: the flag name as given, the target prefixed" ); }
+	    run( p, "keys music music/x.mp3" ); run( p, "make target_play_music song" ); { int mu = get_int( p, "NUM" ); CHECK( get_int( p, "OK" ) == 1 && g_entities[mu].use != (void *)1, "music spawned" ); }
+	    run( p, "keys message Hi option1 Yes go1 pay option2 No go2 door1 speaker guard need1 quest_done" ); refill( p ); run( p, "make target_dialog talk" );
+	    { int d = get_int( p, "NUM" ); CHECK( get_int( p, "OK" ) == 1 && !strcmp( t_recordValue( d, "go1" ), "lua.qp.pay" ) && !strcmp( t_recordValue( d, "go2" ), "lua.qp.door1" ) && !strcmp( t_recordValue( d, "speaker" ), "lua.qp.guard" ) && !strcmp( t_recordValue( d, "need1" ), "quest_done" ), "a dialogue: go1, go2 and speaker prefixed, need1 as given (%s)", t_recordValue( d, "go2" ) ); }
+	    // a use of the reward through the plugin's own names: pays, then its target (the speaker) -- the plugin's, not a map one
+	    t_frame( 1000 ); refill( p ); t_payouts = 0; run( p, "usex lua.qp.pay" ); CHECK( t_payouts == 1 && t_usedCount[after] == 1, "the chain stays in the plugin: paid, speaker used (%d %d)", t_payouts, t_usedCount[after] ); }
+	  // a map door named door1 is not what go2 reaches
+	  { int door = t_mapEntity( "func_door", "door1", NULL ); refill( p ); run( p, "usex lua.qp.door1" ); CHECK( !strcmp( get_str( p, "WHY" ), "nothing has that targetname" ) && t_usedCount[door] == 0, "the prefixed name reaches no map entity" ); } }
+	run( p, "badk target_dialog go1 door.1" ); CHECK( strstr( get_str( p, "E" ), "'go1' is a name of one of this plugin's entities" ), "go<n> dotted refused" );
+	run( p, "badk target_dialog speaker a-b" ); CHECK( strstr( get_str( p, "E" ), "'speaker' is a name" ), "speaker checked" );
+	run( p, "badk target_flag targetname x" ); CHECK( strstr( get_str( p, "E" ), "not allowed" ), "targetname still opts.name only" );
+	// G4: a script's use of music needs room on every client; a player's own does not
+	{ int k; t_frame( 1000 ); refill( p ); t_musicChanges = 0; run( p, "usex lua.qp.song" ); CHECK( t_musicChanges == 1, "music changed once (%d)", t_musicChanges );
+	  rp_luaInCall++; for ( k = 0; k < RP_LUA_CMDS_PER_SEC; k++ ) trap->SendServerCommand( 1, "print \"x\n\"" ); rp_luaInCall--;	// Bob's budget spent
+	  refill( p ); run( p, "usex lua.qp.song" ); CHECK( t_musicChanges == 1 && p->cmdsHeld >= 1, "held back: one client has no room (%d)", t_musicChanges );
+	  { gentity_t *m = NULL; while ( ( m = G_Find( m, FOFS( targetname ), "lua.qp.song" ) ) ) GlobalUse( m, &g_entities[1], &g_entities[1] ); } CHECK( t_musicChanges == 2, "a player's own use is not counted" );
+	  t_frame( 1000 ); refill( p ); run( p, "usex lua.qp.song" ); CHECK( t_musicChanges == 3, "a second later it changes again" ); }
+	// the dialogue cap: 16 a map, the other classes still spawn
+	{ int k; run( p, "keys message Hi option1 Yes" ); for ( k = 0; k < 20; k++ ) { refill( p ); run( p, "make target_dialog" ); if ( !get_int( p, "OK" ) ) break; }
+	  CHECK( p->dialogSpawns == RP_LUA_DIALOG_SPAWNS_MAP && !strcmp( get_str( p, "WHY" ), "spawn limit for this map" ), "16 dialogues a map: %d, %s", p->dialogSpawns, get_str( p, "WHY" ) );
+	  run( p, "keys credits 5" ); refill( p ); run( p, "make target_reward" ); CHECK( get_int( p, "OK" ) == 1, "a reward still spawns" ); }
+	// the name room: lua.<plugin>.<name> fits a targetname
+	run( p, "badk target_flag flag x" ); { lua_getglobal( p->L, "OK2" ); lua_pop( p->L, 1 ); }
+	refill( p ); run( p, "keys flag f" ); t_args( "make target_flag a_name_of_exactly_32_characters__" ); RP_LUA_COMMAND( &g_entities[0], "make" ); CHECK( get_int( p, "OK" ) == 1 && strlen( get_str( p, "TN" ) ) < MAX_QPATH, "a 32-character name fits with a 2-letter plugin: %s", get_str( p, "TN" ) );
+	RP_LUA_SHUTDOWN(); t_frame( 100 ); t_runThinks();
 
 	// --- the spawn options of World.npc and World.vehicle: set on the spawner, read back on the handle; a wrong value is
 	// an error with nothing spawned and no token spent; a vehicle takes team and scale only

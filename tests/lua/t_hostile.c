@@ -54,6 +54,10 @@ static const shape_t shapes[] = {
 	{ "vehnpc",		"for i = 1, 100000 do World.npc('xwing', {x=0,y=0,z=0}) end" },
 	{ "npcopts",	"local t = {'player', 'enemy', 'ghost', 'holo', 'x', 5, true, {}, 'fedora', 'none'} for i = 1, 100000 do pcall(World.npc, 'jedi', {x=0,y=0,z=0}, nil, {team=t[i%10+1], effect=t[(i*3)%10+1], health=i*7, scale=i%600, frozen=(i%2==0), noai=t[(i*7)%10+1], hat=t[(i*5)%10+1], cape=t[i%10+1]}) end" },
 	{ "vehopts",	"local t = {'player', 'enemy', 'x', 5, true, {}} for i = 1, 100000 do pcall(World.vehicle, 'swoop', {x=0,y=0,z=0}, nil, {team=t[i%6+1], scale=i%600, health=(i%3==0) and 5 or nil}) end" },
+	{ "questloop",	"for i = 1, 100000 do World.prop('target_dialog', {x=0,y=0,z=0}, nil, {message='x', option1='y', go1='pay'}) World.prop('target_reward', {x=0,y=0,z=0}, nil, {credits=100000}, {name='pay'}) World.prop('target_flag', {x=0,y=0,z=0}, nil, {flag='f'}) end" },
+	{ "musicloop",	"local h = World.prop('target_play_music', {x=0,y=0,z=0}, nil, {music='music/x.mp3'}, {name='song'}) local p = Players.get(0) for i = 1, 100000 do World.use('lua.h.song', p) end" },
+	{ "musictimer",	"World.prop('target_play_music', {x=0,y=0,z=0}, nil, {music='music/x.mp3'}, {name='song'}) Timer.every(50, function() for i = 0, 23 do World.use('lua.h.song', Players.get(i)) end end)" },
+	{ "linkbomb",	"for i = 1, 100000 do pcall(World.prop, 'misc_model_breakable', {x=0,y=0,z=0}, nil, {paintarget=('a'):rep(i % 80), target='door.1', go1='x'}) end" },
 	{ "npcreward",	"for i = 1, 100000 do World.npc('jedi', {x=0,y=0,z=0}, nil, {credits=100000, xp=100}) end" },
 	{ "pay200",		"local p = Players.get(0) for i = 1, 100000 do World.use('pay200', p) end" },
 	{ "print200",	"local p = Players.get(0) for i = 1, 100000 do World.use('print200', p) end" },
@@ -89,7 +93,7 @@ int main( void )
 
 		Com_sprintf( code, sizeof( code ), "Events.on('init', function() %s end)\n", shapes[i].code );
 		t_write_plugin( "h", code );
-		t_logLen = 0; t_log[0] = 0; t_clear_sent(); t_payouts = 0;
+		t_logLen = 0; t_log[0] = 0; t_clear_sent(); t_payouts = 0; t_musicChanges = 0;
 		t0 = trap->Milliseconds();
 		t_start( "h" );
 		took = trap->Milliseconds() - t0;
@@ -101,10 +105,13 @@ int main( void )
 		if ( !strcmp( shapes[i].name, "pay200" ) ) CHECK( t_payouts == RP_LUA_DB_WRITES_FRAME, "pay200: the guard, not something else, stopped it (%d)", t_payouts );
 		if ( !strcmp( shapes[i].name, "print200" ) ) CHECK( maxq == RP_LUA_CMDS_PER_SEC, "print200: %d reached the player", maxq );
 		if ( !strcmp( shapes[i].name, "bcastloop" ) ) CHECK( maxq == RP_LUA_CMDS_PER_SEC, "bcastloop: %d reached each player", maxq );
+		if ( !strcmp( shapes[i].name, "musicloop" ) ) CHECK( t_musicChanges <= RP_LUA_CMDS_PER_SEC && t_musicChanges >= 1, "musicloop: %d music changes in one call", t_musicChanges );
+		if ( !strcmp( shapes[i].name, "questloop" ) ) CHECK( p && p->dialogSpawns <= RP_LUA_DIALOG_SPAWNS_MAP && p->propSpawns <= RP_LUA_TOKENS, "questloop: %d dialogues, %d props (the bucket paces it)", p ? p->dialogSpawns : -1, p ? p->propSpawns : -1 );
 		CHECK( p && p->inUse, "%s: plugin slot", shapes[i].name );
 		if ( p ) CHECK( p->memUsed <= 512 * 1024, "%s: memory %d", shapes[i].name, (int)p->memUsed );
 		t0 = trap->Milliseconds();
-		for ( k = 0; k < 20; k++ ) { int before = t_payouts; t_frame( 50 ); CHECK( t_payouts - before <= RP_LUA_DB_WRITES_FRAME, "%s: %d payouts in a frame", shapes[i].name, t_payouts - before ); }	// timers and flushes
+		for ( k = 0; k < 20; k++ ) { int before = t_payouts, mbefore = t_musicChanges; t_frame( 50 ); CHECK( t_payouts - before <= RP_LUA_DB_WRITES_FRAME, "%s: %d payouts in a frame", shapes[i].name, t_payouts - before ); CHECK( t_musicChanges - mbefore <= RP_LUA_TOKENS, "%s: %d music changes in a frame", shapes[i].name, t_musicChanges - mbefore ); }	// timers and flushes
+		if ( !strcmp( shapes[i].name, "musictimer" ) ) CHECK( t_musicChanges <= RP_LUA_CMDS_PER_SEC, "musictimer: %d music changes in a second", t_musicChanges );
 		took = trap->Milliseconds() - t0;
 		CHECK( took < 20 * RP_LUA_LIMIT_MS, "%s: 20 frames took %d ms", shapes[i].name, took );
 		for ( k = 0, maxq = 0; k < 24; k++ ) if ( t_nsent[k] > maxq ) maxq = t_nsent[k];

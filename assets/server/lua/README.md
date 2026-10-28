@@ -70,11 +70,12 @@ however written, costs the server a bounded amount.
 | errors | 20 in 60 s | the plugin is switched off (`/scripts enable` brings it back) |
 | actions (`Msg.*`, `World.use/prop/npc/vehicle`, `Effect.play`, `Sound.play`) | one bucket of 4, one token back per `sv_floodProtect` ms | `false, "too fast"` |
 | props / NPCs / vehicles alive | 32 / 8 / 6 | `false, "too many props"` / `"too many npcs"` / `"too many vehicles"` |
-| spawns per map | 128 props / 32 NPCs / 24 vehicles | `false, "spawn limit for this map"` |
+| spawns per map | 128 props (16 of them dialogues) / 32 NPCs / 24 vehicles | `false, "spawn limit for this map"` |
 | script vehicles on the server | 24, all plugins and released ones together | `false, "too many vehicles on the server"` |
 | entity slots | the server's reserve of 64 kept free, as for `/entadd` | `false, "no room"` |
 | messages and `World.use`s to one player | 4 a second across all plugins | `false, "player busy"` |
 | commands a script call sets off, to one client (what a `World.use`'s chain prints, a dialogue, `Msg.*`) | 32 a second across all plugins | not sent; one log line a second |
+| a music change a script call sets off (`target_play_music`: one command to everyone) | needs room in every client's 32 | the music is not changed; one log line |
 | rewards a script call sets off (each is a database write) | 4 a server frame across all plugins | not paid, and the reward does not fire its target; one log line a frame |
 | timers | 32 live, 50 ms minimum | `false, "too many timers"` |
 | commands | 16, names of 3–24 characters | `false, "..."` |
@@ -188,12 +189,35 @@ Each `World.use` takes one of the player's four a second (`"player busy"`).
 `/entedit` and `/entremove` may touch even on the map's own entities:
 weapons, ammo, items, dispensers and racks, `misc_model_breakable`,
 `misc_model_ghoul`, `misc_model_cargo_small`, `misc_exploding_crate`,
-`misc_gas_tank`, `fx_runner`, `target_speaker`. The keys are the class's
-own, as for `/entadd`, except the link keys (`targetname`,
-`script_targetname`, `team`, `target`…`target6`), `rpLock` and the spawner
-reward keys, which are refused. A script's entity is named
+`misc_gas_tank`, `fx_runner`, `target_speaker`, and the quest entities
+`target_dialog`, `target_reward`, `target_flag` and `target_play_music`
+(see `/enthelp` for their keys). The keys are the class's own, as for
+`/entadd`, except `targetname`, `script_targetname`, `team`, `rpLock` and
+the spawner reward keys, which are refused. A script's entity is named
 `lua.<plugin>.<name>` when `{name=...}` is given, so it can never take a map
-entity's name. `/entsave` leaves script entities out; `/entremove`,
+entity's name; admins reach it by that name (`/npc kill lua.quest.guard`,
+`/entuse`).
+
+**A script's entities link only to each other.** Every link key — `target`
+to `target6`, `paintarget`, `opentarget`, `closetarget`, `npc_target`, and a
+dialogue's `go1`…`go6` and `speaker` — takes the plain name of one of the
+plugin's own entities and is stored as `lua.<plugin>.<name>`:
+`go1 = "pay"` fires the plugin's `pay`. So a plugin's dialogue can pay its
+own reward, set its own flags, play its own music or open its next
+dialogue, but never a map door, a map `target_kill` or another plugin's
+entity. (Flag names, `flag` and `need<n>`, are per-player state, not links,
+and stay as given.) A dialogue's options fire when the player answers, as
+their own action. A plugin may spawn 16 dialogues per map (each keeps its
+text in the level's memory until the map ends); the other classes count
+within the 128 props.
+
+```lua
+local pay  = World.prop("target_reward", o, nil, {credits=50, xp=5, message="Quest done"}, {name="pay"})
+local done = World.prop("target_flag",   o, nil, {flag="quest_done", target="pay"}, {name="done"})
+local talk = World.prop("target_dialog", o, nil, {message="Did you do it?", option1="Yes", need1="quest_done", go1="done",
+                                                   option2="Not yet"}, {name="talk"})
+World.use("lua.quest.talk", p)           -- opens the dialogue for p; "Yes" sets the flag and pays, as p's own action
+``` `/entsave` leaves script entities out; `/entremove`,
 `/entedit` and `/entload` treat them as any other, and the handle goes
 stale then. A dead NPC counts as alive until its body is gone or removed.
 
@@ -268,8 +292,8 @@ or `loadfile`; `load` takes text only; `collectgarbage` only answers
 `"count"`. Plugins cannot call each other, touch accounts, kick, rename,
 damage, teleport, pay or give to a player directly (only through the map's
 entities and their own NPCs' kill rewards), spawn anything outside the
-exempt classes, make rewards or dialogues of their own, give NPCs orders,
-or change cvars. That is by design for this stage.
+exempt classes, link their entities to the map's, give NPCs orders, or
+change cvars. That is by design for this stage.
 
 ## Writing a plugin
 

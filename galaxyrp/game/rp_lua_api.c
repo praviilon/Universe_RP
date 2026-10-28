@@ -307,6 +307,33 @@ qboolean RP_Lua_ScriptCmdRoom( int clientNum, int n )
 	return RP_Lua_CmdFits( clientNum, n );
 }
 
+// something that reaches every client at once and cannot be split (a configstring change: the engine sends a "cs"
+// reliable command to everyone): room for n on every counted client, all or nothing, and counted when it passes
+qboolean RP_Lua_ScriptBroadcastRoom( int n )
+{
+	int i, k;
+
+	if ( !rp_luaInCall )
+		return qtrue;
+	for ( i = 0; i < level.maxclients; i++ )
+	{
+		if ( RP_Lua_CmdCounted( i ) && !RP_Lua_CmdFits( i, n ) )
+		{
+			RP_Lua_CmdHeld( i );
+			return qfalse;
+		}
+	}
+	for ( i = 0; i < level.maxclients; i++ )
+	{
+		if ( RP_Lua_CmdCounted( i ) )
+		{
+			for ( k = 0; k < n; k++ )
+				RP_Lua_CmdCount( i );
+		}
+	}
+	return qtrue;
+}
+
 // trap->SendServerCommand: the engine's, counted per client while a script call is on the stack
 static void RP_Lua_SendGuarded( int clientNum, const char *text )
 {

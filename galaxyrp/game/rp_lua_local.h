@@ -58,6 +58,7 @@ three cvars (rp_lua, rp_lua_plugins, rp_lua_memkb) are in g_xcvar.h.
 												// no plugin's, still a script's (/entsave leaves it out)
 #define RP_LUA_PROP_SPAWNS_MAP	128		// spawns per plugin per map: the key/value pool (G_Alloc) and the
 #define RP_LUA_NPC_SPAWNS_MAP	32		// spawner strings are never freed within a map
+#define RP_LUA_DIALOG_SPAWNS_MAP 16		// target_dialogs per plugin per map, within the 128: each keeps ~1.5 KB of pool
 #define RP_LUA_NPC_HEALTH_MAX	100000	// World.npc's health option: 1..this
 #define RP_LUA_MAX_KEYS			24		// key/value pairs a World.prop may carry (ZYK_MAX_SPAWN_STRING_SLOTS/2 is 64)
 #define RP_LUA_KEY_NAME_MAX		32
@@ -146,7 +147,7 @@ typedef struct rpLuaPlugin_s {
 	// P2: the world
 	rpLuaEntity_t	ents[RP_LUA_MAX_ENTS];
 	int				numEnts;
-	int				propSpawns, npcSpawns, vehicleSpawns;	// this map (this load)
+	int				propSpawns, npcSpawns, vehicleSpawns, dialogSpawns;	// this map (this load)
 	qboolean		removesQueued;
 
 	// stats

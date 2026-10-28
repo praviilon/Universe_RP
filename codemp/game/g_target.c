@@ -1381,6 +1381,8 @@ void target_play_music_use(gentity_t *self, gentity_t *other, gentity_t *activat
 {
 	const char *reason = "";
 
+	if ( !RP_LUA_BROADCAST_ROOM( 1 ) )
+		return;	// GLX_U: [Lua] a script's use: the "cs" the change sends everyone needs room in every client's budget (logged)
 	G_ActivateBehavior(self,BSET_USE);
 	// GalaxyRP fix: [Music] through G_SetMusic(): two file names at most, within the gamestate budget
 	if ( !G_SetMusic( self->message, &reason ) )

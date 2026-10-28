@@ -40,6 +40,7 @@ extern int rp_luaInCall;		// a script call is on the stack: the stability guards
 // the stability guards (rp_lua_api.c): only while a script call is on the stack; always qtrue outside one
 void RP_Lua_TrapGuardInstall( void );	// G_InitGame: trap->SendServerCommand counted per client in script calls
 qboolean RP_Lua_ScriptCmdRoom( int clientNum, int n );	// n more commands to that client fit this second
+qboolean RP_Lua_ScriptBroadcastRoom( int n );	// n more to every client fit (a configstring change), counted when they do
 qboolean RP_Lua_ScriptDbWrite( void );	// one more database write fits this frame (and is counted)
 const char *RP_Lua_CurrentName( void );	// the plugin whose call runs, or NULL
 
@@ -58,4 +59,5 @@ const char *RP_Lua_CurrentName( void );	// the plugin whose call runs, or NULL
 #define RP_LUA_EVENT_DIALOG( p, n, num, c, o, r )	do { if ( rp_luaActive ) RP_Lua_EventDialog( p, n, num, c, o, r ); } while ( 0 )
 #define RP_LUA_IN_CALL()				( rp_luaInCall != 0 )
 #define RP_LUA_CMD_ROOM( c, n )			( !rp_luaInCall || RP_Lua_ScriptCmdRoom( c, n ) )
+#define RP_LUA_BROADCAST_ROOM( n )		( !rp_luaInCall || RP_Lua_ScriptBroadcastRoom( n ) )
 #define RP_LUA_DB_WRITE_OK()			( !rp_luaInCall || RP_Lua_ScriptDbWrite() )

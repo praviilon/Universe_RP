@@ -21,6 +21,10 @@ static int t_knocked[MAX_CLIENTS]; qboolean BG_InKnockDown( int anim ) { return 
 
 // a target_dialog or target_flag spawned from keys, the way the game would (slot, classname, then SP_)
 void SP_target_dialog( gentity_t *ent ); void SP_target_flag( gentity_t *ent );
+// World.prop's target_dialog and target_flag spawned for real: the record's keys become the spawn keys
+void t_spawnReal( gentity_t *ent ) { int n = ent->s.number, i; const char *keys[] = { "title", "message", "option1", "go1", "need1", "option2", "go2", "need2", "option3", "go3", "need3", "timeout", "range", "speaker", "flag", "targetname", NULL };
+	t_nkeys = 0; for ( i = 0; keys[i]; i++ ) { const char *v = t_recordValue( n, keys[i] ); if ( v ) t_key( keys[i], v ); } ent->use = NULL;
+	if ( !strcmp( ent->classname, "target_dialog" ) ) SP_target_dialog( ent ); else SP_target_flag( ent ); t_nkeys = 0; }
 static int spawn_dialog( const char *targetname, const char *target, int spawnflags )
 { gentity_t *e = &g_entities[t_mapEntity( "target_dialog", targetname, target )]; e->spawnflags = spawnflags; e->use = NULL; t_key( "targetname", targetname ); SP_target_dialog( e ); t_nkeys = 0; return e->inuse ? e->s.number : -1; }
 static int spawn_flag( const char *targetname, const char *flag, int spawnflags )
@@ -148,6 +152,34 @@ int main( void )
 	  GlobalUse( &g_entities[dq], &g_entities[0], &g_entities[0] ); id = level.rpDialog[0].id; CHECK( id > 0, "Alice's own use opens it" );
 	  t_args( "talk quest" ); RP_LUA_COMMAND( &g_entities[0], "talk" ); CHECK( level.rpDialog[0].id == id, "a script's use without room leaves the open one untouched" );
 	  frames( 1000 ); t_args( "talk quest" ); RP_LUA_COMMAND( &g_entities[0], "talk" ); CHECK( level.rpDialog[0].id > id, "a second later it opens (replacing): %d", level.rpDialog[0].id );
+	  RP_LUA_SHUTDOWN(); }
+
+	// --- a plugin's own quest: its dialogue (real g_dialog.c), reward and flag, spawned by World.prop; opened by its own
+	// World.use; the answer fires the plugin's own entities as the player's action; a map name is out of reach; the
+	// entity removed while open closes as "gone"
+	t_init( 8 ); t_player( 0, "Alice", qtrue, 7 ); g_entities[0].client->pers.enterTime = 100;
+	t_write_plugin( "own", "H = {} local function mk(c, k, n) local h, why = World.prop(c, {x=0,y=0,z=0}, nil, k, {name=n}) if not h then Log.info('mk ' .. c .. ': ' .. tostring(why)) end H[#H+1] = h return h end\n"
+		"Events.on('init', function() mk('target_reward', {credits=30, xp=1}, 'pay') mk('target_flag', {flag='own_done', target='pay'}, 'done')\n"
+		"  mk('target_dialog', {message='Again?', option1='Yes', go1='talk'}, 'again')\n"
+		"  mk('target_dialog', {message='Job?', option1='I did it', need1='own_done', go1='done', option2='Open the map door', go2='door1', option3='Talk again', go3='again', timeout=30}, 'talk') end)\n"
+		"Commands.add('talk', function(p) U, S = World.use('lua.own.talk', p) end)\n"
+		"Commands.add('drop', function(p) World.remove(H[4]) end)\n" );
+	{ int door = t_mapEntity( "func_door", "door1", NULL ); rpLuaPlugin_t *pl; int dq = -1, i;
+	  t_logLen = 0; t_log[0] = 0; t_start( "own" ); pl = RP_Lua_Find( "own" ); CHECK( pl && pl->L && !strstr( t_log, "mk " ), "the four spawned: %s", t_log );
+	  for ( i = MAX_CLIENTS; i < level.num_entities; i++ ) if ( g_entities[i].inuse && g_entities[i].targetname && !strcmp( g_entities[i].targetname, "lua.own.talk" ) ) dq = i;
+	  CHECK( dq >= 0 && g_entities[dq].rpDialogDef && !strcmp( g_entities[dq].rpDialogDef->go[1], "lua.own.door1" ) && !strcmp( g_entities[dq].rpDialogDef->need[0], "own_done" ), "the real dialogue: go2 prefixed, need1 as given" );
+	  pl->tokens = RP_LUA_TOKENS; t_args( "talk" ); RP_LUA_COMMAND( &g_entities[0], "talk" ); CHECK( level.rpDialog[0].id > 0 && level.rpDialog[0].numShown == 2, "opened by the plugin's own use; 'I did it' hidden without the flag (%d shown)", level.rpDialog[0].numShown );
+	  dialog_cmd( 0, "dialog 1" ); CHECK( level.rpDialog[0].id == 0 && t_usedCount[door] == 0, "'Open the map door' fires lua.own.door1: the map's door1 is untouched" );
+	  pl->tokens = RP_LUA_TOKENS; t_args( "talk" ); RP_LUA_COMMAND( &g_entities[0], "talk" ); { int id = level.rpDialog[0].id; dialog_cmd( 0, "dialog 2" ); CHECK( level.rpDialog[0].id > id && level.rpDialog[0].numShown == 1, "'Talk again' opened the plugin's other dialogue (%d)", level.rpDialog[0].id ); }
+	  dialog_cmd( 0, "dialog 1" ); CHECK( level.rpDialog[0].numShown == 2, "and that one reopened the first" );
+	  dialog_cmd( 0, "dialog 0" );
+	  // the flag set by a map button aimed at the plugin's flag entity? no: a map cannot name lua.own.done -- the plugin uses it
+	  pl->tokens = RP_LUA_TOKENS; { gentity_t *f = NULL; while ( ( f = G_Find( f, FOFS( targetname ), "lua.own.done" ) ) ) GlobalUse( f, &g_entities[0], &g_entities[0] ); }
+	  CHECK( RP_FlagHas( &g_entities[0], "own_done" ) && t_payouts == 1 && t_paidCredits[0] == 30, "the flag set and its target, the reward, paid (as a player's use)" );
+	  pl->tokens = RP_LUA_TOKENS; t_args( "talk" ); RP_LUA_COMMAND( &g_entities[0], "talk" ); CHECK( level.rpDialog[0].numShown == 3, "with the flag, 'I did it' is offered (%d)", level.rpDialog[0].numShown );
+	  t_logLen = 0; t_log[0] = 0; dialog_cmd( 0, "dialog 1" ); CHECK( t_payouts == 2 && !t_log_has( "[lua:" ), "the answer paid the plugin's reward as Alice's own action" );
+	  pl->tokens = RP_LUA_TOKENS; t_args( "talk" ); RP_LUA_COMMAND( &g_entities[0], "talk" ); CHECK( level.rpDialog[0].id > 0, "open again" );
+	  t_args( "drop" ); RP_LUA_COMMAND( &g_entities[0], "drop" ); t_frame( 50 ); frames( 500 ); CHECK( level.rpDialog[0].id == 0 && t_log_has( ": gone" ), "removed while open: closed as gone" );
 	  RP_LUA_SHUTDOWN(); }
 
 	printf( fails ? "%d FAILED\n" : "t_dialog: ALL OK\n", fails );

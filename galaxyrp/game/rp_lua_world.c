@@ -606,6 +606,23 @@ static void RP_LuaWorld_OptNotForVehicle( lua_State *L, int idx )
 	}
 }
 
+// how long a <name> may be for this plugin: lua.<plugin>.<name> has to fit a targetname (MAX_QPATH)
+static int RP_LuaWorld_NameRoom( void )
+{
+	int room = MAX_QPATH - 1 - 4 - (int)strlen( rpLuaCurrent->name ) - 1;
+
+	return room < RP_LUA_ENT_NAME_MAX ? room : RP_LUA_ENT_NAME_MAX;
+}
+
+// "lua.<plugin>.<name>" into out; qfalse when it would not fit
+static qboolean RP_LuaWorld_PrefixedName( const char *name, char *out, int outSize )
+{
+	if ( (int)strlen( name ) > RP_LuaWorld_NameRoom() )
+		return qfalse;
+	Com_sprintf( out, outSize, "lua.%s.%s", rpLuaCurrent->name, name );
+	return qtrue;
+}
+
 // opts.name -> "lua.<plugin>.<name>" in out, or out empty when there is none; an error for a bad one
 static void RP_LuaWorld_Targetname( lua_State *L, int idx, char *out, int outSize )
 {
@@ -622,9 +639,8 @@ static void RP_LuaWorld_Targetname( lua_State *L, int idx, char *out, int outSiz
 		return;
 	}
 	name = lua_tostring( L, -1 );
-	if ( !name || !RP_LuaWorld_NameOk( name ) )
-		luaL_error( L, "name is letters, digits and '_', up to %d", RP_LUA_ENT_NAME_MAX );
-	Com_sprintf( out, outSize, "lua.%s.%s", rpLuaCurrent->name, name );
+	if ( !name || !RP_LuaWorld_NameOk( name ) || !RP_LuaWorld_PrefixedName( name, out, outSize ) )
+		luaL_error( L, "name is letters, digits and '_', up to %d", RP_LuaWorld_NameRoom() );
 	lua_pop( L, 1 );
 }
 
@@ -689,18 +705,28 @@ static int RP_LuaWorld_Use( lua_State *L )
 
 /*
 ==================
-World.prop( classname, origin, angles, keys )
+World.prop( classname, origin, angles, keys, opts )
 
 The /entadd sequence (zyk_entadd, g_cmds.c) for one of the Entity System's exempt classes (RP_MapExemptClass:
-pickups, dispensers, decor, fx_runner, target_speaker -- the classes /entedit and /entremove may touch even
-when the map made them). The keys are validated as /entadd validates them, with the link keys, rpLock and the
-spawner reward keys refused; the game's spawn function decides the rest, as it does for /entadd.
+pickups, dispensers, decor, fx_runner, target_speaker, and the quest entities target_dialog, target_reward,
+target_flag, target_play_music -- the classes /entedit and /entremove may touch even when the map made them).
+The keys are validated as /entadd validates them, with the name keys, rpLock and the spawner reward keys
+refused, and every link key (target..., a dialogue's go<n> and speaker) taken as a plain name of one of the
+plugin's own entities and stored with the plugin's prefix; the game's spawn function decides the rest, as it
+does for /entadd.
 ==================
 */
 static const char *const rpLuaRefusedKeys[] = {
 	"classname", "origin", "angles", "aimoffset",	// arguments of the call, not keys
-	"targetname", "script_targetname", "team", "target", "target2", "target3", "target4", "target5", "target6",	// links to the map
+	"targetname", "script_targetname", "npc_targetname", "team",	// the name is opts.name; ICARUS and the mover teams are the map's
 	"rpLock", "npccredits", "npcxp",
+	NULL
+};
+// a link key: its value is a plain name of one of this plugin's own entities, stored as lua.<plugin>.<name>, so a
+// script's entity can aim only at the plugin's own -- never at the map's, an admin's or another plugin's
+static const char *const rpLuaLinkKeys[] = {
+	"target", "target2", "target3", "target4", "target5", "target6", "paintarget", "opentarget", "closetarget", "npc_target",
+	"go1", "go2", "go3", "go4", "go5", "go6", "speaker",	// a target_dialog's options and its speaker
 	NULL
 };
 
@@ -732,6 +758,18 @@ static qboolean RP_LuaWorld_KeyRefused( const char *key )
 	for ( i = 0; rpLuaRefusedKeys[i]; i++ )
 	{
 		if ( !Q_stricmp( key, rpLuaRefusedKeys[i] ) )
+			return qtrue;
+	}
+	return qfalse;
+}
+
+static qboolean RP_LuaWorld_KeyIsLink( const char *key )
+{
+	int i;
+
+	for ( i = 0; rpLuaLinkKeys[i]; i++ )
+	{
+		if ( !Q_stricmp( key, rpLuaLinkKeys[i] ) )
 			return qtrue;
 	}
 	return qfalse;
@@ -779,7 +817,13 @@ static int RP_LuaWorld_Keys( lua_State *L, int idx, rpLuaPair_t *pairs, int maxP
 		if ( n >= maxPairs )
 			return luaL_error( L, "at most %d keys", maxPairs );
 		Q_strncpyz( pairs[n].key, key, sizeof( pairs[n].key ) );
-		Q_strncpyz( pairs[n].value, value, sizeof( pairs[n].value ) );
+		if ( RP_LuaWorld_KeyIsLink( key ) )
+		{ // one of the plugin's own entities, by its plain name
+			if ( !RP_LuaWorld_NameOk( value ) || !RP_LuaWorld_PrefixedName( value, pairs[n].value, sizeof( pairs[n].value ) ) )
+				return luaL_error( L, "'%s' is a name of one of this plugin's entities: letters, digits and '_', up to %d", key, RP_LuaWorld_NameRoom() );
+		}
+		else
+			Q_strncpyz( pairs[n].value, value, sizeof( pairs[n].value ) );
 		n++;
 		lua_pop( L, 1 );
 	}
@@ -821,6 +865,8 @@ static int RP_LuaWorld_Prop( lua_State *L )
 		return RP_LuaWorld_Refuse( L, "too many props" );
 	if ( p->propSpawns >= RP_LUA_PROP_SPAWNS_MAP )
 		return RP_LuaWorld_Refuse( L, "spawn limit for this map" );
+	if ( !Q_stricmp( classname, "target_dialog" ) && p->dialogSpawns >= RP_LUA_DIALOG_SPAWNS_MAP )
+		return RP_LuaWorld_Refuse( L, "spawn limit for this map" );	// each keeps ~1.5 KB of pool to the map's end
 	RP_SpawnRouteInit( &route );
 	for ( i = 0; i < n; i++ )
 	{
@@ -836,6 +882,8 @@ static int RP_LuaWorld_Prop( lua_State *L )
 	if ( !RP_LuaApi_TakeToken( p, 1 ) )
 		return RP_LuaWorld_Refuse( L, "too fast" );
 	p->propSpawns++;
+	if ( !Q_stricmp( classname, "target_dialog" ) )
+		p->dialogSpawns++;
 
 	e = RP_SpawnForRoute( &route );
 	if ( !e )
