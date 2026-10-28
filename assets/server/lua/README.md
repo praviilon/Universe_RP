@@ -167,7 +167,8 @@ the map's items, a `target_kill` kills them. NPCs, vehicles, held entities
 and entities with no use are skipped. It returns `used, skipped`. A name
 whose chain reaches a `target_reward` (through any number of relays,
 delays or counters) is refused with `false, "leads to a reward"`: scripts
-never pay credits or XP, not even through the map.
+never pay credits or XP, not even through the map. A chain that reaches a
+`target_dialog` is refused the same way (`"leads to a dialogue"`) for now.
 
 `World.prop` spawns one of the Entity System's exempt classes — the ones
 `/entedit` and `/entremove` may touch even on the map's own entities:

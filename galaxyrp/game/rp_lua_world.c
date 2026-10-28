@@ -329,11 +329,12 @@ after it. NPCs and vehicles (using one boards it), held entities and those witho
 /entuse skips them. The entity_used event does not fire for a use made by a script (rpLuaCurrent).
 ==================
 */
-// GLX_U: [Rewards] a target_reward reachable from these entities through the keys a use follows (target,
-// target2..6, and a mover's open/close/pain targets): a script may not pull a trigger that pays anyone,
-// however many relays, delays or counters sit in between. A bounded walk with a visited set, over the
-// networked and the logical region both (G_Find searches both).
-static qboolean RP_LuaWorld_ChainReachesReward( const int *start, int numStart )
+// GLX_U: [Rewards][Dialogues] a target_reward or a target_dialog reachable from these entities through the
+// keys a use follows (target, target2..6, a mover's open/close/pain targets, and a dialogue's go1..6): a
+// script may not pull a trigger that pays anyone or starts a conversation, however many relays, delays or
+// counters sit in between. A bounded walk with a visited set, over the networked and the logical region
+// both (G_Find searches both). The refusal text, or NULL.
+static const char *RP_LuaWorld_ChainRefused( const int *start, int numStart )
 {
 	static byte visited[MAX_ENTITIESTOTAL];
 	static int queue[MAX_ENTITIESTOTAL];
@@ -351,16 +352,19 @@ static qboolean RP_LuaWorld_ChainReachesReward( const int *start, int numStart )
 	while ( head < tail && steps++ < 2048 )
 	{
 		gentity_t *e = &g_entities[queue[head++]];
-		const char *names[9];
-		int n;
+		const char *names[9 + RP_DIALOG_OPTIONS];
+		int n, count = 9;
 
 		if ( !e->inuse )
 			continue;
 		if ( e->classname && !Q_stricmp( e->classname, "target_reward" ) )
-			return qtrue;
+			return "leads to a reward";
+		if ( e->classname && !Q_stricmp( e->classname, "target_dialog" ) )
+			return "leads to a dialogue";
 		names[0] = e->target; names[1] = e->target2; names[2] = e->target3; names[3] = e->target4; names[4] = e->target5;
 		names[5] = e->target6; names[6] = e->closetarget; names[7] = e->opentarget; names[8] = e->paintarget;
-		for ( n = 0; n < 9; n++ )
+		count += RP_DialogOptionTargets( e, &names[9], RP_DIALOG_OPTIONS );
+		for ( n = 0; n < count; n++ )
 		{
 			gentity_t *t = NULL;
 
@@ -378,7 +382,7 @@ static qboolean RP_LuaWorld_ChainReachesReward( const int *start, int numStart )
 			}
 		}
 	}
-	return qfalse;
+	return NULL;
 }
 
 static int RP_LuaWorld_Use( lua_State *L )
@@ -398,8 +402,12 @@ static int RP_LuaWorld_Use( lua_State *L )
 		found[numFound++] = e - g_entities;
 	if ( !numFound )
 		return RP_LuaWorld_Refuse( L, "nothing has that targetname" );
-	if ( RP_LuaWorld_ChainReachesReward( found, numFound ) )
-		return RP_LuaWorld_Refuse( L, "leads to a reward" );
+	{
+		const char *refused = RP_LuaWorld_ChainRefused( found, numFound );
+
+		if ( refused )
+			return RP_LuaWorld_Refuse( L, refused );
+	}
 	if ( !RP_LuaApi_TakeToken( p, 1 ) )
 		return RP_LuaWorld_Refuse( L, "too fast" );
 

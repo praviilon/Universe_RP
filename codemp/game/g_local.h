@@ -146,6 +146,33 @@ extern vec3_t gPainPoint;
 // That is the cost these guards exist to avoid, and the reason the one surviving call in G_Spawn
 // writes its reason to the log first.
 #define ZYK_ENTITY_RESERVE			64
+
+// GLX_U: [Dialogues] g_dialog.c. The limits the menu needs: a text of one client cvar, an option of one menu
+// line, six options; flag names and how many a player may hold.
+#define RP_FLAG_NAME_MAX		31
+#define RP_FLAGS_PER_PLAYER		16
+#define RP_DIALOG_OPTIONS		6
+typedef struct rpDialogDef_s {
+	char		title[49];
+	char		text[256];
+	char		option[RP_DIALOG_OPTIONS][65];
+	char		go[RP_DIALOG_OPTIONS][64];		// targetname fired for that option, with the player as activator
+	char		need[RP_DIALOG_OPTIONS][RP_FLAG_NAME_MAX + 2];	// a flag the player needs ("!flag": must not have)
+	int			numOptions;
+	int			timeoutMs;
+	float		range;							// 0: never closes for distance
+	char		speaker[64];					// targetname of whom the range is measured from; empty: the dialogue itself
+} rpDialogDef_t;
+typedef struct {
+	int				id;							// 0: none open
+	int				entNum;
+	rpDialogDef_t	*def;						// the entity's record at the time: a respawn in place closes it
+	int				deadline, nextCheck;
+	int				shown[RP_DIALOG_OPTIONS];	// option index for each number offered (the need<n> rule)
+	int				numShown;
+	vec3_t			origin;						// where the speaker was when it opened
+	float			range;
+} rpDialogOpen_t;
 // GalaxyRP: [Logical Entities] the same idea for the logical region. G_SpawnLogical() ends the
 // server the way G_Spawn() does once every logical slot is in use, so the player-driven spawn paths
 // (/entadd, the entity-file loader, a dropped /entcopy, a misc_bsp rebuild) refuse while this many
@@ -529,6 +556,9 @@ struct gentity_s {
 	int			rpRewardPlayerWait;
 	int			rpRewardLastPaid;
 	int			*rpRewardSlots;
+	// GLX_U: [Dialogues] target_dialog's record (G_Alloc'ed at spawn, g_dialog.c); NULL on every other entity.
+	// A target_dialog with ONCE_EACH keeps its per-player record in rpRewardSlots, as target_reward does.
+	struct rpDialogDef_s *rpDialogDef;
 
 	// GalaxyRP: [SP Maps] true on a misc_turret spawned on a single-player map as the turret that
 	// classname means there -- a misc_turretG2 (SP_misc_turret() in g_turret.c). It then behaves as
@@ -1365,6 +1395,11 @@ typedef struct clientPersistant_s {
 
 	// Tr!Force: [Plugin] Client plugin check
 	qboolean		clientPlugin;
+	// GLX_U: [Dialogues] the client's cgame shows target_dialog menus ("rpdlg 1" in its userinfo, read in
+	// ClientUserinfoChanged); and the target_flag flags this player holds, for this connection and map
+	// (g_dialog.c). Both live in pers, so they survive a respawn and go with a disconnect.
+	qboolean		rpDialogMenu;
+	char			rpFlags[RP_FLAGS_PER_PLAYER][RP_FLAG_NAME_MAX + 1];
 
 	int				rpVoiceCmdTime;		// GLX_U: [Voice] level.time of the next /voice_cmd allowed
 
@@ -2247,6 +2282,7 @@ typedef struct level_locals_s {
 	qboolean rp_use_limit_warned;
 	int rp_use_depth;	// GlobalUse(): uses nested inside each other right now
 	int rp_use_chain;	// GlobalUse(): uses so far under the current outermost one
+	rpDialogOpen_t rpDialog[MAX_CLIENTS];	// GLX_U: [Dialogues] the one dialogue each player may have open (g_dialog.c)
 	vec3_t rp_fallback_spawn_origin;
 	vec3_t rp_fallback_spawn_angles;
 
@@ -2569,6 +2605,14 @@ int			RP_BreakStringEdRefs( char *text );
 qboolean	RP_HasStringEdRef( const char *text );
 const char	*RP_ShownText( const char *text );
 void		RP_PayNpcKillReward( gentity_t *npc, gentity_t *killer );
+// GLX_U: [Dialogues] g_dialog.c
+void		RP_DialogFrame( void );						// every frame, after the thinks: timeouts, range, the player's state
+void		RP_DialogPlayerGone( int clientNum, qboolean disconnected );	// ClientDisconnect (qtrue), ClientSpawn (qfalse)
+int			RP_DialogOptionTargets( const gentity_t *ent, const char **names, int max );	// a dialogue's go1..6, for the Lua chain walk
+qboolean	RP_FlagHas( const gentity_t *ent, const char *name );
+void		Cmd_Dialog_f( gentity_t *ent );
+void		Cmd_EntFlags_f( gentity_t *ent );
+void		target_dialog_use( gentity_t *self, gentity_t *other, gentity_t *activator );
 qboolean	RP_PayReward( gentity_t *player, int credits, int xp, const char *label, const char *logTag, qboolean silent );	// GLX_U: [Rewards] the one payout path (g_cmds.c)
 qboolean	RP_SoundSetKnown( const char *name );
 // GalaxyRP fix: [Shader Remap] /remapreset's worker -- returns how many remaps it cleared. See the

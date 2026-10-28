@@ -9434,6 +9434,7 @@ void G_RunFrame( int levelTime ) {
 		iTimer_Queues);
 #endif
 
+	RP_DialogFrame();	// GLX_U: [Dialogues] open dialogues: timeout, range, the player's state (after the thinks)
 	RP_LUA_FRAME();	// GLX_U: [Lua] timers, flushes and the queued loads and unloads, last
 
 	g_LastFrameTime = level.time;

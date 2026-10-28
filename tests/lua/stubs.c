@@ -55,6 +55,7 @@ void t_init( int maxclients )
 	memset( &level, 0, sizeof( level ) ); memset( g_entities, 0, sizeof( g_entities ) ); memset( g_clients_store, 0, sizeof( g_clients_store ) );
 	level.maxclients = maxclients; level.num_entities = MAX_CLIENTS; level.time = 1000;
 	Q_strncpyz( level.rawmapname, "testmap", sizeof( level.rawmapname ) );
+	for ( i = 0; i < MAX_ENTITIESTOTAL; i++ ) g_entities[i].s.number = i;
 	for ( i = 0; i < MAX_CLIENTS; i++ ) { g_entities[i].client = &g_clients_store[i]; }
 	rp_lua.integer = 1; rp_lua_memkb.integer = 512; Q_strncpyz( rp_lua_plugins.string, "", sizeof( rp_lua_plugins.string ) );
 	t_logLen = 0; t_log[0] = 0; t_console[0] = 0; memset( t_nsent, 0, sizeof( t_nsent ) );
@@ -112,6 +113,10 @@ static const char *s_RecordValue( int n, const char *key ) { int i; for ( i = 0;
 void G_FreeEntity( gentity_t *ed ) { int n = ed->s.number; if ( n >= MAX_CLIENTS ) t_freed++; if ( ed->client && n >= MAX_CLIENTS && ( ed->client < g_clients_store || ed->client >= g_clients_store + MAX_CLIENTS ) ) { free( ed->client ); t_npcsAlive--; } memset( ed, 0, sizeof( *ed ) ); ed->s.number = n; ed->classname = "freed"; t_recordCount[n] = 0; t_freeSlots++; }
 void zyk_main_spawn_entity( gentity_t *ent ) { int n = ent->s.number; const char *v; if ( !ent->inuse ) return; level.rp_spawn_refusal[0] = 0; ent->classname = G_NewString( s_RecordValue( n, "classname" ) ); if ( ( v = s_RecordValue( n, "targetname" ) ) ) ent->targetname = G_NewString( v ); if ( ( v = s_RecordValue( n, "origin" ) ) ) sscanf( v, "%f %f %f", &ent->r.currentOrigin[0], &ent->r.currentOrigin[1], &ent->r.currentOrigin[2] ); if ( ( v = s_RecordValue( n, "health" ) ) ) ent->health = atoi( v ); ent->use = (void *)1; if ( t_spawnRefuse ) { Q_strncpyz( level.rp_spawn_refusal, "the server does not have that model", sizeof( level.rp_spawn_refusal ) ); G_FreeEntity( ent ); } }
 int RP_FreeEntityChildren( gentity_t *maker ) { (void)maker; return 0; }
+const char *t_dialogGo[MAX_ENTITIESTOTAL][RP_DIALOG_OPTIONS];	// a stand-in target_dialog's go1..6
+#ifndef T_REAL_DIALOG	// t_dialog links the real g_dialog.c
+int RP_DialogOptionTargets( const gentity_t *ent, const char **names, int max ) { int i, n = 0; if ( !ent->classname || strcmp( ent->classname, "target_dialog" ) ) return 0; for ( i = 0; i < RP_DIALOG_OPTIONS && n < max; i++ ) if ( t_dialogGo[ent->s.number][i] ) names[n++] = t_dialogGo[ent->s.number][i]; return n; }
+#endif
 qboolean RP_EntityIsCharacter( const gentity_t *e ) { return ( e && e->client ) ? qtrue : qfalse; }
 void G_SetOrigin( gentity_t *ent, vec3_t origin ) { VectorCopy( origin, ent->r.currentOrigin ); VectorCopy( origin, ent->s.origin ); }
 gentity_t *NPC_Spawn_Do( gentity_t *spawner ) { gentity_t *npc; if ( t_npcRefuse || !G_EntitySlotsAvailable( 3 ) ) return NULL; npc = s_SpawnSlot(); if ( !npc ) return NULL; npc->client = calloc( 1, sizeof( gclient_t ) ); npc->classname = "NPC"; npc->NPC_type = spawner->NPC_type; npc->targetname = spawner->NPC_targetname; VectorCopy( spawner->s.origin, npc->r.currentOrigin ); npc->health = 100; npc->use = (void *)1; t_npcsAlive++; return npc; }
@@ -119,7 +124,7 @@ void RP_SpawnedRemove( gentity_t *e ) { e->takedamage = qfalse; e->health = 0; e
 int RP_ConfigstringIndexOf( const char *name, int start, int max ) { int b = ( start == CS_SOUNDS ) ? 0 : 1, i; (void)max; for ( i = 0; i < t_ncs[b]; i++ ) if ( !Q_stricmp( t_cs[b][i], name ) ) return i + 1; return 0; }
 gentity_t *G_PlayEffectID( const int fxID, vec3_t org, vec3_t ang ) { (void)ang; t_effects++; t_lastEffect = fxID; VectorCopy( org, t_lastEffectOrigin ); return NULL; }
 void G_SoundAtLoc( vec3_t loc, int channel, int soundIndex ) { (void)loc; (void)channel; t_sounds++; t_lastSound = soundIndex; }
-static void s_Use( gentity_t *self, gentity_t *other, gentity_t *activator ) { int n = self->s.number; t_usedCount[n]++; t_usedInCall[n] = rp_luaInCall; t_usedOther[n] = other; t_usedActivator[n] = activator; if ( self->target ) { gentity_t *t = NULL; while ( ( t = G_Find( t, FOFS( targetname ), self->target ) ) ) GlobalUse( t, self, activator ); } }
+static void s_Use( gentity_t *self, gentity_t *other, gentity_t *activator ) { int n = self->s.number; t_usedCount[n]++; t_usedInCall[n] = rp_luaInCall; t_usedOther[n] = other; t_usedActivator[n] = activator; if ( self->use && self->use != (void *)1 ) { self->use( self, other, activator ); return; } if ( self->target ) { gentity_t *t = NULL; while ( ( t = G_Find( t, FOFS( targetname ), self->target ) ) ) GlobalUse( t, self, activator ); } }
 void GlobalUse( gentity_t *self, gentity_t *other, gentity_t *activator )
 { // the real one's shape: inactive, no use, the lock with a player activator, depth 128 / chain 2048, then use, then the Lua event
 	if ( !self || ( self->flags & FL_INACTIVE ) || !self->use ) return;
@@ -142,6 +147,6 @@ void t_worldReset( void )
 	for ( i = 0; i < s_numStrings; i++ ) free( s_strings[i] );
 	s_numStrings = 0;
 	t_freeSlots = 1000; t_poolFree = 1 << 20; t_spawnRefuse = qfalse; t_npcRefuse = qfalse;
-	memset( t_locked, 0, sizeof( t_locked ) ); memset( t_usedCount, 0, sizeof( t_usedCount ) ); memset( t_usedInCall, 0, sizeof( t_usedInCall ) ); memset( t_recordCount, 0, sizeof( t_recordCount ) );
+	memset( t_locked, 0, sizeof( t_locked ) ); memset( t_usedCount, 0, sizeof( t_usedCount ) ); memset( t_usedInCall, 0, sizeof( t_usedInCall ) ); memset( t_dialogGo, 0, sizeof( t_dialogGo ) ); memset( t_recordCount, 0, sizeof( t_recordCount ) );
 	t_useDepth = t_useChain = t_useRefused = 0; t_effects = t_sounds = 0; t_ncs[0] = t_ncs[1] = 0; t_freed = 0; t_npcsAlive = 0; t_removedSilently = 0;
 }

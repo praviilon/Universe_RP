@@ -52,6 +52,7 @@ set(MPGameGameFiles
 	"${MPDir}/game/g_client.c"
 	"${MPDir}/game/g_cmds.c"
 	"${MPDir}/game/g_combat.c"
+	"${MPDir}/game/g_dialog.c"
 	"${MPDir}/game/g_entbounds.c"
 	"${MPDir}/game/g_entgrab.c"
 	"${MPDir}/game/g_statics.c"

@@ -2445,6 +2445,8 @@ qboolean ClientUserinfoChanged( int clientNum ) {
 	} else {
 		client->pers.clientPlugin = qfalse;
 	}
+	// GLX_U: [Dialogues] a cgame that shows target_dialog menus says so (g_dialog.c)
+	client->pers.rpDialogMenu = ( atoi( Info_ValueForKey( userinfo, "rpdlg" ) ) >= 1 ) ? qtrue : qfalse;
 
 	// check the item prediction
 	s = Info_ValueForKey( userinfo, "cg_predictItems" );
@@ -3824,6 +3826,8 @@ void ClientSpawn(gentity_t *ent) {
 	index = ent - g_entities;
 	client = ent->client;
 
+	RP_DialogPlayerGone( index, qfalse );	// GLX_U: [Dialogues] a (re)spawn ends any dialogue left open
+
 	//first we want the userinfo so we can see if we should update this client's saber -rww
 	trap->GetUserinfo( index, userinfo, sizeof( userinfo ) );
 
@@ -4844,6 +4848,7 @@ void ClientDisconnect( int clientNum ) {
 		return;
 	}
 
+	RP_DialogPlayerGone( clientNum, qtrue );	// GLX_U: [Dialogues] an open dialogue goes with the player
 	RP_LUA_EVENT_DISCONNECT( ent );	// GLX_U: [Lua] client_disconnect, while the player can still be read; then the handles go stale
 	RP_LUA_GEN( clientNum );
 

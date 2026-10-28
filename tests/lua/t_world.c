@@ -49,7 +49,13 @@ int main( void )
 	  run( p, "use chest_pay" ); CHECK( !strcmp( get_str( p, "WHY" ), "leads to a reward" ), "the reward itself" );
 	  g_entities[del].target = "chest_relay"; run( p, "use chest_delay" ); CHECK( !strcmp( get_str( p, "WHY" ), "leads to a reward" ) || t_usedCount[pay] == 0, "a loop in the chain ends (%s)", get_str( p, "WHY" ) ); g_entities[del].target = "chest_pay";
 	  run( p, "use plain_btn" ); CHECK( get_int( p, "U" ) == 1 && t_usedCount[plain] == 1 && t_usedInCall[plain] == 1, "an unrelated chain still works, and inside a script call the flag is set (%d)", t_usedInCall[plain] );
-	  GlobalUse( &g_entities[plain], &g_entities[1], &g_entities[1] ); CHECK( t_usedInCall[plain] == 0 && rp_luaInCall == 0, "a player's use: flag clear" ); }
+	  GlobalUse( &g_entities[plain], &g_entities[1], &g_entities[1] ); CHECK( t_usedInCall[plain] == 0 && rp_luaInCall == 0, "a player's use: flag clear" );
+	  // dialogues: a chain reaching a target_dialog is refused; a reward behind a dialogue's option is seen through the dialogue
+	  { int tb = t_mapEntity( "func_button", "talk_btn", "talk_dlg" ); int dlg = t_mapEntity( "target_dialog", "talk_dlg", NULL ); int other = t_mapEntity( "func_button", "quiz_btn", "quiz_relay" ); int qr = t_mapEntity( "target_relay", "quiz_relay", "quiz_dlg" ); int qd = t_mapEntity( "target_dialog", "quiz_dlg", NULL ); (void)qr; (void)qd;
+	    t_dialogGo[qd][1] = "chest_pay"; (void)other;
+	    refill( p ); run( p, "use talk_btn" ); CHECK( !strcmp( get_str( p, "WHY" ), "leads to a dialogue" ) && t_usedCount[tb] == 0 && t_usedCount[dlg] == 0 && p->tokens == RP_LUA_TOKENS, "a dialogue refused: %s", get_str( p, "WHY" ) );
+	    run( p, "use quiz_btn" ); CHECK( !strcmp( get_str( p, "WHY" ), "leads to a dialogue" ), "a dialogue behind a relay refused: %s", get_str( p, "WHY" ) );
+	    CHECK( t_usedCount[pay] == 0, "the reward behind the quiz was never reached" ); } }
 	RP_LUA_SHUTDOWN();
 
 	// --- World.prop: classes, keys, name, handle, tag, refusal text, caps, no room

@@ -13,4 +13,6 @@ gcc -c -O1 -w -I$R/lib/lua -o out/sqlite3.o $R/shared/sqlite/sqlite3.c
 for t in t_core t_api t_store t_world t_hostile; do
 	gcc $CFLAGS -o out/$t $t.c $SRC $LUA out/sqlite3.o -lm -ldl -lpthread
 done
+# the dialogue harness: the real g_dialog.c with the same stubs (no Lua state is made, but the Lua files link)
+gcc $CFLAGS -DT_REAL_DIALOG -o out/t_dialog t_dialog.c $R/codemp/game/g_dialog.c $SRC $LUA out/sqlite3.o -lm -ldl -lpthread
 echo built

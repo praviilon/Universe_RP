@@ -1956,6 +1956,23 @@ static const rpEntHelp_t rp_ent_help[] = {
 		"targetname||Using it starts the countdown.",
 		"target_delay targetname later wait 3 target lights1",
 		"common target" },
+	{ "target_dialog", 0, NULL,
+		"A conversation: used with a player as activator -- by a trigger_multiple with USE_BUTTON placed on an NPC or a prop, a button, a relay, /entuse -- it shows that player a title, a text and up to six numbered answers, in the console area for everyone and as a menu for players with the " RP_MOD_NAME " client. The player answers with /dialog <number> (/dialog shows it again, /dialog 0 walks away). The chosen option's go<n> is then fired with the player as activator, exactly as a button press would fire it: another target_dialog continues the conversation, a target_reward pays, a target_level_change changes the map, a target_kill kills, a door opens. An option with need<n> is offered only to a player holding that target_flag (!flag: not holding it); the options offered are numbered in order. The dialogue closes by itself after timeout seconds, when the player goes farther than range from its speaker (or from itself), dies, is knocked down, goes spectator, leaves, or opens another dialogue; its own target fires then (walk-away, timeout, range), not after an answer. One dialogue per player at a time. Scripts cannot use anything that leads to one.",
+		"1|ONCE_EACH|Shown to each player once per map and per connection.\n"
+		"4|NO_CANCEL_TEXT|No \"(the conversation is over)\" line when it closes without an answer.\n"
+		"128|INACTIVE|Starts inactive: it ignores every use until a target_activate names it.",
+		"title||Who speaks, up to 48 characters. Colour codes work.\n"
+		"message||Required. The text, up to 255 characters; quotes become ' and a word longer than 40 characters is broken.\n"
+		"option1|...|Required. The first answer, up to 64 characters. option2 to option6 follow; the first missing one ends the list.\n"
+		"go1|...|Targetname fired when option1 is chosen, with the player as activator. go2 to go6 likewise. Empty: the dialogue just closes.\n"
+		"need1|...|A target_flag flag the player must hold for option1 to be offered (!flag: must not hold it). need2 to need6 likewise.\n"
+		"timeout|60|Seconds before it closes by itself, 5 to 600.\n"
+		"range|256|Units from the speaker past which it closes. 0: never.\n"
+		"speaker||Targetname of the NPC or prop the player talks to, for range. Empty: this entity's own origin.\n"
+		"target||Fired when it closes without an answer (walk-away, timeout, range), with the player as activator.\n"
+		"targetname||Using it opens the dialogue for the activator.",
+		"target_dialog targetname oracle_talk title Oracle message \"What walks on four legs in the morning?\" option1 \"A dog\" go1 oracle_wrong option2 Man go2 oracle_right spawnflags 1",
+		"common target target_flag target_reward target_level_change trigger_multiple" },
 	{ "target_escapetrig", RP_EH_MAPONLY | RP_EH_REMOVED, "Only works in the single-player gametype, which " RP_MOD_NAME " does not run: it removes itself at spawn.",
 		"Starts, or with escapegoal ends, a timed escape in the single-player gametype (survivors get points and the round ends). In every gametype " RP_MOD_NAME " runs it removes itself at spawn.",
 		NULL,
@@ -1963,6 +1980,15 @@ static const rpEntHelp_t rp_ent_help[] = {
 		"escapegoal|0|Non-zero: using it ends an escape in progress instead of starting one.",
 		NULL,
 		"common target" },
+	{ "target_flag", 0, NULL,
+		"Sets a named flag on the player who started the chain that used it (or clears it with CLEAR). A player's flags last for this connection on this map and are gone on a reconnect or a map change; each player may hold 16. They are read by a target_dialog's need<n> keys: a quest's last step fires a target_flag, and the quest-giver's dialogue offers \"I finished the job\" only to a player holding it. /entflags <player> lists a player's flags. Then it fires its target with the same activator.",
+		"1|CLEAR|Clears the flag instead of setting it.\n"
+		"128|INACTIVE|Starts inactive until a target_activate names it.",
+		"flag||Required. The flag's name: letters, digits and '_', up to 31.\n"
+		"target||Fired after the flag is set or cleared, with the same activator.\n"
+		"targetname||Using it sets (or clears) the flag on the activator.",
+		"target_flag targetname quest1_done_set flag quest1_done",
+		"common target target_dialog" },
 	{ "target_give", 0, NULL,
 		"Gives the activator the items named by its target, as if they had walked over them (the usual pickup rules apply: a player at full health gets no medpak), then keeps those items off the map. Each use gives them again, so the items work as its stock: place them anywhere, they spawn hidden because they have a targetname. Using an item's own name still shows it on the map, and the next give takes it off again. An item someone picked up off the map is not given until it respawns. A player who cannot take one (full health for a medpak) leaves it where it is.",
 		NULL,
@@ -2072,7 +2098,7 @@ static const rpEntHelp_t rp_ent_help[] = {
 		"target||Fired after a payout, with the same activator.\n"
 		"targetname||Using it pays the activator.",
 		"target_reward targetname chest_pay credits 250 spawnflags 1 target chest_msg",
-		"common target target_relay target_counter trigger_multiple npc_spawner" },
+		"common target target_relay target_counter trigger_multiple npc_spawner target_dialog" },
 	{ "target_remove_powerups", 0, NULL,
 		"Takes every powerup from the activator when used: a carried CTF flag goes back to its base, cloak is switched off properly, and all other powerups (speed, enlightenment, ysalamiri and the rest) are cleared.",
 		NULL,

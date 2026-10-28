@@ -16776,6 +16776,70 @@ static const char *zyk_spawner_reward_problem( qboolean vehicle, const char *key
 	return NULL;
 }
 
+// GLX_U: [Dialogues] what is wrong with a target_dialog's or target_flag's key, or NULL: the lengths the menu can
+// show (title 48, message 255, option 64), timeout 5..600 and range 0 or more in seconds and units, a flag
+// name (also in need<n>, with an optional '!') of letters, digits and '_' up to 31. Removing a key is always
+// fine; SP_target_dialog() refuses an entity left without a message or option1 and says so.
+static const char *zyk_dialog_entity_problem( const char *classname, const char *key, const char *value )
+{
+	static char problem[256];
+	const char *name = value;
+	qboolean dialog = !Q_stricmp( classname, "target_dialog" ) ? qtrue : qfalse;
+	int i, max = 0;
+
+	if ( !value || !value[0] || !Q_stricmp( value, "zykremovekey" ) )
+		return NULL;
+	if ( dialog && !Q_stricmp( key, "title" ) )
+		max = 48;
+	else if ( dialog && !Q_stricmp( key, "message" ) )
+		max = 255;
+	else if ( dialog && !Q_stricmpn( key, "option", 6 ) && key[6] >= '1' && key[6] <= '6' && !key[7] )
+		max = 64;
+	if ( max )
+	{
+		if ( (int)strlen( value ) > max )
+		{
+			Com_sprintf( problem, sizeof( problem ), "^3%s^7 is up to %d characters (this one is %d).", key, max, (int)strlen( value ) );
+			return problem;
+		}
+		return NULL;
+	}
+	if ( dialog && ( !Q_stricmp( key, "timeout" ) || !Q_stricmp( key, "range" ) ) )
+	{
+		char *end = NULL;
+		double v = strtod( value, &end );
+
+		if ( !end || *end || !( v >= 0.0 ) || ( !Q_stricmp( key, "timeout" ) && ( v < 5 || v > 600 ) ) )
+		{
+			Com_sprintf( problem, sizeof( problem ), "^3%s %s^7: %s.", key, zyk_shown_name( value ),
+				!Q_stricmp( key, "timeout" ) ? "seconds, 5 to 600" : "units, 0 (never) or more" );
+			return problem;
+		}
+		return NULL;
+	}
+	if ( ( dialog && !Q_stricmpn( key, "need", 4 ) && key[4] >= '1' && key[4] <= '6' && !key[5] ) || ( !dialog && !Q_stricmp( key, "flag" ) ) )
+	{
+		if ( dialog && name[0] == '!' )
+			name++;
+		if ( !name[0] || strlen( name ) > 31 )
+		{
+			Com_sprintf( problem, sizeof( problem ), "^3%s %s^7: a flag name is letters, digits and '_', up to 31.", key, zyk_shown_name( value ) );
+			return problem;
+		}
+		for ( i = 0; name[i]; i++ )
+		{
+			char c = name[i];
+
+			if ( !( ( c >= 'a' && c <= 'z' ) || ( c >= 'A' && c <= 'Z' ) || ( c >= '0' && c <= '9' ) || c == '_' ) )
+			{
+				Com_sprintf( problem, sizeof( problem ), "^3%s %s^7: a flag name is letters, digits and '_', up to 31.", key, zyk_shown_name( value ) );
+				return problem;
+			}
+		}
+	}
+	return NULL;
+}
+
 // GLX_U: [Rewards] what is wrong with a target_reward's key, or NULL: "credits" 0..RP_REWARD_MAX_CREDITS, "xp"
 // 0..RP_REWARD_MAX_XP, "wait" and "playerwait" a number of seconds, 0 or more. Removing a key is always fine
 // (SP_target_reward() refuses an entity left with neither credits nor xp, and says so). A value that reaches
@@ -17327,8 +17391,9 @@ static void zyk_entadd( gentity_t *ent, qboolean aim, qboolean grab ) {
 		}
 	}
 
-	// GLX_U: [Rewards] a target_reward's numbers, as its spawn would bring them into range
-	if (!Q_stricmp(arg1, "target_reward"))
+	// GLX_U: [Rewards] a target_reward's numbers, as its spawn would bring them into range; [Dialogues] a
+	// target_dialog's or target_flag's lengths and names
+	if (!Q_stricmp(arg1, "target_reward") || !Q_stricmp(arg1, "target_dialog") || !Q_stricmp(arg1, "target_flag"))
 	{
 		for (i = 2; i + 1 < number_of_args; i += 2)
 		{
@@ -17336,7 +17401,7 @@ static void zyk_entadd( gentity_t *ent, qboolean aim, qboolean grab ) {
 
 			trap->Argv( i, key, sizeof( key ) );
 			trap->Argv( i + 1, arg2, sizeof( arg2 ) );
-			problem = zyk_reward_entity_problem( key, arg2 );
+			problem = !Q_stricmp(arg1, "target_reward") ? zyk_reward_entity_problem( key, arg2 ) : zyk_dialog_entity_problem( arg1, key, arg2 );
 			if (problem)
 			{
 				trap->SendServerCommand( ent-g_entities, va("print \"%s\n\"", problem) );
@@ -17919,8 +17984,8 @@ void Cmd_EntEdit_f( gentity_t *ent ) {
 			}
 		}
 
-		// GLX_U: [Rewards] a target_reward's numbers, as /entadd checks them
-		if (!Q_stricmp(this_ent->classname, "target_reward"))
+		// GLX_U: [Rewards] a target_reward's numbers, as /entadd checks them; [Dialogues] the same for the two dialogue classes
+		if (!Q_stricmp(this_ent->classname, "target_reward") || !Q_stricmp(this_ent->classname, "target_dialog") || !Q_stricmp(this_ent->classname, "target_flag"))
 		{
 			for (i = first_pair; i + 1 < number_of_args; i += 2)
 			{
@@ -17928,7 +17993,7 @@ void Cmd_EntEdit_f( gentity_t *ent ) {
 
 				trap->Argv(i, key, sizeof(key));
 				trap->Argv(i + 1, arg2, sizeof(arg2));
-				problem = zyk_reward_entity_problem(key, arg2);
+				problem = !Q_stricmp(this_ent->classname, "target_reward") ? zyk_reward_entity_problem(key, arg2) : zyk_dialog_entity_problem(this_ent->classname, key, arg2);
 				if (problem)
 				{
 					trap->SendServerCommand( ent-g_entities, va("print \"%s\n\"", problem) );
@@ -26526,6 +26591,7 @@ command_t commands[] = {
 	{ "debugBMove_Left",	Cmd_BotMoveLeft_f,			CMD_CHEAT|CMD_ALIVE },
 	{ "debugBMove_Right",	Cmd_BotMoveRight_f,			CMD_CHEAT|CMD_ALIVE },
 	{ "debugBMove_Up",		Cmd_BotMoveUp_f,			CMD_CHEAT|CMD_ALIVE },
+	{ "dialog",				Cmd_Dialog_f,				CMD_NOINTERMISSION },	// GLX_U: [Dialogues] g_dialog.c
 	{ "drop",				Cmd_Drop_f,					CMD_ALIVE|CMD_NOINTERMISSION },
 	{ "follow",				Cmd_Follow_f,				CMD_NOINTERMISSION },
 	{ "follownext",			Cmd_FollowNext_f,			CMD_NOINTERMISSION },
@@ -26598,6 +26664,7 @@ command_t commands[] = {
 	{ "entcut",				Cmd_EntCut_f,				CMD_LOGGEDIN | CMD_NOINTERMISSION },
 	{ "entdeletefile",		Cmd_EntDeleteFile_f,		CMD_LOGGEDIN | CMD_NOINTERMISSION },
 	{ "entedit",			Cmd_EntEdit_f,				CMD_LOGGEDIN | CMD_NOINTERMISSION },
+	{ "entflags",			Cmd_EntFlags_f,				CMD_LOGGEDIN | CMD_NOINTERMISSION },	// GLX_U: [Dialogues] g_dialog.c
 	{ "enthelp",			Cmd_EntHelp_f,				CMD_LOGGEDIN | CMD_NOINTERMISSION },	// DAJ_RP: [Entity Help] g_enthelp.c
 	{ "entitiesandremaps",	Cmd_EntitiesAndRemaps_f,	CMD_LOGGEDIN | CMD_NOINTERMISSION },
 	{ "entlist",			Cmd_EntList_f,				CMD_LOGGEDIN | CMD_NOINTERMISSION },
