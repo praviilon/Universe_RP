@@ -1039,6 +1039,12 @@ void UI_SetActiveMenu( uiMenuCommand_t menu ) {
 			Menus_ActivateByName("ingame_galaxyrp");
 			UI_UpdateSaberCvars();
 			return;
+		case UIMENU_RPDIALOG:	// GLX_U: [Dialogues] ui_rpdialog.c
+			UI_RpDialogOpen();
+			return;
+		case UIMENU_RPDIALOG_CLOSE:
+			UI_RpDialogClose();
+			return;
 		}
 	}
 }
@@ -6113,6 +6119,11 @@ static void UI_RunMenuScript(char **args)
 		{
 			return;
 		}
+		// GLX_U: [Dialogues] the dialogue menu's scripts -- ui_rpdialog.c
+		if ( UI_RpDialogScript( name, args ) )
+		{
+			return;
+		}
 
 		if (Q_stricmp(name, "StartServer") == 0)
 		{
@@ -10727,6 +10738,8 @@ void UI_KeyEvent( int key, qboolean down ) {
 					escapeHoldSuppressed = qtrue;
 					Menus_CloseAll();
 				}
+			} else if (down && UI_RpDialogKey(menu, key)) {
+				// GLX_U: [Dialogues] 1-6 answer the dialogue menu, as a click on that option would (ui_rpdialog.c)
 			} else {
 				Menu_HandleKey(menu, key, down );
 			}

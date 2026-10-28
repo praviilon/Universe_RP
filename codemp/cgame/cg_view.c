@@ -2661,6 +2661,7 @@ void CG_DrawActiveFrame( int serverTime, stereoFrame_t stereoView, qboolean demo
 	// GalaxyRP: [Extras] the Extras menus' requests, and whether the effect preview pass runs this
 	// frame -- before the sky portal below, which leaves its effects to that pass when it does
 	CG_RpxFrame();
+	CG_RpDialogFrame();	// GLX_U: [Dialogues] the time left, a pending open (cg_rpdialog.c)
 
 	// let the client system know what our weapon and zoom settings are
 	if (cg.snap && cg.snap->ps.saberLockTime > cg.time)

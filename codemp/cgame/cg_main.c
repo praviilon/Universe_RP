@@ -2638,6 +2638,7 @@ Ghoul2 Insert End
 
 	// GalaxyRP: [Extras] the Extras menus start this map afresh -- cg_rpextras.c
 	CG_RpxInit();
+	CG_RpDialogInit();	// GLX_U: [Dialogues] the rpdlg userinfo key, the font, clean cvars (cg_rpdialog.c)
 
 	cg.renderingThirdPerson = cg_thirdPerson.integer;
 

@@ -1877,6 +1877,11 @@ void CG_RpxFrame( void );
 void CG_RpxFxPass( void );
 qboolean CG_RpxFxPassActive( void );
 void CG_RpxReply( void );
+// GLX_U: [Dialogues] cg_rpdialog.c
+void CG_RpDialogInit( void );
+void CG_RpDialogFrame( void );
+void CG_RpDialogCmd( void );
+void CG_RpDialogCloseCmd( void );
 void CG_Rpx_f( void );
 
 // GLX_U: [Chat] the chat input box -- cg_rpchat.c

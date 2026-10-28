@@ -533,6 +533,8 @@ void Menu_PaintAll();
 menuDef_t *Menus_ActivateByName(const char *p);
 void Menu_Reset(void);
 qboolean Menus_AnyFullScreenVisible( void );
+qboolean Menus_FocusAnyVisible( void );	// GLX_U: [Dialogues] a menu still visible gets the focus back; qfalse when none is
+void Item_RunScript(itemDef_t *item, const char *s);
 void  Menus_Activate(menuDef_t *menu);
 itemDef_t *Menu_FindItemByName(menuDef_t *menu, const char *p);
 void Menu_ShowGroup (menuDef_t *menu, const char *itemName, qboolean showFlag);

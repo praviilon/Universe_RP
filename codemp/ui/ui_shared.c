@@ -6774,6 +6774,25 @@ qboolean Menus_AnyFullScreenVisible( void ) {
   return qfalse;
 }
 
+// GLX_U: [Dialogues] after a menu opened on top of another closes: the last menu still visible takes the
+// focus again, so its keys work; qfalse when no menu is visible and the keyboard can go back to the game
+qboolean Menus_FocusAnyVisible( void ) {
+	int i, last = -1;
+	for (i = 0; i < menuCount; i++) {
+		if (Menus[i].window.flags & WINDOW_VISIBLE) {
+			last = i;
+		}
+	}
+	if (last < 0) {
+		return qfalse;
+	}
+	for (i = 0; i < menuCount; i++) {
+		Menus[i].window.flags &= ~WINDOW_HASFOCUS;
+	}
+	Menus[last].window.flags |= WINDOW_HASFOCUS;
+	return qtrue;
+}
+
 menuDef_t *Menus_ActivateByName(const char *p) {
   int i;
   menuDef_t *m = NULL;

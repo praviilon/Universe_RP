@@ -2131,6 +2131,8 @@ static serverCommand_t	commands[] = {
 	{ "rcg",				CG_RestoreClientGhoul_f },
 	{ "remapShader",		CG_RemapShader_f },
 	{ "rpxl",				CG_RpxReply },	// GalaxyRP: [Extras] a listing for the Extras menus, cg_rpextras.c
+	{ "rpdlg",				CG_RpDialogCmd },	// GLX_U: [Dialogues] a dialogue to show, cg_rpdialog.c
+	{ "rpdlgclose",			CG_RpDialogCloseCmd },
 	{ "sb",					CG_SiegeBriefingDisplay_f },
 	{ "scl",				CG_SiegeClassSelect_f },
 	{ "scores",				CG_ParseScores },

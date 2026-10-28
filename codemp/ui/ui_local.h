@@ -412,6 +412,11 @@ int			UI_RpxAnimFeederCount( void );			// GLX_U: [Extras] GLM Props' animations
 const char	*UI_RpxAnimFeederItemText( int index );
 qboolean	UI_RpxAnimFeederSelection( int index );
 qboolean	UI_RpxScript( const char *name, char **args );
+// GLX_U: [Dialogues] ui_rpdialog.c
+void		UI_RpDialogOpen( void );
+void		UI_RpDialogClose( void );
+qboolean	UI_RpDialogScript( const char *name, char **args );
+qboolean	UI_RpDialogKey( menuDef_t *menu, int key );
 qboolean	UI_RpxOwnerDraw( int ownerDraw, rectDef_t *rect, float scale, vec4_t color, int iMenuFont );
 void		UI_RpxRegisterCvars( void );
 char		*UI_Cvar_VariableString( const char *var_name );
