@@ -2,6 +2,13 @@
 
 
 
+## [3.9.0]
+
+### Added
+- Server-side Lua plugins: small Lua 5.4 scripts that react to server events and add chat commands, timers, stored data, props, NPCs, vehicles, rewards and dialogues. Each plugin runs in its own sandbox under strict time, memory and rate limits, can never touch accounts or act on players directly, and is managed with `/scripts` (Scripts admin power). See `assets/server/lua/README.md` for the API and the example plugins.
+- Dialogue system: the new `target_dialog` entity shows a player a conversation with up to six answers, as a menu for Universe RP clients or in the console for others, answered with `/dialog <number>`. Each answer fires its own target with the player as activator, so it can open a door, pay a reward or lead to the next dialogue. The new `target_flag` entity sets per-player flags that decide which answers a player is offered; `/entflags <player>` lists them.
+- `target_reward` entity: pays credits and XP to the player who used it (logged in to an RPG character), with optional cooldowns, once per player or once in all. Every payout is saved at once and logged.
+
 ## [3.8.8]
 
 ### Added
