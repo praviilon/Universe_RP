@@ -12,6 +12,15 @@ static void refill( rpLuaPlugin_t *p ) { p->tokens = RP_LUA_TOKENS; }
 static void ride_all( int tag, gentity_t *pilot ) { int i; for ( i = MAX_CLIENTS; i < level.num_entities; i++ ) if ( g_entities[i].inuse && g_entities[i].m_pVehicle && g_entities[i].rpLuaPlugin == tag ) t_ride( &g_entities[i], pilot, 0 ); }
 static int count_tag( int tag ) { int i, n = 0; for ( i = MAX_CLIENTS; i < level.num_entities; i++ ) if ( g_entities[i].inuse && g_entities[i].rpLuaPlugin == tag ) n++; return n; }
 
+// a stand-in target_print: one command to its activator, or to everyone; s_test_limit > 0: only that many do
+static int s_test_broadcast, s_test_limit, s_test_count;
+static void s_test_print( gentity_t *self, gentity_t *other, gentity_t *activator )
+{
+	(void)self; (void)other;
+	if ( s_test_limit && s_test_count++ >= s_test_limit ) return;
+	trap->SendServerCommand( s_test_broadcast ? -1 : activator->s.number, "print \"a line\n\"" );
+}
+
 int main( void )
 {
 	rpLuaPlugin_t *p;
@@ -36,30 +45,75 @@ int main( void )
 	run( p, "use vault" ); CHECK( get_int( p, "U" ) == 1 && t_usedCount[locked] == 0, "a locked door: counted as used by the call, refused by the lock (%d)", t_usedCount[locked] );
 	run( p, "use guard" ); CHECK( get_int( p, "U" ) == 0 && get_int( p, "S" ) == 1, "an NPC is skipped (%d/%d)", get_int( p, "U" ), get_int( p, "S" ) );
 	run( p, "use held" ); CHECK( get_int( p, "S" ) == 1, "held skipped" );
+	t_frame( 1000 );	// Alice's allowance: four uses a second (G1)
 	refill( p ); run( p, "use inert" ); CHECK( get_int( p, "S" ) == 1, "no use: skipped (U %d S %s WHY %s)", get_int( p, "U" ), get_str( p, "S" ), get_str( p, "WHY" ) );
 	refill( p ); run( p, "use nothing" ); CHECK( !strcmp( get_str( p, "WHY" ), "nothing has that targetname" ), "unknown name: %s", get_str( p, "WHY" ) );
 	refill( p ); run( p, "usebob door1" ); CHECK( t_usedActivator[door] == &g_entities[1], "another player as activator" );
 	// a player pressing the button fires entity_used as before
 	GlobalUse( &g_entities[button], &g_entities[1], &g_entities[1] ); CHECK( get_int( p, "N" ) == 2, "a player's use fires (button and door): %d", get_int( p, "N" ) );
-	// the bucket: 4 then refused
-	refill( p ); run( p, "use btn1" ); run( p, "use btn1" ); run( p, "use btn1" ); run( p, "use btn1" ); run( p, "use btn1" );
+	// the bucket: 4 then refused (two players, so the allowance of each is not what stops it)
+	t_frame( 1000 ); refill( p ); run( p, "use btn1" ); run( p, "use btn1" ); run( p, "usebob btn1" ); run( p, "usebob btn1" ); run( p, "use btn1" );
 	CHECK( !strcmp( get_str( p, "WHY" ), "too fast" ), "5th use refused: %s", get_str( p, "WHY" ) );
-	// rewards: a chain that reaches a target_reward is refused up front, however deep; the in-call flag is set
-	// for every use a script makes (target_reward_use refuses on it) and clear for a player's
-	{ int chest = t_mapEntity( "func_button", "chest_btn", "chest_relay" ); int rel = t_mapEntity( "target_relay", "chest_relay", "chest_delay" ); int del = t_mapEntity( "target_delay", "chest_delay", "chest_pay" ); int pay = t_mapEntity( "target_reward", "chest_pay", NULL );
-	  int plain = t_mapEntity( "func_button", "plain_btn", "plain_door" ); t_mapEntity( "func_door", "plain_door", NULL ); (void)rel; (void)del;
-	  refill( p ); run( p, "use chest_btn" ); CHECK( !strcmp( get_str( p, "WHY" ), "leads to a reward" ) && t_usedCount[chest] == 0 && t_usedCount[pay] == 0 && p->tokens == RP_LUA_TOKENS, "a chain to a reward refused before the token: %s", get_str( p, "WHY" ) );
-	  run( p, "use chest_relay" ); CHECK( !strcmp( get_str( p, "WHY" ), "leads to a reward" ), "from the middle of the chain too" );
-	  run( p, "use chest_pay" ); CHECK( !strcmp( get_str( p, "WHY" ), "leads to a reward" ), "the reward itself" );
-	  g_entities[del].target = "chest_relay"; run( p, "use chest_delay" ); CHECK( !strcmp( get_str( p, "WHY" ), "leads to a reward" ) || t_usedCount[pay] == 0, "a loop in the chain ends (%s)", get_str( p, "WHY" ) ); g_entities[del].target = "chest_pay";
-	  run( p, "use plain_btn" ); CHECK( get_int( p, "U" ) == 1 && t_usedCount[plain] == 1 && t_usedInCall[plain] == 1, "an unrelated chain still works, and inside a script call the flag is set (%d)", t_usedInCall[plain] );
+	// G1: four uses a second to one player, all plugins together, shared with Msg.*; refused before the token
+	t_frame( 1000 ); refill( p ); run( p, "use btn1" ); run( p, "use btn1" ); run( p, "use btn1" ); refill( p ); run( p, "use btn1" ); refill( p ); run( p, "use btn1" );
+	CHECK( !strcmp( get_str( p, "WHY" ), "player busy" ) && p->tokens == RP_LUA_TOKENS && p->usesBusy == 1, "a fifth use to Alice in a second: %s, tokens %d", get_str( p, "WHY" ), p->tokens );
+	run( p, "usebob btn1" ); CHECK( get_int( p, "U" ) == 1, "Bob still has room" );
+	t_frame( 1000 ); refill( p ); run( p, "use btn1" ); CHECK( get_int( p, "U" ) == 1, "a second later Alice has room again" );
+	{ int i; for ( i = 0; i < 3; i++ ) RP_LuaApi_Sent( 0 ); } refill( p ); run( p, "use btn1" ); CHECK( !strcmp( get_str( p, "WHY" ), "player busy" ), "messages to Alice share the allowance" );
+	// rewards and dialogues: reached as by a button, at any depth; the reward pays the player, its log line names the plugin
+	{ int chest = t_mapEntity( "func_button", "chest_btn", "chest_relay" ); int rel = t_mapEntity( "target_relay", "chest_relay", "chest_pay" ); int pay = t_rewardEntity( "chest_pay", "after_pay", 50, 1 ); int after = t_mapEntity( "target_relay", "after_pay", NULL );
+	  int del = t_mapEntity( "target_delay", "late_btn", NULL ), plain = t_mapEntity( "func_button", "plain_btn", "plain_door" ); t_mapEntity( "func_door", "plain_door", NULL ); (void)rel; (void)del;
+	  t_frame( 1000 ); refill( p ); t_logLen = 0; t_log[0] = 0; run( p, "use chest_btn" );
+	  CHECK( get_int( p, "U" ) == 1 && t_usedCount[chest] == 1 && t_payouts == 1 && t_paidCredits[0] == 50 && t_usedCount[after] == 1, "a chain to a reward pays Alice and fires its target (%d payouts)", t_payouts );
+	  CHECK( t_log_has( "Reward: chest_pay (" ) && t_log_has( "used [lua:w]: Alice" ), "the log line names the plugin: %s", t_log );
+	  run( p, "use chest_pay" ); CHECK( t_payouts == 1, "ONCE_EACH: not Alice again" );
+	  run( p, "usebob chest_relay" ); CHECK( t_payouts == 2 && t_paidCredits[1] == 50, "Bob, from the middle of the chain" );
+	  GlobalUse( &g_entities[chest], &g_entities[2], &g_entities[2] ); CHECK( t_payouts == 2, "a player not logged in to a character: nothing (no player 2)" );
+	  // a player's own use: no plugin in the log, nothing counted
+	  t_player( 2, "Carol", qtrue, 9 ); t_logLen = 0; t_log[0] = 0; GlobalUse( &g_entities[chest], &g_entities[2], &g_entities[2] );
+	  CHECK( t_payouts == 3 && t_log_has( "used: Carol" ) && !t_log_has( "[lua:" ), "a player's button: paid, no plugin named" );
+	  run( p, "use plain_btn" ); CHECK( get_int( p, "U" ) == 1 && t_usedCount[plain] == 1 && t_usedInCall[plain] == 1, "inside a script call the flag is set (%d)", t_usedInCall[plain] );
 	  GlobalUse( &g_entities[plain], &g_entities[1], &g_entities[1] ); CHECK( t_usedInCall[plain] == 0 && rp_luaInCall == 0, "a player's use: flag clear" );
-	  // dialogues: a chain reaching a target_dialog is refused; a reward behind a dialogue's option is seen through the dialogue
-	  { int tb = t_mapEntity( "func_button", "talk_btn", "talk_dlg" ); int dlg = t_mapEntity( "target_dialog", "talk_dlg", NULL ); int other = t_mapEntity( "func_button", "quiz_btn", "quiz_relay" ); int qr = t_mapEntity( "target_relay", "quiz_relay", "quiz_dlg" ); int qd = t_mapEntity( "target_dialog", "quiz_dlg", NULL ); (void)qr; (void)qd;
-	    t_dialogGo[qd][1] = "chest_pay"; (void)other;
-	    refill( p ); run( p, "use talk_btn" ); CHECK( !strcmp( get_str( p, "WHY" ), "leads to a dialogue" ) && t_usedCount[tb] == 0 && t_usedCount[dlg] == 0 && p->tokens == RP_LUA_TOKENS, "a dialogue refused: %s", get_str( p, "WHY" ) );
-	    run( p, "use quiz_btn" ); CHECK( !strcmp( get_str( p, "WHY" ), "leads to a dialogue" ), "a dialogue behind a relay refused: %s", get_str( p, "WHY" ) );
-	    CHECK( t_usedCount[pay] == 0, "the reward behind the quiz was never reached" ); } }
+	  // a loop through relays ends at the stock chain limit
+	  { int a1 = t_mapEntity( "target_relay", "loopa", "loopb" ), a2 = t_mapEntity( "target_relay", "loopb", "loopa" ); (void)a1; (void)a2;
+	    t_frame( 1000 ); refill( p ); run( p, "use loopa" ); CHECK( t_useRefused > 0 && t_useDepth == 0, "a loop ends at the chain limit" ); } }
+	// G3: database writes from inside script calls, four a frame, all plugins together; a payout past it gives nothing, fires
+	// nothing and keeps no ONCE_EACH record; the next frame pays again; a player's own use is not counted
+	{ int k, after = t_mapEntity( "target_relay", "many_after", NULL ); for ( k = 0; k < 6; k++ ) t_rewardEntity( "many", "many_after", 10, 0 );
+	  t_frame( 1000 ); refill( p ); t_payouts = 0; p->dbRefused = 0; t_logLen = 0; t_log[0] = 0; t_usedCount[after] = 0; run( p, "use many" );
+	  CHECK( t_payouts == RP_LUA_DB_WRITES_FRAME && t_usedCount[after] == RP_LUA_DB_WRITES_FRAME && p->dbRefused == 2, "6 rewards in one call: %d paid, %d fired, %d skipped", t_payouts, t_usedCount[after], p->dbRefused );
+	  CHECK( t_log_has( "[lua:w] payout skipped" ) && !strstr( strstr( t_log, "payout skipped" ) + 1, "payout skipped" ), "logged once: %s", t_log );
+	  run( p, "usebob many" ); CHECK( t_payouts == RP_LUA_DB_WRITES_FRAME, "the same frame, another call: nothing (%d)", t_payouts );
+	  t_frame( 50 ); refill( p ); run( p, "usebob many" ); CHECK( t_payouts == 2 * RP_LUA_DB_WRITES_FRAME, "the next frame pays again: %d", t_payouts );
+	  t_payouts = 0; { gentity_t *e = NULL; while ( ( e = G_Find( e, FOFS( targetname ), "many" ) ) ) GlobalUse( e, &g_entities[2], &g_entities[2] ); }
+	  CHECK( t_payouts == 6, "a player's own use: all six pay (%d)", t_payouts ); }
+	{ int k, once; for ( k = 0; k < 4; k++ ) t_rewardEntity( "oncebatch", NULL, 5, 0 ); once = t_rewardEntity( "oncebatch", NULL, 5, 1 );	// the ONCE_EACH one is found last
+	  t_frame( 1000 ); refill( p ); t_payouts = 0; run( p, "usebob oncebatch" );
+	  CHECK( t_payouts == 4, "five in a call: four paid, the ONCE_EACH one skipped (%d)", t_payouts );
+	  t_frame( 50 ); GlobalUse( &g_entities[once], &g_entities[1], &g_entities[1] ); CHECK( t_payouts == 5, "the skipped one kept no record: it pays Bob later (%d)", t_payouts ); }
+	RP_LUA_SHUTDOWN();
+
+	// --- G2: commands to a client from inside script calls, 32 a second per client, all plugins together
+	t_init( 8 ); t_player( 0, "Alice", qtrue, 7 ); t_player( 1, "Bob", qtrue, 8 ); t_player( 2, "Bot", qtrue, 9 ); g_entities[2].r.svFlags |= SVF_BOT;
+	CHECK( trap->Cvar_VariableIntegerValue( "sv_floodProtect" ) == t_floodProtect && trap->Argc() == t_argc, "the guarded table forwards the other functions unchanged" );
+	{ gameImport_t *before = trap; RP_Lua_TrapGuardInstall(); CHECK( trap == before, "installed once: a second G_InitGame does not wrap again" ); }
+	t_write_plugin( "g2", "Commands.add('prn', function(p, a) World.use(a[1], p) end)\n"
+		"Commands.add('one', function(p, a) Msg.print(p, 'hi') end)\n" );
+	t_start( "g2" ); p = RP_Lua_Find( "g2" );
+	{ int k; for ( k = 0; k < 200; k++ ) t_mapEntity( "target_print", "prints", NULL ); }
+	{ gentity_t *e = NULL; while ( ( e = G_Find( e, FOFS( targetname ), "prints" ) ) ) e->use = s_test_print; }
+	memset( t_nsent, 0, sizeof( t_nsent ) ); t_logLen = 0; t_log[0] = 0; refill( p ); run( p, "prn prints" );
+	CHECK( t_nsent[0] == RP_LUA_CMDS_PER_SEC && p->cmdsHeld == 200 - RP_LUA_CMDS_PER_SEC, "200 prints to Alice: %d sent, %d held", t_nsent[0], p->cmdsHeld );
+	CHECK( t_log_has( "[lua:g2] commands to Alice^7 held back" ) && strstr( t_log, "held back" ) == strstr( t_log, "held back" ) && !strstr( strstr( t_log, "held back" ) + 1, "held back" ), "one log line: %s", t_log );
+	CHECK( t_nsent[1] == 0, "Bob got none of them" );
+	refill( p ); run( p, "one" ); CHECK( t_nsent[0] == RP_LUA_CMDS_PER_SEC, "Msg.print is held back too while the budget is spent" );
+	memset( t_nsent, 0, sizeof( t_nsent ) ); s_test_broadcast = 1; refill( p ); run( p, "prn prints" ); s_test_broadcast = 0;
+	CHECK( t_nsent[0] == 0 && t_nsent[1] == RP_LUA_CMDS_PER_SEC && t_nsent[2] > 0, "a message to everyone: none to Alice (spent), %d to Bob, the bot is not counted (%d)", t_nsent[1], t_nsent[2] );
+	CHECK( t_nsent[5] == 0, "a free slot gets nothing one by one" );
+	t_frame( 1000 ); memset( t_nsent, 0, sizeof( t_nsent ) ); s_test_broadcast = 1; s_test_limit = 3; s_test_count = 0; refill( p ); run( p, "prn prints" ); s_test_broadcast = 0; s_test_limit = 0;
+	CHECK( t_nsent[0] == 3 && t_nsent[1] == 3 && t_nsent[5] == 3, "a second later, everyone has room: sent whole (%d %d %d)", t_nsent[0], t_nsent[1], t_nsent[5] );
+	{ int k; t_nsent[0] = 0; for ( k = 0; k < 50; k++ ) trap->SendServerCommand( 0, "print \"x\n\"" ); CHECK( t_nsent[0] == 50, "outside a call: nothing counted (%d)", t_nsent[0] ); }
+	CHECK( RP_Lua_ScriptCmdRoom( 0, 1000 ), "outside a call there is always room" );
 	RP_LUA_SHUTDOWN();
 
 	// --- World.prop: classes, keys, name, handle, tag, refusal text, caps, no room
@@ -105,7 +159,9 @@ int main( void )
 	t_init( 8 ); t_player( 0, "Alice", qtrue, 7 );
 	t_write_plugin( "np", "H = {} Events.on('npc_death', function(e) DEAD = e.npc_type .. ' by ' .. (e.killer and e.killer.name or '-') end)\n"
 		"Commands.add('npc', function(p, a) local h, why = World.npc(a[1], {x=1,y=2,z=3}, {x=0,y=45,z=0}, {name=a[2]}) if h then H[#H+1] = h NUM = h.number T = h.npc_type TN = h.targetname OK = true else OK = false WHY = why end end)\n"
-		"Commands.add('rmv', function(p, a) R = World.remove(H[tonumber(a[1])]) end)\n" );
+		"Commands.add('rmv', function(p, a) R = World.remove(H[tonumber(a[1])]) end)\n"
+		"Commands.add('paid', function(p, a) local h, why = World.npc('jedi', {x=0,y=0,z=0}, nil, {credits=tonumber(a[1]), xp=tonumber(a[2])}) if h then NUM = h.number C = h.credits X = h.xp OK = true else OK = false WHY = why end end)\n"
+		"Commands.add('badpay', function(p, a) local v = a[2] == 'str' and '5' or tonumber(a[2]) OK2, E = pcall(World.npc, 'jedi', {x=0,y=0,z=0}, nil, {[a[1]] = v}) E = tostring(E) end)\n" );
 	t_write_plugin( "other", "Events.on('npc_death', function(e) OTHER = 1 end)\n" );
 	t_start( "np other" ); p = RP_Lua_Find( "np" );
 	run( p, "npc jedi guard" ); CHECK( get_int( p, "OK" ) == 1 && !strcmp( get_str( p, "T" ), "jedi" ) && !strcmp( get_str( p, "TN" ), "lua.np.guard" ), "npc spawned: %s %s %s", get_str( p, "WHY" ), get_str( p, "T" ), get_str( p, "TN" ) );
@@ -120,14 +176,27 @@ int main( void )
 	  // a map NPC's death reports nothing
 	  { int m = t_mapEntity( "NPC", "mapnpc", NULL ); g_entities[m].client = &g_clients_store[6]; lua_pushstring( p->L, "x" ); lua_setglobal( p->L, "DEAD" ); RP_LUA_EVENT_DEATH( &g_entities[m], &g_entities[0], 3 ); CHECK( !strcmp( get_str( p, "DEAD" ), "x" ), "a map NPC: no event" ); g_entities[m].client = NULL; }
 	  run( p, "rmv 1" ); CHECK( get_int( p, "R" ) == 1 && g_entities[n].inuse, "remove queued" ); t_frame( 50 ); CHECK( t_removedSilently == 1 && g_entities[n].think == G_FreeEntity && g_entities[n].rpLuaPlugin == 0, "RP_SpawnedRemove'd at the frame end, untagged" ); t_frame( 100 ); t_runThinks(); CHECK( !g_entities[n].inuse, "gone next frame" ); }
+	// a kill reward on the plugin's own NPC: set on the spawner, copied to the NPC, read on the handle (nil for a prop)
+	refill( p ); run( p, "paid 500 20" ); { int n = get_int( p, "NUM" );
+	  CHECK( get_int( p, "OK" ) == 1 && get_int( p, "C" ) == 500 && get_int( p, "X" ) == 20 && g_entities[n].rpRewardCredits == 500 && g_entities[n].rpRewardXP == 20, "credits/xp on the NPC: %d %d", g_entities[n].rpRewardCredits, g_entities[n].rpRewardXP );
+	  g_entities[n].rpRewardCredits = g_entities[n].rpRewardXP = 0; }	// what RP_PayNpcKillReward leaves once it paid
+	refill( p ); run( p, "paid 100000 100" ); CHECK( get_int( p, "OK" ) == 1 && get_int( p, "C" ) == 100000 && get_int( p, "X" ) == 100, "the maxima" );
+	refill( p ); run( p, "npc jedi" ); { int n = get_int( p, "NUM" ); CHECK( g_entities[n].rpRewardCredits == 0 && g_entities[n].rpRewardXP == 0, "no options: no reward" ); }
+	refill( p ); run( p, "badpay credits 100001" ); CHECK( get_int( p, "OK2" ) == 0 && strstr( get_str( p, "E" ), "credits is a whole number from 0 to 100000" ), "too many credits: %s", get_str( p, "E" ) );
+	run( p, "badpay xp 101" ); CHECK( get_int( p, "OK2" ) == 0 && strstr( get_str( p, "E" ), "xp is a whole number from 0 to 100" ), "too much xp: %s", get_str( p, "E" ) );
+	run( p, "badpay xp -1" ); CHECK( get_int( p, "OK2" ) == 0, "negative" );
+	run( p, "badpay xp 2.5" ); CHECK( get_int( p, "OK2" ) == 0, "not whole" );
+	run( p, "badpay xp str" ); CHECK( get_int( p, "OK2" ) == 0, "a string" );
+	CHECK( p->npcSpawns == 4, "no spawn for a bad reward: %d", p->npcSpawns );
+	RP_Lua_QueueOp( "np", RPLOP_RELOAD ); t_frame( 50 ); t_frame( 100 ); t_runThinks(); p = RP_Lua_Find( "np" );
 	run( p, "npc swoop" ); CHECK( get_int( p, "OK" ) == 0 && strstr( get_str( p, "WHY" ), "World.vehicle" ), "a vehicle type sent to World.vehicle: %s", get_str( p, "WHY" ) );
 	run( p, "npc nosuch" ); CHECK( strstr( get_str( p, "WHY" ), "unknown" ), "unknown type refused" );
-	t_freeSlots = 2; run( p, "npc jedi" ); CHECK( !strcmp( get_str( p, "WHY" ), "no room" ) && p->tokens == RP_LUA_TOKENS - 1, "no room before the token" ); t_freeSlots = 1000;
+	{ int tk = p->tokens; t_freeSlots = 2; run( p, "npc jedi" ); CHECK( !strcmp( get_str( p, "WHY" ), "no room" ) && p->tokens == tk, "no room before the token" ); t_freeSlots = 1000; }
 	t_npcRefuse = qtrue; run( p, "npc jedi" ); t_npcRefuse = qfalse; CHECK( !strcmp( get_str( p, "WHY" ), "no room" ) && p->spawnsRefused == 2, "NPC_Spawn_Do's refusal: %d", p->spawnsRefused );
 	{ int i; for ( i = 0; i < 12; i++ ) { refill( p ); run( p, "npc stormtrooper" ); } }
 	CHECK( RP_LuaWorld_CountLive( p, qtrue ) == RP_LUA_MAX_NPCS && !strcmp( get_str( p, "WHY" ), "too many npcs" ), "8 NPCs then refused: %d %s", RP_LuaWorld_CountLive( p, qtrue ), get_str( p, "WHY" ) );
 	// unload takes them all, silently, after shutdown
-	RP_Lua_QueueOp( "np", RPLOP_UNLOAD ); t_frame( 50 ); CHECK( t_removedSilently == 1 + RP_LUA_MAX_NPCS, "unload removed every NPC: %d", t_removedSilently ); t_frame( 100 ); t_runThinks(); CHECK( t_npcsAlive == 0, "all gone" );
+	{ int before = t_removedSilently; RP_Lua_QueueOp( "np", RPLOP_UNLOAD ); t_frame( 50 ); CHECK( t_removedSilently - before == RP_LUA_MAX_NPCS, "unload removed every NPC: %d", t_removedSilently - before ); } t_frame( 100 ); t_runThinks(); CHECK( t_npcsAlive == 0, "all gone" );
 	RP_LUA_SHUTDOWN();
 
 	// --- World.vehicle: every type, the spawner, the G_VehicleSpawn tail, caps, remove refused while ridden,

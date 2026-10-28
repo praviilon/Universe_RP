@@ -45,7 +45,6 @@ int main( void )
 	door = t_mapEntity( "func_door", "door1", NULL ); btn = t_mapEntity( "func_button", "btn1", "talk" ); (void)btn;
 	t_key( "title", "@Oracle" ); t_key( "message", "Say \"hello\"\nfriend " "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" ); t_key( "option1", "Open the door" ); t_key( "go1", "door1" ); t_key( "option2", "Nothing" ); t_key( "timeout", "10" ); t_key( "range", "100" );
 	d = spawn_dialog( "talk", "bye", 0 ); CHECK( d >= 0, "dialogue spawned (%s)", level.rp_spawn_refusal );
-	{ const char *names[6]; CHECK( RP_DialogOptionTargets( &g_entities[d], names, 6 ) == 1 && !strcmp( names[0], "door1" ), "option targets listed" ); }
 	clear_sent(); GlobalUse( &g_entities[d], &g_entities[0], &g_entities[0] );
 	CHECK( level.rpDialog[0].id > 0 && level.rpDialog[0].numShown == 2, "opened for Alice: id %d, %d options", level.rpDialog[0].id, level.rpDialog[0].numShown );
 	CHECK( strstr( last_sent( 0 ), "^7@Oracle" ) && strstr( last_sent( 0 ), "Say 'hello' friend" ) && strstr( last_sent( 0 ), "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa aaaa" ) && strstr( last_sent( 0 ), "^31.^7 Open the door" ) && strstr( last_sent( 0 ), "/dialog <number>" ), "the console text, cleaned: %s", last_sent( 0 ) );
@@ -128,6 +127,27 @@ int main( void )
 	  g_entities[2].inuse = qtrue; g_entities[2].client->pers.connected = CON_CONNECTED; g_entities[2].r.svFlags |= SVF_BOT; GlobalUse( &g_entities[d], &g_entities[2], &g_entities[2] );
 	  GlobalUse( &g_entities[d], &g_entities[1], &g_entities[1] ); { rpDialogDef_t *def = g_entities[d].rpDialogDef; g_entities[d].rpDialogDef = NULL; frames( 500 ); g_entities[d].rpDialogDef = def; }
 	  { lua_State *L = pl->L; lua_getglobal( L, "L" ); CHECK( (int)lua_rawlen( L, -1 ) == 8, "the bot raised nothing, the gone one did: %d", (int)lua_rawlen( L, -1 ) ); lua_rawgeti( L, -1, 8 ); CHECK( lua_tostring( L, -1 ) && strstr( lua_tostring( L, -1 ), "gone Bob" ), "gone: %s", lua_tostring( L, -1 ) ); lua_pop( L, 2 ); }
+	  RP_LUA_SHUTDOWN(); }
+
+	// --- a script's World.use opens a dialogue; the answer is the player's own action (a reward behind it pays, no plugin
+	// named); without room in the player's command budget for script calls (2) it does not open, and an open one is untouched
+	t_init( 8 ); t_player( 0, "Alice", qtrue, 7 ); g_entities[0].client->pers.enterTime = 100;
+	t_write_plugin( "ds", "Commands.add('talk', function(p, a) U, S = World.use(a[1], p) end)\n" );
+	t_start( "ds" ); { rpLuaPlugin_t *pl = RP_Lua_Find( "ds" ); int dq, k, id;
+	  t_rewardEntity( "dpay", NULL, 25, 0 );
+	  t_key( "message", "Want it?" ); t_key( "option1", "Yes" ); t_key( "go1", "dpay" ); t_key( "timeout", "30" ); t_key( "range", "100" );
+	  dq = spawn_dialog( "quest", NULL, 0 ); CHECK( dq >= 0 && pl && pl->L, "set up" );
+	  t_args( "talk quest" ); RP_LUA_COMMAND( &g_entities[0], "talk" );
+	  CHECK( level.rpDialog[0].id > 0 && t_payouts == 0, "a script's use opened it, nothing paid yet" );
+	  t_logLen = 0; t_log[0] = 0; dialog_cmd( 0, "dialog 1" );
+	  CHECK( t_payouts == 1 && t_paidCredits[0] == 25 && t_log_has( "used: Alice" ) && !t_log_has( "[lua:" ), "the answer paid as Alice's own action: %s", t_log );
+	  rp_luaInCall++; for ( k = 0; k < RP_LUA_CMDS_PER_SEC - 2; k++ ) trap->SendServerCommand( 0, "print \"x\n\"" ); rp_luaInCall--;	// one was the open's
+	  CHECK( RP_Lua_ScriptCmdRoom( 0, 2 ) == qtrue, "outside a call: always room" );
+	  rp_luaInCall++; CHECK( RP_Lua_ScriptCmdRoom( 0, 1 ) && !RP_Lua_ScriptCmdRoom( 0, 2 ), "one command left this second" ); rp_luaInCall--;
+	  t_args( "talk quest" ); RP_LUA_COMMAND( &g_entities[0], "talk" ); CHECK( level.rpDialog[0].id == 0, "no room for two commands: not opened" );
+	  GlobalUse( &g_entities[dq], &g_entities[0], &g_entities[0] ); id = level.rpDialog[0].id; CHECK( id > 0, "Alice's own use opens it" );
+	  t_args( "talk quest" ); RP_LUA_COMMAND( &g_entities[0], "talk" ); CHECK( level.rpDialog[0].id == id, "a script's use without room leaves the open one untouched" );
+	  frames( 1000 ); t_args( "talk quest" ); RP_LUA_COMMAND( &g_entities[0], "talk" ); CHECK( level.rpDialog[0].id > id, "a second later it opens (replacing): %d", level.rpDialog[0].id );
 	  RP_LUA_SHUTDOWN(); }
 
 	printf( fails ? "%d FAILED\n" : "t_dialog: ALL OK\n", fails );

@@ -26,6 +26,10 @@ three cvars (rp_lua, rp_lua_plugins, rp_lua_memkb) are in g_xcvar.h.
 #define RP_LUA_TOKENS			4		// the command bucket: a player sends one reliable command per
 										// sv_floodProtect ms; a plugin gets the same rate with this burst
 #define RP_LUA_SENDS_PER_SEC	4		// script commands to one player per second, all plugins together
+										// (Msg.*, and every World.use: its activator's room)
+#define RP_LUA_CMDS_PER_SEC		32		// any command to one client from inside script calls, a second, all plugins
+										// together (the engine drops a client 128 behind)
+#define RP_LUA_DB_WRITES_FRAME	4		// database writes from inside script calls, a server frame (a payout)
 #define RP_LUA_BROADCAST_PER_TOKEN 8	// recipients one token buys in Msg.broadcast
 #define RP_LUA_MAX_TIMERS		32		// live timers per plugin
 #define RP_LUA_TIMER_MIN_MS		50
@@ -147,6 +151,7 @@ typedef struct rpLuaPlugin_s {
 	// stats
 	int				calls, callMs, errorsTotal, refusedTokens, refusedRecipients, deferredTimers, sent;
 	int				uses, effects, sounds, spawnsRefused;
+	int				usesBusy, cmdsHeld, dbRefused;	// the stability guards (rp_lua_api.c)
 } rpLuaPlugin_t;
 
 extern rpLuaPlugin_t rpLuaPlugins[RP_LUA_MAX_PLUGINS];

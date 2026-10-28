@@ -21687,7 +21687,8 @@ else is paid nothing and qfalse comes back. Credits go through add_credits() (rp
 them, the shortfall is said), XP carries over level by level through RP_LevelUpFromXP() unless the player is
 at rp_rpg_max_level. One console line ("<label>: +50 credits, +5 XP"; none when silent), one save of
 credits, XP, level and skillpoints together, one log line "<logTag>: <player> ...: N credits, M XP".
-qtrue when anything was paid.
+qtrue when anything was paid. From inside a script call (a plugin's World.use set it off), the write must fit
+RP_LUA_DB_WRITES_FRAME (RP_LUA_DB_WRITE_OK, rp_lua_api.c), or nothing is paid and qfalse comes back.
 ==================
 */
 qboolean RP_PayReward( gentity_t *player, int credits, int xp, const char *label, const char *logTag, qboolean silent )
@@ -21700,6 +21701,8 @@ qboolean RP_PayReward( gentity_t *player, int credits, int xp, const char *label
 	if ( !player || !player->inuse || !player->client || player->s.number < 0 || player->s.number >= MAX_CLIENTS ||
 		player->client->pers.connected != CON_CONNECTED || player->client->sess.amrpgmode != 2 || player->client->pers.CharID <= 0 )
 		return qfalse;
+	if ( !RP_LUA_DB_WRITE_OK() )
+		return qfalse;	// GLX_U: [Lua] a payout a script call set off, past the database writes a frame allows (logged)
 
 	Com_sprintf( line, sizeof( line ), "^3%s^3:", label );
 

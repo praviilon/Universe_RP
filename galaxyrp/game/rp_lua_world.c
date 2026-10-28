@@ -5,9 +5,11 @@ player or an admin command already runs, with that function's own checks, and a 
 bucket the messages use: a plugin acts at a player's pace.
 
   World.use( targetname, player )         GlobalUse() on each entity of that name, the player as activator:
-                                          locks, depth and chain limits as for a button; no admin bypass
+                                          locks, depth and chain limits as for a button; no admin bypass;
+                                          rewards pay and dialogues open, as for a button
   World.prop( class, origin, angles, keys ) the /entadd sequence, for the Entity System's exempt classes
-  World.npc( type, origin, angles, opts ) a spawner and NPC_Spawn_Do(), as /npc spawn
+  World.npc( type, origin, angles, opts ) a spawner and NPC_Spawn_Do(), as /npc spawn; opts may give it a
+                                          kill reward (credits, xp), as a spawner's npccredits/npcxp
   World.vehicle( type, origin, angles, opts ) the same for a vehicle, as a map's NPC_Vehicle spawner
   World.remove( handle )                  queued: freed at the end of the frame, never inside a call
   Effect.play( name, origin, angles )     G_PlayEffectID() of an effect already registered
@@ -337,6 +339,13 @@ static int RP_LuaWorld_EntityIndex( lua_State *L )
 		lua_pushstring( L, ent->targetname ? ent->targetname : "" );
 	else if ( !strcmp( key, "health" ) )
 		lua_pushinteger( L, ent->health );
+	else if ( !strcmp( key, "credits" ) || !strcmp( key, "xp" ) )
+	{ // an NPC's kill reward, 0 once paid (a vehicle never has one); nil for a prop
+		if ( ent->client && ent->s.number >= MAX_CLIENTS )
+			lua_pushinteger( L, key[0] == 'c' ? ent->rpRewardCredits : ent->rpRewardXP );
+		else
+			lua_pushnil( L );
+	}
 	else if ( !strcmp( key, "vehicle_type" ) )
 	{
 		static const char *const names[] = { "none", "walker", "fighter", "speeder", "animal", "flier" };
@@ -452,6 +461,27 @@ static qboolean RP_LuaWorld_NameOk( const char *name )
 	return qtrue;
 }
 
+// opts.<key>: a kill reward, a whole number from 0 to max (0 when absent), as /entadd allows npccredits/npcxp
+static int RP_LuaWorld_OptReward( lua_State *L, int idx, const char *key, int max )
+{
+	lua_Integer v;
+	int isInt;
+
+	if ( lua_isnoneornil( L, idx ) )
+		return 0;
+	lua_getfield( L, idx, key );
+	if ( lua_isnil( L, -1 ) )
+	{
+		lua_pop( L, 1 );
+		return 0;
+	}
+	v = lua_tointegerx( L, -1, &isInt );
+	if ( !isInt || lua_type( L, -1 ) != LUA_TNUMBER || v < 0 || v > max )
+		luaL_error( L, "%s is a whole number from 0 to %d", key, max );
+	lua_pop( L, 1 );
+	return (int)v;
+}
+
 // opts.name -> "lua.<plugin>.<name>" in out, or out empty when there is none; an error for a bad one
 static void RP_LuaWorld_Targetname( lua_State *L, int idx, char *out, int outSize )
 {
@@ -482,64 +512,12 @@ Every entity with that targetname, through GlobalUse() with the player as activa
 the player's account (no bypass, no pass mark), the stock depth and chain limits, the map's own chain
 after it. NPCs and vehicles (using one boards it), held entities and those without a use are skipped, as
 /entuse skips them. The entity_used event does not fire for a use made by a script (rpLuaCurrent).
+A chain may reach a target_reward or a target_dialog: it pays or opens for the player, as for a button --
+how much and how often is the server host's design. Every use takes room in the player's allowance
+(RP_LUA_SENDS_PER_SEC, shared with Msg.*), and what the chain sends that player, or writes to the database,
+is counted by the stability guards (rp_lua_api.c).
 ==================
 */
-// GLX_U: [Rewards][Dialogues] a target_reward or a target_dialog reachable from these entities through the
-// keys a use follows (target, target2..6, a mover's open/close/pain targets, and a dialogue's go1..6): a
-// script may not pull a trigger that pays anyone or starts a conversation, however many relays, delays or
-// counters sit in between. A bounded walk with a visited set, over the networked and the logical region
-// both (G_Find searches both). The refusal text, or NULL.
-static const char *RP_LuaWorld_ChainRefused( const int *start, int numStart )
-{
-	static byte visited[MAX_ENTITIESTOTAL];
-	static int queue[MAX_ENTITIESTOTAL];
-	int head = 0, tail = 0, steps = 0, i;
-
-	memset( visited, 0, sizeof( visited ) );
-	for ( i = 0; i < numStart; i++ )
-	{
-		if ( start[i] >= 0 && start[i] < MAX_ENTITIESTOTAL && !visited[start[i]] )
-		{
-			visited[start[i]] = 1;
-			queue[tail++] = start[i];
-		}
-	}
-	while ( head < tail && steps++ < 2048 )
-	{
-		gentity_t *e = &g_entities[queue[head++]];
-		const char *names[9 + RP_DIALOG_OPTIONS];
-		int n, count = 9;
-
-		if ( !e->inuse )
-			continue;
-		if ( e->classname && !Q_stricmp( e->classname, "target_reward" ) )
-			return "leads to a reward";
-		if ( e->classname && !Q_stricmp( e->classname, "target_dialog" ) )
-			return "leads to a dialogue";
-		names[0] = e->target; names[1] = e->target2; names[2] = e->target3; names[3] = e->target4; names[4] = e->target5;
-		names[5] = e->target6; names[6] = e->closetarget; names[7] = e->opentarget; names[8] = e->paintarget;
-		count += RP_DialogOptionTargets( e, &names[9], RP_DIALOG_OPTIONS );
-		for ( n = 0; n < count; n++ )
-		{
-			gentity_t *t = NULL;
-
-			if ( !names[n] || !names[n][0] )
-				continue;
-			while ( ( t = G_Find( t, FOFS( targetname ), names[n] ) ) != NULL && tail < MAX_ENTITIESTOTAL )
-			{
-				int num = t - g_entities;
-
-				if ( num >= 0 && num < MAX_ENTITIESTOTAL && !visited[num] )
-				{
-					visited[num] = 1;
-					queue[tail++] = num;
-				}
-			}
-		}
-	}
-	return NULL;
-}
-
 static int RP_LuaWorld_Use( lua_State *L )
 {
 	rpLuaPlugin_t *p = rpLuaCurrent;
@@ -557,14 +535,14 @@ static int RP_LuaWorld_Use( lua_State *L )
 		found[numFound++] = e - g_entities;
 	if ( !numFound )
 		return RP_LuaWorld_Refuse( L, "nothing has that targetname" );
+	if ( !RP_LuaApi_SendRoom( clientNum ) )
 	{
-		const char *refused = RP_LuaWorld_ChainRefused( found, numFound );
-
-		if ( refused )
-			return RP_LuaWorld_Refuse( L, refused );
+		p->usesBusy++;
+		return RP_LuaWorld_Refuse( L, "player busy" );
 	}
 	if ( !RP_LuaApi_TakeToken( p, 1 ) )
 		return RP_LuaWorld_Refuse( L, "too fast" );
+	RP_LuaApi_Sent( clientNum );
 
 	for ( i = 0; i < numFound; i++ )
 	{
@@ -772,12 +750,15 @@ static int RP_LuaWorld_Npc( lua_State *L )
 	vec3_t origin, angles;
 	char targetname[MAX_QPATH];
 	gentity_t *spawner, *npc;
+	int credits, xp;
 
 	if ( !type[0] || strlen( type ) >= 64 )
 		return luaL_error( L, "an NPC type is 1 to 63 characters" );
 	RP_LuaWorld_Vec( L, 2, origin, "origin" );
 	RP_LuaWorld_Angles( L, 3, angles );
 	RP_LuaWorld_Targetname( L, 4, targetname, sizeof( targetname ) );
+	credits = RP_LuaWorld_OptReward( L, 4, "credits", RP_REWARD_MAX_CREDITS );
+	xp = RP_LuaWorld_OptReward( L, 4, "xp", RP_REWARD_MAX_XP );
 	if ( !RP_NpcTypeKnown( type ) )
 		return RP_LuaWorld_Refuse( L, "unknown NPC type" );
 	if ( RP_NpcTypeIsVehicle( type ) )
@@ -808,6 +789,8 @@ static int RP_LuaWorld_Npc( lua_State *L )
 		spawner->NPC_targetname = G_NewString( targetname );
 	spawner->count = 1;
 	spawner->delay = 0;
+	spawner->rpRewardCredits = credits;	// NPC_Spawn_Do copies them to the NPC; player_die pays its killer
+	spawner->rpRewardXP = xp;
 	RP_NpcPrecacheByType( type );
 
 	npc = NPC_Spawn_Do( spawner );

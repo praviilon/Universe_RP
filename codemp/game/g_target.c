@@ -757,10 +757,12 @@ first words of the player's line ("Reward" by default). Spawnflags: 1 ONCE_EACH 
 and per connection, 2 ONCE pays once in all and removes itself, 4 SILENT no console line, 128 INACTIVE as every
 target. A lock on it (g_locks.c) limits who it pays, through GlobalUse() as for any entity.
 
-Never for a script: a plugin's World.use refuses a chain that reaches one (rp_lua_world.c), and this use
-refuses while a script call is on the stack (RP_LUA_IN_CALL), so a chain a script started cannot pay even
-if it got here. The per-player stamps are a G_Alloc block, made only when "playerwait" or ONCE_EACH needs
-one: {enterTime, time paid} per client, so a reconnect is a new player.
+A plugin's World.use may reach one (rp_lua_world.c): how much and how often is the server host's design.
+The log line then names the plugin, and RP_PayReward() keeps database writes from inside script calls to
+RP_LUA_DB_WRITES_FRAME a frame (a payout past it is skipped, as if "wait" had stopped it).
+
+The per-player stamps are a G_Alloc block, made only when "playerwait" or ONCE_EACH needs one: {enterTime,
+time paid} per client, so a reconnect is a new player.
 ==================
 */
 #define RP_REWARD_ONCE_EACH	1
@@ -785,11 +787,11 @@ static int *RP_RewardSlot( gentity_t *self, gentity_t *activator )
 void target_reward_use( gentity_t *self, gentity_t *other, gentity_t *activator )
 {
 	int *slot;
+	char logTag[MAX_QPATH * 2];
+	const char *plugin = RP_LUA_IN_CALL() ? RP_Lua_CurrentName() : NULL;
 
 	if ( self->flags & FL_INACTIVE )
 		return;
-	if ( RP_LUA_IN_CALL() )
-		return;	// a script's use, or a chain one started: nothing for it here
 	if ( !activator || !activator->inuse || !activator->client || activator->s.number < 0 || activator->s.number >= MAX_CLIENTS )
 		return;
 	if ( self->wait > 0 && self->rpRewardLastPaid && level.time - self->rpRewardLastPaid < (int)( self->wait * 1000 ) )
@@ -804,8 +806,9 @@ void target_reward_use( gentity_t *self, gentity_t *other, gentity_t *activator 
 	}
 
 	G_ActivateBehavior( self, BSET_USE );
-	if ( !RP_PayReward( activator, self->rpRewardCredits, self->rpRewardXP, self->message ? self->message : "Reward",
-			va( "Reward: %s (%d) used", self->targetname ? self->targetname : "target_reward", self->s.number ),
+	Com_sprintf( logTag, sizeof( logTag ), "Reward: %s (%d) used%s%s%s", self->targetname ? self->targetname : "target_reward",
+		self->s.number, plugin ? " [lua:" : "", plugin ? plugin : "", plugin ? "]" : "" );	// GLX_U: [Lua] a script's use names its plugin
+	if ( !RP_PayReward( activator, self->rpRewardCredits, self->rpRewardXP, self->message ? self->message : "Reward", logTag,
 			( self->spawnflags & RP_REWARD_SILENT ) ? qtrue : qfalse ) )
 	{
 		return;	// not eligible (logged out, no character, not in RPG mode), or nothing could be given

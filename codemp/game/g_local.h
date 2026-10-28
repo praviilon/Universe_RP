@@ -2608,7 +2608,6 @@ void		RP_PayNpcKillReward( gentity_t *npc, gentity_t *killer );
 // GLX_U: [Dialogues] g_dialog.c
 void		RP_DialogFrame( void );						// every frame, after the thinks: timeouts, range, the player's state
 void		RP_DialogPlayerGone( int clientNum, qboolean disconnected );	// ClientDisconnect (qtrue), ClientSpawn (qfalse)
-int			RP_DialogOptionTargets( const gentity_t *ent, const char **names, int max );	// a dialogue's go1..6, for the Lua chain walk
 qboolean	RP_FlagHas( const gentity_t *ent, const char *name );
 void		Cmd_Dialog_f( gentity_t *ent );
 void		Cmd_EntFlags_f( gentity_t *ent );

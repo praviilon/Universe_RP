@@ -6,6 +6,11 @@ Everything that reaches a player goes through the command bucket (RP_LuaApi_Take
 paced like one more client, one token per sv_floodProtect ms with a burst of RP_LUA_TOKENS, and no
 player receives more than RP_LUA_SENDS_PER_SEC script commands a second from all plugins together.
 A refusal is returned as false, "why"; argument errors raise.
+
+The stability guards, for what a script call sets off in the game (a World.use's chain): every command to
+a client from inside a script call counts toward RP_LUA_CMDS_PER_SEC for that client (the engine drops a
+client 128 reliable commands behind), and every database write toward RP_LUA_DB_WRITES_FRAME. Outside a
+script call -- a player's own button, trigger, /dialog answer or kill -- nothing is counted.
 ===========================================================================
 */
 #include "rp_lua_local.h"
@@ -18,6 +23,14 @@ typedef struct {
 } rpLuaPlayer_t;
 
 static int rpLuaSends[MAX_CLIENTS][RP_LUA_SENDS_PER_SEC];	// level.time of the last sends to each client
+
+// the stability guards
+static gameImport_t rpLuaTrap;		// the engine's import table, SendServerCommand guarded
+static void ( *rpLuaEngineSend )( int clientNum, const char *text );
+static int rpLuaCmdRing[MAX_CLIENTS][RP_LUA_CMDS_PER_SEC];	// level.time + 1 of the last guarded commands (0: none)
+static int rpLuaCmdHead[MAX_CLIENTS];	// the oldest of them
+static int rpLuaCmdLogged[MAX_CLIENTS];	// level.time + 1 of the last "held back" log line
+static int rpLuaDbFrame, rpLuaDbWrites, rpLuaDbLogged;	// level.time + 1 of the frame counted, writes in it, logged in it
 
 /*
 ==================
@@ -234,6 +247,161 @@ void RP_LuaApi_Sent( int clientNum )
 			oldest = i;
 	}
 	rpLuaSends[clientNum][oldest] = level.time;
+}
+
+/*
+==================
+The stability guards
+==================
+*/
+const char *RP_Lua_CurrentName( void )
+{
+	return rpLuaCurrent ? rpLuaCurrent->name : NULL;
+}
+
+// n more guarded commands to clientNum fit in the last second: the n oldest in its ring are a second old or none
+static qboolean RP_Lua_CmdFits( int clientNum, int n )
+{
+	int k;
+
+	for ( k = 0; k < n && k < RP_LUA_CMDS_PER_SEC; k++ )
+	{
+		const int t = rpLuaCmdRing[clientNum][( rpLuaCmdHead[clientNum] + k ) % RP_LUA_CMDS_PER_SEC];
+
+		if ( t && level.time + 1 - t >= 0 && level.time + 1 - t < 1000 )
+			return qfalse;
+	}
+	return ( n <= RP_LUA_CMDS_PER_SEC ) ? qtrue : qfalse;
+}
+
+static void RP_Lua_CmdCount( int clientNum )
+{
+	rpLuaCmdRing[clientNum][rpLuaCmdHead[clientNum]] = level.time + 1;
+	rpLuaCmdHead[clientNum] = ( rpLuaCmdHead[clientNum] + 1 ) % RP_LUA_CMDS_PER_SEC;
+}
+
+// a client the budget looks after: connected and not a bot (a bot has no command queue to overflow)
+static qboolean RP_Lua_CmdCounted( int clientNum )
+{
+	const gentity_t *ent = &g_entities[clientNum];
+
+	return ( ent->client && ent->client->pers.connected != CON_DISCONNECTED && !( ent->r.svFlags & SVF_BOT ) ) ? qtrue : qfalse;
+}
+
+static void RP_Lua_CmdHeld( int clientNum )
+{
+	if ( rpLuaCurrent )
+		rpLuaCurrent->cmdsHeld++;
+	if ( !rpLuaCmdLogged[clientNum] || level.time + 1 - rpLuaCmdLogged[clientNum] >= 1000 || level.time + 1 < rpLuaCmdLogged[clientNum] )
+	{
+		rpLuaCmdLogged[clientNum] = level.time + 1;
+		G_LogPrintf( "[lua:%s] commands to %s^7 held back: script budget (%d a second)\n", rpLuaCurrent ? rpLuaCurrent->name : "?",
+			g_entities[clientNum].client ? g_entities[clientNum].client->pers.netname : "?", RP_LUA_CMDS_PER_SEC );
+	}
+}
+
+qboolean RP_Lua_ScriptCmdRoom( int clientNum, int n )
+{
+	if ( !rp_luaInCall || clientNum < 0 || clientNum >= MAX_CLIENTS || !RP_Lua_CmdCounted( clientNum ) )
+		return qtrue;
+	return RP_Lua_CmdFits( clientNum, n );
+}
+
+// trap->SendServerCommand: the engine's, counted per client while a script call is on the stack
+static void RP_Lua_SendGuarded( int clientNum, const char *text )
+{
+	int i;
+
+	if ( !rp_luaInCall )
+	{
+		rpLuaEngineSend( clientNum, text );
+		return;
+	}
+	if ( clientNum >= 0 )
+	{
+		if ( clientNum < MAX_CLIENTS && RP_Lua_CmdCounted( clientNum ) )
+		{
+			if ( !RP_Lua_CmdFits( clientNum, 1 ) )
+			{
+				RP_Lua_CmdHeld( clientNum );
+				return;
+			}
+			RP_Lua_CmdCount( clientNum );
+		}
+		rpLuaEngineSend( clientNum, text );
+		return;
+	}
+	// everyone: sent once when everyone has room, else one by one to those who have
+	for ( i = 0; i < level.maxclients; i++ )
+	{
+		if ( RP_Lua_CmdCounted( i ) && !RP_Lua_CmdFits( i, 1 ) )
+			break;
+	}
+	if ( i == level.maxclients )
+	{
+		for ( i = 0; i < level.maxclients; i++ )
+		{
+			if ( RP_Lua_CmdCounted( i ) )
+				RP_Lua_CmdCount( i );
+		}
+		rpLuaEngineSend( clientNum, text );
+		return;
+	}
+	for ( i = 0; i < level.maxclients; i++ )
+	{
+		const gentity_t *ent = &g_entities[i];
+
+		if ( !ent->client || ent->client->pers.connected == CON_DISCONNECTED )
+			continue;
+		if ( RP_Lua_CmdCounted( i ) )
+		{
+			if ( !RP_Lua_CmdFits( i, 1 ) )
+			{
+				RP_Lua_CmdHeld( i );
+				continue;
+			}
+			RP_Lua_CmdCount( i );
+		}
+		rpLuaEngineSend( i, text );
+	}
+}
+
+// from G_InitGame, for both entry paths (GetModuleAPI and dllEntry set trap before it): the game module uses a
+// copy of the import table whose SendServerCommand is guarded; every other entry is the engine's own
+void RP_Lua_TrapGuardInstall( void )
+{
+	if ( !trap || trap == &rpLuaTrap )
+		return;
+	rpLuaTrap = *trap;
+	rpLuaEngineSend = trap->SendServerCommand;
+	rpLuaTrap.SendServerCommand = RP_Lua_SendGuarded;
+	trap = &rpLuaTrap;
+}
+
+// a database write (a payout) from inside a script call: RP_LUA_DB_WRITES_FRAME a server frame, all plugins together
+qboolean RP_Lua_ScriptDbWrite( void )
+{
+	if ( !rp_luaInCall )
+		return qtrue;
+	if ( rpLuaDbFrame != level.time + 1 )
+	{
+		rpLuaDbFrame = level.time + 1;
+		rpLuaDbWrites = 0;
+	}
+	if ( rpLuaDbWrites >= RP_LUA_DB_WRITES_FRAME )
+	{
+		if ( rpLuaCurrent )
+			rpLuaCurrent->dbRefused++;
+		if ( rpLuaDbLogged != rpLuaDbFrame )
+		{
+			rpLuaDbLogged = rpLuaDbFrame;
+			G_LogPrintf( "[lua:%s] payout skipped: %d database writes from scripts this frame\n", rpLuaCurrent ? rpLuaCurrent->name : "?",
+				RP_LUA_DB_WRITES_FRAME );
+		}
+		return qfalse;
+	}
+	rpLuaDbWrites++;
+	return qtrue;
 }
 
 // the text as one engine command argument: at most RP_LUA_TEXT_MAX bytes, no '"' (it would end the argument)
@@ -720,6 +888,10 @@ void RP_LuaApi_Open( rpLuaPlugin_t *p )
 void RP_LuaApi_Reset( void )
 { // a new map: level.time starts over, so the old timestamps must go
 	memset( rpLuaSends, 0, sizeof( rpLuaSends ) );
+	memset( rpLuaCmdRing, 0, sizeof( rpLuaCmdRing ) );
+	memset( rpLuaCmdHead, 0, sizeof( rpLuaCmdHead ) );
+	memset( rpLuaCmdLogged, 0, sizeof( rpLuaCmdLogged ) );
+	rpLuaDbFrame = rpLuaDbWrites = rpLuaDbLogged = 0;
 }
 
 void RP_LuaApi_ClosePlugin( rpLuaPlugin_t *p )

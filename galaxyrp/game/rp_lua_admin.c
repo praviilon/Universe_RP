@@ -82,6 +82,9 @@ static void RP_LuaAdmin_Stats( gentity_t *ent, const char *name )
 			RP_LuaAdmin_Out( ent, va( "   world: %d props, %d NPCs and %d vehicles alive (%d, %d and %d spawned this map, %d refused); %d uses, %d effects, %d sounds\n",
 				RP_LuaWorld_CountLive( p, qfalse ), RP_LuaWorld_CountLive( p, qtrue ), RP_LuaWorld_CountVehicles( p ), p->propSpawns, p->npcSpawns, p->vehicleSpawns,
 				p->spawnsRefused, p->uses, p->effects, p->sounds ) );
+		if ( p->L && ( p->usesBusy || p->cmdsHeld || p->dbRefused ) )
+			RP_LuaAdmin_Out( ent, va( "   guards: %d uses refused (player busy), %d commands held back, %d payouts skipped (database writes)\n",
+				p->usesBusy, p->cmdsHeld, p->dbRefused ) );
 	}
 }
 

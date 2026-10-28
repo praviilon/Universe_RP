@@ -5,11 +5,14 @@ is told what happens on the server and can answer with messages, chat
 commands, timers and stored data (P1), and act on the world the way a
 player would (P2): use a named entity as a button would, place props,
 NPCs and vehicles of its own, play effects and sounds the map already has. It never
-reaches past that: no accounts, credits or levels, no kicking, renaming or
-damaging anyone, no giving or taking from a player — what a script wants
-done to a player, the map's own mechanics do (a `target_give`, a
-`target_teleporter`, a `trigger_hurt`), with that player as activator. A
-plugin that misbehaves is cut off by its own budget, never the server.
+reaches past that: no accounts, no kicking, renaming or damaging anyone, no
+giving or taking from a player directly — what a script wants done to a
+player, the map's own mechanics do (a `target_give`, a `target_teleporter`,
+a `trigger_hurt`, a `target_reward`, a `target_dialog`), with that player as
+activator. How much a plugin pays and how often is the server host's design;
+that the server stays up and nobody is dropped, whatever a plugin does, is
+the budget's. A plugin that misbehaves is cut off by its own budget, never
+the server.
 
 ## Setup
 
@@ -36,7 +39,7 @@ Stored data goes to `<mod folder>/database/lua.db`, beside `accounts.db`.
 | Command | Does |
 |---|---|
 | `/scripts` or `/scripts list` | each plugin: running or off, memory, errors, timers, commands, watches |
-| `/scripts stats [name]` | calls, time, messages sent and refused, deferred timers, stored bytes; props, NPCs and vehicles alive, uses, effects, sounds |
+| `/scripts stats [name]` | calls, time, messages sent and refused, deferred timers, stored bytes; props, NPCs and vehicles alive, uses, effects, sounds; what the guards held back |
 | `/scripts help` | every command the plugins add, with its help text |
 | `/scripts load <name>` | load a plugin (for this map; `rp_lua_plugins` is not changed) |
 | `/scripts unload <name>` | stop it and free its slot |
@@ -70,7 +73,9 @@ however written, costs the server a bounded amount.
 | spawns per map | 128 props / 32 NPCs / 24 vehicles | `false, "spawn limit for this map"` |
 | script vehicles on the server | 24, all plugins and released ones together | `false, "too many vehicles on the server"` |
 | entity slots | the server's reserve of 64 kept free, as for `/entadd` | `false, "no room"` |
-| messages to one player | 4 a second across all plugins | `false, "player busy"` |
+| messages and `World.use`s to one player | 4 a second across all plugins | `false, "player busy"` |
+| commands a script call sets off, to one client (what a `World.use`'s chain prints, a dialogue, `Msg.*`) | 32 a second across all plugins | not sent; one log line a second |
+| rewards a script call sets off (each is a database write) | 4 a server frame across all plugins | not paid, and the reward does not fire its target; one log line a frame |
 | timers | 32 live, 50 ms minimum | `false, "too many timers"` |
 | commands | 16, names of 3–24 characters | `false, "..."` |
 | watched targetnames | 32 (256 for all plugins) | `false, "..."` |
@@ -82,6 +87,11 @@ costs one. So a handler that plays an effect, uses a door and prints a line
 spends three of the four, and the next action within the second is
 refused: keep handlers short and check the results. Plugin commands cost
 nothing: the player's own flood protection paces them.
+
+The last two rows only count what happens inside a script call. A player
+pressing a button, answering a dialogue or killing an NPC is never counted,
+and neither is what fires later through a `target_delay` (it runs as the
+map's own action).
 
 ## The API
 
@@ -155,7 +165,7 @@ local h = Timer.every(60000, fn)   -- also Timer.after(ms, fn); Timer.cancel(h)
 ```lua
 World.use("door1", p)            -- every entity named door1, used as a button would with p as activator
 World.prop("misc_model_breakable", {x=0,y=0,z=0}, {x=0,y=90,z=0}, {model="models/x.md3", health=50}, {name="crate"})
-World.npc("jedi", {x=0,y=0,z=0}, {x=0,y=90,z=0}, {name="guard"})
+World.npc("jedi", {x=0,y=0,z=0}, {x=0,y=90,z=0}, {name="guard", credits=500, xp=20})
 World.vehicle("swoop", {x=0,y=0,z=0}, {x=0,y=90,z=0}, {name="bike1"})
 World.remove(h)                  -- queued: the entity goes at the end of the frame
 Effect.play("env/small_fire", origin, angles)
@@ -167,11 +177,12 @@ meets any lock on the entity (a script is not an admin), the stock chain
 limits apply, and what the entity does to its activator is what it does
 to anyone — a `target_teleporter` moves them, a `target_give` gives them
 the map's items, a `target_kill` kills them. NPCs, vehicles, held entities
-and entities with no use are skipped. It returns `used, skipped`. A name
-whose chain reaches a `target_reward` (through any number of relays,
-delays or counters) is refused with `false, "leads to a reward"`: scripts
-never pay credits or XP, not even through the map. A chain that reaches a
-`target_dialog` is refused the same way (`"leads to a dialogue"`) for now.
+and entities with no use are skipped. It returns `used, skipped`. A chain
+may reach a `target_reward` (it pays the player, as a button would: its own
+`wait`, `playerwait`, ONCE and ONCE_EACH apply, and the log line names the
+plugin) or a `target_dialog` (it opens for the player; the answer is the
+player's own `/dialog`, so whatever the option fires runs as their action).
+Each `World.use` takes one of the player's four a second (`"player busy"`).
 
 `World.prop` spawns one of the Entity System's exempt classes — the ones
 `/entedit` and `/entremove` may touch even on the map's own entities:
@@ -186,6 +197,11 @@ entity's name. `/entsave` leaves script entities out; `/entremove`,
 `/entedit` and `/entload` treat them as any other, and the handle goes
 stale then. A dead NPC counts as alive until its body is gone or removed.
 
+`World.npc` may give its NPC a kill reward: `credits` (0 to 100000) and `xp`
+(0 to 100), as an `npc_spawner`'s `npccredits` and `npcxp`. The player who
+kills it is paid, the same way as for an admin's spawner; another value is
+an error. Vehicles never pay.
+
 `World.vehicle` places a vehicle of any type (speeders, swoops, animals,
 fighters, walkers) as a map's `NPC_Vehicle` spawner would: it stands still
 until a player boards it, and players ride it as any other. The vehicle file
@@ -196,7 +212,8 @@ vehicles, and `World.remove` of one somebody rides is refused with
 `false, "someone is riding it"`.
 
 Handles: `h.number`, `h.classname`, `h.origin`, `h.targetname`,
-`h.health`, `h.npc_type`; for a vehicle also `h.vehicle_type` (`walker`,
+`h.health`, `h.npc_type`; for an NPC `h.credits` and `h.xp` (what killing
+it pays, 0 once paid); for a vehicle also `h.vehicle_type` (`walker`,
 `fighter`, `speeder`, `animal`, `flier`), `h.pilot` (the player riding it,
 or nil) and `h.passengers` (how many ride behind the pilot); `h:valid()`.
 Two handles to the same entity are equal. Unloading, reloading or disabling
@@ -232,17 +249,18 @@ end. Rows of a deleted character are removed with it.
 
 No `io`, `os`, `package`, `debug` or `coroutine`; no `require`, `dofile`
 or `loadfile`; `load` takes text only; `collectgarbage` only answers
-`"count"`. Plugins cannot call each other, touch accounts, credits or
-levels, kick, rename, damage, teleport or give to a player directly, spawn
-anything outside the exempt classes, give NPCs orders, or change cvars.
-That is by design for this stage.
+`"count"`. Plugins cannot call each other, touch accounts, kick, rename,
+damage, teleport, pay or give to a player directly (only through the map's
+entities and their own NPCs' kill rewards), spawn anything outside the
+exempt classes, make rewards or dialogues of their own, give NPCs orders,
+or change cvars. That is by design for this stage.
 
 ## Writing a plugin
 
 Start from `plugins/greeter/plugin.lua` (storage and events),
 `plugins/events/plugin.lua` (timers, a command, the message bucket) or
-`plugins/quest/plugin.lua` (an NPC, a prop, a watched button, a use as the
-reward, `npc_death`, a vehicle). Keep
+`plugins/quest/plugin.lua` (an NPC with a kill reward, a prop, a watched
+button, a use as the reward, `npc_death`, a vehicle). Keep
 each handler short: the budget is 10 ms a call, and anything heavier
 belongs in a timer that does a slice at a time. Check the result of
 `Msg.*` and `Storage.*` calls when it matters, and look at

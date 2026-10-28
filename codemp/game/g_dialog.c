@@ -14,7 +14,8 @@ target_flag sets or clears a named flag on its activator, kept per player for th
 (clientPersistant_t::rpFlags): a dialogue's "need<n>" offers an option only to players with (or, with
 "!", without) that flag. That is how a map keeps quest state per player without a script or a database.
 
-Scripts (rp_lua_world.c) may not use anything that leads to a dialogue in this version.
+A plugin's World.use (rp_lua_world.c) may open one for its player, when that player's command budget for
+script calls has room (RP_LUA_CMD_ROOM, rp_lua_api.c); the answer still comes from the player's own /dialog.
 ===========================================================================
 */
 #include "g_local.h"
@@ -280,21 +281,6 @@ void SP_target_dialog( gentity_t *self )
 	self->use = target_dialog_use;
 }
 
-// the "go" names of a dialogue's options, for the Lua chain walk; how many were written
-int RP_DialogOptionTargets( const gentity_t *ent, const char **names, int max )
-{
-	int i, n = 0;
-
-	if ( !ent || !ent->rpDialogDef )
-		return 0;
-	for ( i = 0; i < ent->rpDialogDef->numOptions && n < max; i++ )
-	{
-		if ( ent->rpDialogDef->go[i][0] )
-			names[n++] = ent->rpDialogDef->go[i];
-	}
-	return n;
-}
-
 /*
 ==================
 The open dialogue of a player
@@ -437,6 +423,8 @@ void target_dialog_use( gentity_t *self, gentity_t *other, gentity_t *activator 
 	if ( !activator || !activator->inuse || !activator->client || activator->s.number < 0 || activator->s.number >= MAX_CLIENTS ||
 		activator->client->pers.connected != CON_CONNECTED || ( activator->r.svFlags & SVF_BOT ) )
 		return;
+	if ( !RP_LUA_CMD_ROOM( activator->s.number, 2 ) )
+		return;	// GLX_U: [Lua] a script's use, the player's command budget spent: not opened, the open one untouched
 	G_ActivateBehavior( self, BSET_USE );
 	RP_DialogOpen( self, activator );
 }

@@ -36,7 +36,12 @@ void Svcmd_LuaList_f( void );
 int RP_AdminBitByTitle( const char *title );	// g_cmds.c: an admin power's bit by its /adminlist title, -1 for none
 qboolean RP_IsBuiltInCommand( const char *name );	// g_cmds.c: the name is in commands[]
 extern int rp_luaWatchCount;	// targetnames any plugin watches (RP_LUA_EVENT_USED's first test)
-extern int rp_luaInCall;		// a script call is on the stack: what must never happen for a script refuses (target_reward)
+extern int rp_luaInCall;		// a script call is on the stack: the stability guards below apply
+// the stability guards (rp_lua_api.c): only while a script call is on the stack; always qtrue outside one
+void RP_Lua_TrapGuardInstall( void );	// G_InitGame: trap->SendServerCommand counted per client in script calls
+qboolean RP_Lua_ScriptCmdRoom( int clientNum, int n );	// n more commands to that client fit this second
+qboolean RP_Lua_ScriptDbWrite( void );	// one more database write fits this frame (and is counted)
+const char *RP_Lua_CurrentName( void );	// the plugin whose call runs, or NULL
 
 #define RP_LUA_INIT()					do { if ( rp_lua.integer ) RP_Lua_Init(); } while ( 0 )
 #define RP_LUA_SHUTDOWN()				do { if ( rp_lua.integer ) RP_Lua_Shutdown(); } while ( 0 )
@@ -52,3 +57,5 @@ extern int rp_luaInCall;		// a script call is on the stack: what must never happ
 #define RP_LUA_CHAR_REMOVED( id )		do { if ( rp_luaActive ) RP_Lua_CharacterRemoved( id ); } while ( 0 )
 #define RP_LUA_EVENT_DIALOG( p, n, num, c, o, r )	do { if ( rp_luaActive ) RP_Lua_EventDialog( p, n, num, c, o, r ); } while ( 0 )
 #define RP_LUA_IN_CALL()				( rp_luaInCall != 0 )
+#define RP_LUA_CMD_ROOM( c, n )			( !rp_luaInCall || RP_Lua_ScriptCmdRoom( c, n ) )
+#define RP_LUA_DB_WRITE_OK()			( !rp_luaInCall || RP_Lua_ScriptDbWrite() )

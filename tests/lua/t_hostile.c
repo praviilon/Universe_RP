@@ -1,4 +1,4 @@
-// TEST ONLY: the worst shapes from the first attempt's audits, P1 reach only. Each must end within
+// TEST ONLY: the worst shapes from the first attempt's audits, and what P2 reaches (rewards, chains of prints). Each must end within
 // RP_LUA_LIMIT_MS of real time, drop nobody (an emulated engine queue drops a client 129 commands behind),
 // and leave the state closable.
 #include "t.h"
@@ -52,8 +52,21 @@ static const shape_t shapes[] = {
 	{ "vehtypes",	"for i = 1, 100000 do World.vehicle(({'swoop','jedi','novehfile','nosuch','atst'})[i % 5 + 1], {x=0,y=0,z=0}) end" },
 	{ "vehspawnrm",	"for i = 1, 100000 do local h = World.vehicle('tauntaun', {x=0,y=0,z=0}) if h then World.remove(h) World.remove(h) end end" },
 	{ "vehnpc",		"for i = 1, 100000 do World.npc('xwing', {x=0,y=0,z=0}) end" },
+	{ "npcreward",	"for i = 1, 100000 do World.npc('jedi', {x=0,y=0,z=0}, nil, {credits=100000, xp=100}) end" },
+	{ "pay200",		"local p = Players.get(0) for i = 1, 100000 do World.use('pay200', p) end" },
+	{ "print200",	"local p = Players.get(0) for i = 1, 100000 do World.use('print200', p) end" },
+	{ "bcastloop",	"for i = 0, 23 do World.use('bcast1', Players.get(i)) end" },
+	{ "timerpay",	"Timer.every(50, function() for i = 0, 23 do World.use('pay200', Players.get(i)) World.use('print200', Players.get(i)) end end)" },
 	{ NULL, NULL }
 };
+
+// a stand-in target_print: one line to its activator, or to everyone (bcast*)
+static void s_HPrint( gentity_t *self, gentity_t *other, gentity_t *activator )
+{
+	(void)other;
+	trap->SendServerCommand( !Q_stricmpn( self->targetname, "bcast", 5 ) ? -1 : activator->s.number, "print \"a line\n\"" );
+	if ( self->target ) { gentity_t *t = NULL; while ( ( t = G_Find( t, FOFS( targetname ), self->target ) ) ) GlobalUse( t, self, activator ); }
+}
 
 int main( void )
 {
@@ -62,7 +75,10 @@ int main( void )
 	for ( c = 0; c < 24; c++ ) t_player( c, va( "P%d", c ), qtrue, 100 + c );
 	t_mapEntity( "func_button", "btn1", NULL ); t_mapEntity( "target_relay", "loop1", "loop2" ); t_mapEntity( "target_relay", "loop2", "loop1" );	// a use loop the chain limit cuts
 	t_cs[0][0] = "sound/a.wav"; t_ncs[0] = 1; t_cs[1][0] = "env/fire"; t_ncs[1] = 1;
-	t_mapEntity( "func_button", "chest_btn", "chest_relay" ); t_mapEntity( "target_relay", "chest_relay", "chest_pay" ); t_mapEntity( "target_reward", "chest_pay", NULL );
+	t_mapEntity( "func_button", "chest_btn", "chest_relay" ); t_mapEntity( "target_relay", "chest_relay", "chest_pay" ); t_rewardEntity( "chest_pay", NULL, 100000, 0 );
+	for ( c = 0; c < 200; c++ ) t_rewardEntity( "pay200", NULL, 100000, 0 );
+	for ( c = 0; c < 200; c++ ) g_entities[t_mapEntity( "target_print", "print200", NULL )].use = s_HPrint;
+	g_entities[t_mapEntity( "target_print", "bcast1", "bcast2" )].use = s_HPrint; g_entities[t_mapEntity( "target_print", "bcast2", "bcast1" )].use = s_HPrint;	// a loop: the chain limit ends it
 	for ( i = 0; shapes[i].name; i++ )
 	{
 		rpLuaPlugin_t *p;
@@ -71,18 +87,22 @@ int main( void )
 
 		Com_sprintf( code, sizeof( code ), "Events.on('init', function() %s end)\n", shapes[i].code );
 		t_write_plugin( "h", code );
-		t_logLen = 0; t_log[0] = 0; t_clear_sent();
+		t_logLen = 0; t_log[0] = 0; t_clear_sent(); t_payouts = 0;
 		t0 = trap->Milliseconds();
 		t_start( "h" );
 		took = trap->Milliseconds() - t0;
 		p = RP_Lua_Find( "h" );
 		for ( k = 0; k < 24; k++ ) if ( t_nsent[k] > maxq ) maxq = t_nsent[k];
 		CHECK( took < RP_LUA_LIMIT_MS, "%s: init took %d ms", shapes[i].name, took );
-		CHECK( maxq < 8, "%s: %d commands to one player", shapes[i].name, maxq );
+		CHECK( maxq <= RP_LUA_CMDS_PER_SEC, "%s: %d commands to one player", shapes[i].name, maxq );
+		CHECK( t_payouts <= RP_LUA_DB_WRITES_FRAME, "%s: %d payouts in one frame", shapes[i].name, t_payouts );
+		if ( !strcmp( shapes[i].name, "pay200" ) ) CHECK( t_payouts == RP_LUA_DB_WRITES_FRAME, "pay200: the guard, not something else, stopped it (%d)", t_payouts );
+		if ( !strcmp( shapes[i].name, "print200" ) ) CHECK( maxq == RP_LUA_CMDS_PER_SEC, "print200: %d reached the player", maxq );
+		if ( !strcmp( shapes[i].name, "bcastloop" ) ) CHECK( maxq == RP_LUA_CMDS_PER_SEC, "bcastloop: %d reached each player", maxq );
 		CHECK( p && p->inUse, "%s: plugin slot", shapes[i].name );
 		if ( p ) CHECK( p->memUsed <= 512 * 1024, "%s: memory %d", shapes[i].name, (int)p->memUsed );
 		t0 = trap->Milliseconds();
-		for ( k = 0; k < 20; k++ ) t_frame( 50 );	// timers and flushes
+		for ( k = 0; k < 20; k++ ) { int before = t_payouts; t_frame( 50 ); CHECK( t_payouts - before <= RP_LUA_DB_WRITES_FRAME, "%s: %d payouts in a frame", shapes[i].name, t_payouts - before ); }	// timers and flushes
 		took = trap->Milliseconds() - t0;
 		CHECK( took < 20 * RP_LUA_LIMIT_MS, "%s: 20 frames took %d ms", shapes[i].name, took );
 		for ( k = 0, maxq = 0; k < 24; k++ ) if ( t_nsent[k] > maxq ) maxq = t_nsent[k];
@@ -95,9 +115,17 @@ int main( void )
 		t_frame( 100 ); t_runThinks();
 		{ int n, left = 0; for ( n = MAX_CLIENTS; n < level.num_entities; n++ ) if ( g_entities[n].inuse && g_entities[n].rpLuaPlugin ) left++; CHECK( left == 0, "%s: %d script entities left", shapes[i].name, left ); }
 		CHECK( t_useDepth == 0, "%s: use depth %d", shapes[i].name, t_useDepth );
-		{ int n; for ( n = MAX_CLIENTS; n < level.num_entities; n++ ) if ( g_entities[n].inuse && g_entities[n].classname && !strcmp( g_entities[n].classname, "target_reward" ) ) CHECK( t_usedCount[n] == 0, "%s: a reward was used", shapes[i].name ); }
 		printf( "%-14s ok\n", shapes[i].name );
 	}
+	// every plugin slot at one player at once: what reaches that player is still the one budget
+	{ char name[16], list[256]; int k, maxq = 0;
+	  list[0] = 0; t_clear_sent(); t_frame( 1000 ); t_payouts = 0;
+	  for ( k = 0; k < RP_LUA_MAX_PLUGINS; k++ ) { Com_sprintf( name, sizeof( name ), "m%d", k ); t_write_plugin( name, "Events.on('init', function() local p = Players.get(0) for i = 1, 100 do World.use('print200', p) World.use('pay200', p) Msg.print(p, 'x') end end)\n" ); Q_strcat( list, sizeof( list ), va( "%s ", name ) ); }
+	  t_start( list ); CHECK( rp_luaActive == RP_LUA_MAX_PLUGINS, "all %d loaded: %d", RP_LUA_MAX_PLUGINS, rp_luaActive );
+	  for ( k = 0; k < 24; k++ ) if ( t_nsent[k] > maxq ) maxq = t_nsent[k];
+	  CHECK( maxq == RP_LUA_CMDS_PER_SEC && t_payouts == RP_LUA_DB_WRITES_FRAME, "16 plugins at one player: %d commands, %d payouts", maxq, t_payouts );
+	  RP_LUA_SHUTDOWN(); t_frame( 100 ); t_runThinks(); printf( "%-14s ok\n", "allplugins" ); }
+
 	// a plugin reloaded over and over while players ride what it spawns: never anyone thrown out, the released
 	// ones bounded by the server's cap, all gone once everyone is off
 	{ int r, n, t0 = trap->Milliseconds(), took, maxReleased = 0;

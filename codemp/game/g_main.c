@@ -1891,6 +1891,9 @@ void G_InitGame( int levelTime, int randomSeed, int restart ) {
 	FILE *zyk_duel_arena_file = NULL;
 	FILE *zyk_melee_arena_file = NULL;
 
+	// GLX_U: [Lua] commands sent from inside a script call are counted per client (rp_lua_api.c), first of all
+	RP_Lua_TrapGuardInstall();
+
 	// GalaxyRP fix: [RNG] seed the module's random generator. Q_irand/Q_flrand/erandom all run off
 	// a single "static uint32_t holdrand" in shared/qcommon/q_math.c, which only Rand_Init() ever
 	// sets -- and nothing in codemp/ was calling it. The engine seeds its OWN copy in common.cpp,

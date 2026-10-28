@@ -21,6 +21,7 @@ qboolean t_clockFrozen = qfalse;
 int t_tick = 0;				// frozen clock: ms added on every read (a deterministic "slow" script)
 int t_argc; char t_argv[64][256];
 int t_floodProtect = 1;
+int t_paidCredits[MAX_CLIENTS], t_payouts, t_rewardOnceEach[MAX_ENTITIESTOTAL][MAX_CLIENTS];	// the stand-in target_reward
 qboolean t_builtin = qfalse;
 
 void t_worldReset( void );
@@ -59,7 +60,9 @@ void t_init( int maxclients )
 	for ( i = 0; i < MAX_CLIENTS; i++ ) { g_entities[i].client = &g_clients_store[i]; }
 	rp_lua.integer = 1; rp_lua_memkb.integer = 512; Q_strncpyz( rp_lua_plugins.string, "", sizeof( rp_lua_plugins.string ) );
 	t_logLen = 0; t_log[0] = 0; t_console[0] = 0; memset( t_nsent, 0, sizeof( t_nsent ) );
+	t_payouts = 0; memset( t_paidCredits, 0, sizeof( t_paidCredits ) ); memset( t_rewardOnceEach, 0, sizeof( t_rewardOnceEach ) );
 	t_worldReset();
+	RP_Lua_TrapGuardInstall();	// as G_InitGame: the game module's commands go through the guarded copy
 }
 void t_player( int i, const char *name, qboolean loggedin, int charId )
 {
@@ -120,16 +123,13 @@ int t_freedRidden;	// G_FreeEntity on a vehicle someone rides: what must never h
 void G_FreeEntity( gentity_t *ed ) { int n = ed->s.number; if ( n >= MAX_CLIENTS ) t_freed++; if ( ed->m_pVehicle ) { if ( ed->m_pVehicle->m_pPilot || ed->m_pVehicle->m_iNumPassengers ) t_freedRidden++; free( ed->m_pVehicle ); t_vehiclesAlive--; } if ( ed->NPC ) free( ed->NPC ); if ( ed->client && n >= MAX_CLIENTS && ( ed->client < g_clients_store || ed->client >= g_clients_store + MAX_CLIENTS ) ) { free( ed->client ); t_npcsAlive--; } memset( ed, 0, sizeof( *ed ) ); ed->s.number = n; ed->classname = "freed"; t_recordCount[n] = 0; t_freeSlots++; }
 void zyk_main_spawn_entity( gentity_t *ent ) { int n = ent->s.number; const char *v; if ( !ent->inuse ) return; level.rp_spawn_refusal[0] = 0; ent->classname = G_NewString( s_RecordValue( n, "classname" ) ); if ( ( v = s_RecordValue( n, "targetname" ) ) ) ent->targetname = G_NewString( v ); if ( ( v = s_RecordValue( n, "origin" ) ) ) sscanf( v, "%f %f %f", &ent->r.currentOrigin[0], &ent->r.currentOrigin[1], &ent->r.currentOrigin[2] ); if ( ( v = s_RecordValue( n, "health" ) ) ) ent->health = atoi( v ); ent->use = (void *)1; if ( t_spawnRefuse ) { Q_strncpyz( level.rp_spawn_refusal, "the server does not have that model", sizeof( level.rp_spawn_refusal ) ); G_FreeEntity( ent ); } }
 int RP_FreeEntityChildren( gentity_t *maker ) { (void)maker; return 0; }
-const char *t_dialogGo[MAX_ENTITIESTOTAL][RP_DIALOG_OPTIONS];	// a stand-in target_dialog's go1..6
-#ifndef T_REAL_DIALOG	// t_dialog links the real g_dialog.c
-int RP_DialogOptionTargets( const gentity_t *ent, const char **names, int max ) { int i, n = 0; if ( !ent->classname || strcmp( ent->classname, "target_dialog" ) ) return 0; for ( i = 0; i < RP_DIALOG_OPTIONS && n < max; i++ ) if ( t_dialogGo[ent->s.number][i] ) names[n++] = t_dialogGo[ent->s.number][i]; return n; }
-#endif
 qboolean RP_EntityIsCharacter( const gentity_t *e ) { return ( e && e->client ) ? qtrue : qfalse; }
 void G_SetOrigin( gentity_t *ent, vec3_t origin ) { VectorCopy( origin, ent->r.currentOrigin ); VectorCopy( origin, ent->s.origin ); }
 char t_lastSpawnerClass[64];
 gentity_t *NPC_Spawn_Do( gentity_t *spawner ) { gentity_t *npc; int vt = s_VehType( spawner->NPC_type ); Q_strncpyz( t_lastSpawnerClass, spawner->classname ? spawner->classname : "", sizeof( t_lastSpawnerClass ) ); if ( t_npcRefuse || !G_EntitySlotsAvailable( 3 ) ) return NULL;
 	if ( spawner->classname && !Q_stricmp( spawner->classname, "NPC_Vehicle" ) && vt <= VH_NONE ) { G_FreeEntity( spawner ); return NULL; }	// no vehicle file: the real one frees the spawner too
 	npc = s_SpawnSlot(); if ( !npc ) return NULL; npc->client = calloc( 1, sizeof( gclient_t ) ); npc->NPC = calloc( 1, sizeof( gNPC_t ) ); npc->classname = "NPC"; npc->NPC_type = spawner->NPC_type; npc->targetname = spawner->NPC_targetname; VectorCopy( spawner->s.origin, npc->r.currentOrigin ); npc->health = 100; npc->use = (void *)1; t_npcsAlive++;
+	if ( !( spawner->classname && !Q_stricmp( spawner->classname, "NPC_Vehicle" ) ) ) { npc->rpRewardCredits = spawner->rpRewardCredits; npc->rpRewardXP = spawner->rpRewardXP; }	// as the real one: never to a vehicle
 	if ( spawner->classname && !Q_stricmp( spawner->classname, "NPC_Vehicle" ) ) { npc->m_pVehicle = calloc( 1, sizeof( Vehicle_t ) ); s_vehInfo[vt].type = vt; npc->m_pVehicle->m_pVehicleInfo = &s_vehInfo[vt]; npc->NPC->behaviorState = BS_DEFAULT; t_vehiclesAlive++; }
 	return npc; }
 void RP_SpawnedRemove( gentity_t *e ) { e->takedamage = qfalse; e->health = 0; e->targetname = NULL; e->think = G_FreeEntity; e->nextthink = level.time + 100; t_removedSilently++; }
@@ -148,6 +148,27 @@ void GlobalUse( gentity_t *self, gentity_t *other, gentity_t *activator )
 	t_useDepth--;
 	RP_LUA_EVENT_USED( self, activator );
 }
+// a stand-in target_reward: the real target_reward_use's shape (g_target.c) -- a player activator, the per-player
+// record (ONCE_EACH), then RP_PayReward's own order: eligible, RP_LUA_DB_WRITE_OK before anything is given, the
+// console line, the log line with the plugin when a script call set it off; then its target
+int t_mapEntity( const char *classname, const char *targetname, const char *target );
+static void s_RewardUse( gentity_t *self, gentity_t *other, gentity_t *activator )
+{
+	const char *plugin = RP_LUA_IN_CALL() ? RP_Lua_CurrentName() : NULL;
+	char logTag[MAX_QPATH * 2];
+	(void)other;
+	if ( !activator || !activator->client || activator->s.number < 0 || activator->s.number >= MAX_CLIENTS ) return;
+	if ( ( self->spawnflags & 1 ) && t_rewardOnceEach[self->s.number][activator->s.number] ) return;
+	if ( activator->client->pers.CharID <= 0 ) return;
+	if ( !RP_LUA_DB_WRITE_OK() ) return;
+	trap->SendServerCommand( activator->s.number, va( "print \"^3Reward^3: ^2+%d credits\n\"", self->rpRewardCredits ) );
+	t_paidCredits[activator->s.number] += self->rpRewardCredits; t_payouts++;
+	Com_sprintf( logTag, sizeof( logTag ), "Reward: %s (%d) used%s%s%s", self->targetname ? self->targetname : "target_reward", self->s.number, plugin ? " [lua:" : "", plugin ? plugin : "", plugin ? "]" : "" );
+	G_LogPrintf( "%s: %s^7: %d credits, %d XP\n", logTag, activator->client->pers.netname, self->rpRewardCredits, self->rpRewardXP );
+	if ( self->spawnflags & 1 ) t_rewardOnceEach[self->s.number][activator->s.number] = 1;
+	if ( self->target ) { gentity_t *t = NULL; while ( ( t = G_Find( t, FOFS( targetname ), self->target ) ) ) GlobalUse( t, self, activator ); }
+}
+int t_rewardEntity( const char *targetname, const char *target, int credits, int spawnflags ) { int n = t_mapEntity( "target_reward", targetname, target ); g_entities[n].use = s_RewardUse; g_entities[n].rpRewardCredits = credits; g_entities[n].rpRewardXP = 1; g_entities[n].spawnflags = spawnflags; return n; }
 // a stand-in map entity with a use (a button, a relay): number returned
 int t_mapEntity( const char *classname, const char *targetname, const char *target ) { gentity_t *e = s_SpawnSlot(); e->classname = (char *)classname; e->targetname = (char *)targetname; e->target = (char *)target; e->use = (void *)1; return e->s.number; }
 // the think the real game would run next frame for an NPC taken away
@@ -159,6 +180,6 @@ void t_worldReset( void )
 	for ( i = 0; i < s_numStrings; i++ ) free( s_strings[i] );
 	s_numStrings = 0;
 	t_freeSlots = 1000; t_poolFree = 1 << 20; t_spawnRefuse = qfalse; t_npcRefuse = qfalse;
-	memset( t_locked, 0, sizeof( t_locked ) ); memset( t_usedCount, 0, sizeof( t_usedCount ) ); memset( t_usedInCall, 0, sizeof( t_usedInCall ) ); memset( t_dialogGo, 0, sizeof( t_dialogGo ) ); memset( t_recordCount, 0, sizeof( t_recordCount ) );
+	memset( t_locked, 0, sizeof( t_locked ) ); memset( t_usedCount, 0, sizeof( t_usedCount ) ); memset( t_usedInCall, 0, sizeof( t_usedInCall ) ); memset( t_recordCount, 0, sizeof( t_recordCount ) );
 	t_useDepth = t_useChain = t_useRefused = 0; t_freedRidden = 0; t_vehiclesAlive = 0; t_effects = t_sounds = 0; t_ncs[0] = t_ncs[1] = 0; t_freed = 0; t_npcsAlive = 0; t_removedSilently = 0;
 }

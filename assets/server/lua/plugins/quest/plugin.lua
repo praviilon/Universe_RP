@@ -5,11 +5,12 @@
 
 local setup = {
 	map        = "mp/ffa5",                                 -- only on this map
-	npc        = { type = "jedi", origin = { x = 0, y = 0, z = 64 }, angles = { x = 0, y = 90, z = 0 } },
+	npc        = { type = "jedi", origin = { x = 0, y = 0, z = 64 }, angles = { x = 0, y = 90, z = 0 },
+	               credits = 200, xp = 10 },                -- paid to the player who defeats the guard
 	crate      = { origin = { x = 128, y = 0, z = 32 }, model = "models/map_objects/imp_mine/crate.md3" },
 	vehicle    = { type = "swoop", origin = { x = -128, y = 0, z = 32 }, angles = { x = 0, y = 90, z = 0 } },
 	button     = "quest_button",                            -- a map or entity-system button's targetname
-	reward     = "quest_door",                              -- what the button's reward uses (a door, a target_teleporter...)
+	reward     = "quest_door",                              -- what the button's reward uses (a door, a target_reward...)
 	effect     = "env/small_fire",                          -- must already be registered on the map
 	sound      = "sound/movers/switches/switch3.wav",       -- same; played when the guard falls
 	respawn_ms = 60000,
@@ -20,7 +21,8 @@ local guard, crate, bike
 local function place()
 	if World.mapname() ~= setup.map then return end
 	local why
-	guard, why = World.npc(setup.npc.type, setup.npc.origin, setup.npc.angles, { name = "guard" })
+	guard, why = World.npc(setup.npc.type, setup.npc.origin, setup.npc.angles,
+		{ name = "guard", credits = setup.npc.credits, xp = setup.npc.xp })
 	if not guard then Log.info("no guard: " .. tostring(why)) end
 	crate, why = World.prop("misc_model_breakable", setup.crate.origin, nil, { model = setup.crate.model, health = 100 }, { name = "crate" })
 	if not crate then Log.info("no crate: " .. tostring(why)) end
@@ -52,7 +54,8 @@ Events.on("entity_used", function(e)
 		Effect.play(setup.effect, crate.origin, nil)
 	end
 	-- the reward is whatever the map does when that name is used, with this player as activator:
-	-- a door opens for them, a teleporter sends them, a target_give gives them the map's items
+	-- a door opens for them, a teleporter sends them, a target_give gives them the map's items,
+	-- a target_reward (placed with /entadd) pays them
 	local used, why = World.use(setup.reward, p)
 	if used == false then Log.info("reward: " .. tostring(why)) end
 	Msg.print(p, "^3Quest: ^7well done, " .. p.name .. "^7.")
@@ -64,7 +67,8 @@ Events.on("npc_death", function(e)
 		Msg.broadcast("^3Quest: ^7the guard was defeated" .. (e.killer and (" by " .. e.killer.name) or "") .. "^7. Another comes in a minute.")
 		Timer.after(setup.respawn_ms, function()
 			if guard and guard:valid() then World.remove(guard) end  -- the body, if it is still there
-			local g, why = World.npc(setup.npc.type, setup.npc.origin, setup.npc.angles, { name = "guard" })
+			local g, why = World.npc(setup.npc.type, setup.npc.origin, setup.npc.angles,
+				{ name = "guard", credits = setup.npc.credits, xp = setup.npc.xp })
 			guard = g
 			if not g then Log.info("no guard: " .. tostring(why)) end
 		end)
