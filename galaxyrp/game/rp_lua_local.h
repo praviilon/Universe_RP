@@ -46,7 +46,12 @@ three cvars (rp_lua, rp_lua_plugins, rp_lua_memkb) are in g_xcvar.h.
 // P2: the world
 #define RP_LUA_MAX_PROPS		32		// a plugin's props alive at once
 #define RP_LUA_MAX_NPCS			8		// and its NPCs
-#define RP_LUA_MAX_ENTS			( RP_LUA_MAX_PROPS + RP_LUA_MAX_NPCS )
+#define RP_LUA_MAX_VEHICLES		6		// and its vehicles (World.vehicle), apart from the NPCs
+#define RP_LUA_MAX_ENTS			( RP_LUA_MAX_PROPS + RP_LUA_MAX_NPCS + RP_LUA_MAX_VEHICLES )
+#define RP_LUA_VEHICLE_SPAWNS_MAP	24	// vehicle spawns per plugin per map (each leaves its spawner's strings in the pool)
+#define RP_LUA_VEHICLES_SERVER	24		// script vehicles alive on the server, all plugins and released ones together
+#define RP_LUA_RELEASED			( RP_LUA_MAX_PLUGINS + 1 )	// gentity_t::rpLuaPlugin of a ridden vehicle its plugin let go:
+												// no plugin's, still a script's (/entsave leaves it out)
 #define RP_LUA_PROP_SPAWNS_MAP	128		// spawns per plugin per map: the key/value pool (G_Alloc) and the
 #define RP_LUA_NPC_SPAWNS_MAP	32		// spawner strings are never freed within a map
 #define RP_LUA_MAX_KEYS			24		// key/value pairs a World.prop may carry (ZYK_MAX_SPAWN_STRING_SLOTS/2 is 64)
@@ -85,6 +90,7 @@ typedef struct {
 	int			number;
 	int			stamp;
 	qboolean	npc;
+	qboolean	vehicle;		// an NPC that is a vehicle (World.vehicle): counted and removed apart
 	qboolean	removeQueued;	// World.remove: freed at the frame end
 } rpLuaEntity_t;
 
@@ -135,7 +141,7 @@ typedef struct rpLuaPlugin_s {
 	// P2: the world
 	rpLuaEntity_t	ents[RP_LUA_MAX_ENTS];
 	int				numEnts;
-	int				propSpawns, npcSpawns;	// this map (this load)
+	int				propSpawns, npcSpawns, vehicleSpawns;	// this map (this load)
 	qboolean		removesQueued;
 
 	// stats
@@ -176,7 +182,10 @@ void RP_LuaApi_Sent( int clientNum );
 void RP_LuaWorld_OpenLib( rpLuaPlugin_t *p );
 void RP_LuaWorld_Frame( rpLuaPlugin_t *p );		// queued removes
 void RP_LuaWorld_PluginClose( rpLuaPlugin_t *p );	// every entity it made, now (frame end or map end only)
-int RP_LuaWorld_CountLive( rpLuaPlugin_t *p, qboolean npcs );
+int RP_LuaWorld_CountLive( rpLuaPlugin_t *p, qboolean npcs );	// props or NPCs, vehicles not included
+int RP_LuaWorld_CountVehicles( rpLuaPlugin_t *p );
+void RP_LuaWorld_ReleasedFrame( void );	// every frame: released vehicles nobody rides any more are removed
+void RP_LuaWorld_Reset( void );			// a new map: no released vehicle survives it
 rpLuaPlugin_t *RP_LuaWorld_OwnerOf( const gentity_t *ent );	// the plugin that spawned it, or NULL
 void RP_LuaWorld_PushEntity( lua_State *L, const gentity_t *ent );	// a handle for an entity it owns
 

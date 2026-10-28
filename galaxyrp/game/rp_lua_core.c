@@ -665,6 +665,7 @@ void RP_Lua_Init( void )
 	rp_luaInCall = 0;
 	rpLuaCurrent = NULL;
 	RP_LuaApi_Reset();
+	RP_LuaWorld_Reset();
 
 	rpLuaStoreReady = RP_LuaStore_Open();
 	if ( rpLuaStoreReady )
@@ -721,6 +722,7 @@ void RP_Lua_Frame( void )
 			RP_LuaWorld_Frame( &rpLuaPlugins[i] );	// World.remove, after every call of the frame
 	}
 	RP_Lua_RunQueue();
+	RP_LuaWorld_ReleasedFrame();	// ridden vehicles let go of at a close, removed once empty
 }
 
 void RP_Lua_Generation( int clientNum )

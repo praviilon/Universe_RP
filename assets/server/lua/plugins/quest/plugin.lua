@@ -1,11 +1,13 @@
--- quest: a guard, a crate and a button. Shows every P2 call: World.npc, World.prop, World.watch +
--- entity_used, Effect.play, Sound.play, World.use, World.remove, the npc_death event, Storage.char.
+-- quest: a guard, a crate, a swoop and a button. Shows every P2 call: World.npc, World.prop,
+-- World.vehicle, World.watch + entity_used, Effect.play, Sound.play, World.use, World.remove, the npc_death
+-- event, Storage.char.
 -- Edit the table for your map. Enable with: rp_lua_plugins "quest"  (or /scripts load quest)
 
 local setup = {
 	map        = "mp/ffa5",                                 -- only on this map
 	npc        = { type = "jedi", origin = { x = 0, y = 0, z = 64 }, angles = { x = 0, y = 90, z = 0 } },
 	crate      = { origin = { x = 128, y = 0, z = 32 }, model = "models/map_objects/imp_mine/crate.md3" },
+	vehicle    = { type = "swoop", origin = { x = -128, y = 0, z = 32 }, angles = { x = 0, y = 90, z = 0 } },
 	button     = "quest_button",                            -- a map or entity-system button's targetname
 	reward     = "quest_door",                              -- what the button's reward uses (a door, a target_teleporter...)
 	effect     = "env/small_fire",                          -- must already be registered on the map
@@ -13,7 +15,7 @@ local setup = {
 	respawn_ms = 60000,
 }
 
-local guard, crate
+local guard, crate, bike
 
 local function place()
 	if World.mapname() ~= setup.map then return end
@@ -22,6 +24,9 @@ local function place()
 	if not guard then Log.info("no guard: " .. tostring(why)) end
 	crate, why = World.prop("misc_model_breakable", setup.crate.origin, nil, { model = setup.crate.model, health = 100 }, { name = "crate" })
 	if not crate then Log.info("no crate: " .. tostring(why)) end
+	-- players may ride it; if someone is on it when the plugin stops, it stays until they get off
+	bike, why = World.vehicle(setup.vehicle.type, setup.vehicle.origin, setup.vehicle.angles, { name = "bike" })
+	if not bike then Log.info("no swoop: " .. tostring(why)) end
 end
 
 Events.on("init", function()

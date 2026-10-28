@@ -3,8 +3,8 @@
 Universe RP's server can run small Lua 5.4 scripts called plugins. A plugin
 is told what happens on the server and can answer with messages, chat
 commands, timers and stored data (P1), and act on the world the way a
-player would (P2): use a named entity as a button would, place props and
-NPCs of its own, play effects and sounds the map already has. It never
+player would (P2): use a named entity as a button would, place props,
+NPCs and vehicles of its own, play effects and sounds the map already has. It never
 reaches past that: no accounts, credits or levels, no kicking, renaming or
 damaging anyone, no giving or taking from a player — what a script wants
 done to a player, the map's own mechanics do (a `target_give`, a
@@ -36,7 +36,7 @@ Stored data goes to `<mod folder>/database/lua.db`, beside `accounts.db`.
 | Command | Does |
 |---|---|
 | `/scripts` or `/scripts list` | each plugin: running or off, memory, errors, timers, commands, watches |
-| `/scripts stats [name]` | calls, time, messages sent and refused, deferred timers, stored bytes; props and NPCs alive, uses, effects, sounds |
+| `/scripts stats [name]` | calls, time, messages sent and refused, deferred timers, stored bytes; props, NPCs and vehicles alive, uses, effects, sounds |
 | `/scripts help` | every command the plugins add, with its help text |
 | `/scripts load <name>` | load a plugin (for this map; `rp_lua_plugins` is not changed) |
 | `/scripts unload <name>` | stop it and free its slot |
@@ -65,9 +65,10 @@ however written, costs the server a bounded amount.
 | all calls in one frame | 20 ms (50 ms for all plugins together) | timers wait for the next frame; nothing is dropped |
 | memory | `rp_lua_memkb` | "not enough memory" in the call |
 | errors | 20 in 60 s | the plugin is switched off (`/scripts enable` brings it back) |
-| actions (`Msg.*`, `World.use/prop/npc`, `Effect.play`, `Sound.play`) | one bucket of 4, one token back per `sv_floodProtect` ms | `false, "too fast"` |
-| props / NPCs alive | 32 / 8 | `false, "too many props"` / `"too many npcs"` |
-| spawns per map | 128 props / 32 NPCs | `false, "spawn limit for this map"` |
+| actions (`Msg.*`, `World.use/prop/npc/vehicle`, `Effect.play`, `Sound.play`) | one bucket of 4, one token back per `sv_floodProtect` ms | `false, "too fast"` |
+| props / NPCs / vehicles alive | 32 / 8 / 6 | `false, "too many props"` / `"too many npcs"` / `"too many vehicles"` |
+| spawns per map | 128 props / 32 NPCs / 24 vehicles | `false, "spawn limit for this map"` |
+| script vehicles on the server | 24, all plugins and released ones together | `false, "too many vehicles on the server"` |
 | entity slots | the server's reserve of 64 kept free, as for `/entadd` | `false, "no room"` |
 | messages to one player | 4 a second across all plugins | `false, "player busy"` |
 | timers | 32 live, 50 ms minimum | `false, "too many timers"` |
@@ -155,6 +156,7 @@ local h = Timer.every(60000, fn)   -- also Timer.after(ms, fn); Timer.cancel(h)
 World.use("door1", p)            -- every entity named door1, used as a button would with p as activator
 World.prop("misc_model_breakable", {x=0,y=0,z=0}, {x=0,y=90,z=0}, {model="models/x.md3", health=50}, {name="crate"})
 World.npc("jedi", {x=0,y=0,z=0}, {x=0,y=90,z=0}, {name="guard"})
+World.vehicle("swoop", {x=0,y=0,z=0}, {x=0,y=90,z=0}, {name="bike1"})
 World.remove(h)                  -- queued: the entity goes at the end of the frame
 Effect.play("env/small_fire", origin, angles)
 Sound.play("sound/x.wav", origin)
@@ -184,10 +186,25 @@ entity's name. `/entsave` leaves script entities out; `/entremove`,
 `/entedit` and `/entload` treat them as any other, and the handle goes
 stale then. A dead NPC counts as alive until its body is gone or removed.
 
+`World.vehicle` places a vehicle of any type (speeders, swoops, animals,
+fighters, walkers) as a map's `NPC_Vehicle` spawner would: it stands still
+until a player boards it, and players ride it as any other. The vehicle file
+decides the rest (its droid, whether it dies without a pilot). A type that is
+not a vehicle is refused (`"not a vehicle type"`); `World.npc` refuses vehicle
+types. A script never boards, drives or empties a vehicle: `World.use` skips
+vehicles, and `World.remove` of one somebody rides is refused with
+`false, "someone is riding it"`.
+
 Handles: `h.number`, `h.classname`, `h.origin`, `h.targetname`,
-`h.health`, `h.npc_type`; `h:valid()`. Two handles to the same entity are
-equal. Unloading, reloading or disabling a plugin removes everything it
-spawned, after its `shutdown` event.
+`h.health`, `h.npc_type`; for a vehicle also `h.vehicle_type` (`walker`,
+`fighter`, `speeder`, `animal`, `flier`), `h.pilot` (the player riding it,
+or nil) and `h.passengers` (how many ride behind the pilot); `h:valid()`.
+Two handles to the same entity are equal. Unloading, reloading or disabling
+a plugin removes everything it spawned, after its `shutdown` event — except
+a vehicle someone is riding: the plugin lets it go (its handles go stale, a
+reloaded plugin does not get it back), the ride goes on, and the vehicle
+is removed once nobody is aboard. Those count toward the 24 on the server
+until then.
 
 `Effect.play` and `Sound.play` only play names already registered on the
 map (by the map, the Entity System or `/playsound`); a script never
@@ -225,7 +242,7 @@ That is by design for this stage.
 Start from `plugins/greeter/plugin.lua` (storage and events),
 `plugins/events/plugin.lua` (timers, a command, the message bucket) or
 `plugins/quest/plugin.lua` (an NPC, a prop, a watched button, a use as the
-reward, `npc_death`). Keep
+reward, `npc_death`, a vehicle). Keep
 each handler short: the budget is 10 ms a call, and anything heavier
 belongs in a timer that does a slice at a time. Check the result of
 `Msg.*` and `Storage.*` calls when it matters, and look at

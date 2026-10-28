@@ -8,6 +8,7 @@ bucket the messages use: a plugin acts at a player's pace.
                                           locks, depth and chain limits as for a button; no admin bypass
   World.prop( class, origin, angles, keys ) the /entadd sequence, for the Entity System's exempt classes
   World.npc( type, origin, angles, opts ) a spawner and NPC_Spawn_Do(), as /npc spawn
+  World.vehicle( type, origin, angles, opts ) the same for a vehicle, as a map's NPC_Vehicle spawner
   World.remove( handle )                  queued: freed at the end of the frame, never inside a call
   Effect.play( name, origin, angles )     G_PlayEffectID() of an effect already registered
   Sound.play( name, origin )              G_SoundAtLoc() of a sound already registered
@@ -15,6 +16,9 @@ bucket the messages use: a plugin acts at a player's pace.
 A spawned entity carries the plugin's slot and a stamp (gentity_t::rpLuaPlugin, rpLuaStamp): /entsave leaves
 it out, a handle to a reused slot never matches, and unload, reload, disable and the map's end take every
 entity the plugin made (RP_LuaWorld_PluginClose, from RP_Lua_ClosePlugin, which runs at a frame end only).
+A vehicle someone rides is never removed: World.remove refuses it, and at a close it is released instead (its
+tag becomes RP_LUA_RELEASED) and removed by RP_LuaWorld_ReleasedFrame once nobody rides it. Freeing a ridden
+vehicle would throw its riders off, and kill them on a vehicle whose file has killRiderOnDeath (EjectAll()).
 ===========================================================================
 */
 #include "rp_lua_local.h"
@@ -32,6 +36,19 @@ typedef struct {
 } rpLuaEntityHandle_t;
 
 static int rpLuaStampNext = 0;
+
+// ridden vehicles their plugin let go of: removed once empty
+typedef struct { int number, stamp; } rpLuaReleased_t;
+static rpLuaReleased_t rpLuaReleased[RP_LUA_VEHICLES_SERVER];
+static int rpLuaNumReleased;
+static int rpLuaReleasedCheck;		// level.time of the next look
+#define RP_LUA_RELEASED_CHECK_MS	500
+
+// a vehicle with a pilot or passengers
+static qboolean RP_LuaWorld_Ridden( const gentity_t *ent )
+{
+	return ( ent->m_pVehicle && ( ent->m_pVehicle->m_pPilot || ent->m_pVehicle->m_iNumPassengers > 0 ) ) ? qtrue : qfalse;
+}
 
 /*
 ==================
@@ -68,7 +85,48 @@ int RP_LuaWorld_CountLive( rpLuaPlugin_t *p, qboolean npcs )
 	RP_LuaWorld_Compact( p );
 	for ( i = 0; i < p->numEnts; i++ )
 	{
-		if ( p->ents[i].npc == npcs )
+		if ( p->ents[i].npc == npcs && !p->ents[i].vehicle )
+			n++;
+	}
+	return n;
+}
+
+int RP_LuaWorld_CountVehicles( rpLuaPlugin_t *p )
+{
+	int i, n = 0;
+
+	RP_LuaWorld_Compact( p );
+	for ( i = 0; i < p->numEnts; i++ )
+	{
+		if ( p->ents[i].vehicle )
+			n++;
+	}
+	return n;
+}
+
+static qboolean RP_LuaWorld_ReleasedLive( const rpLuaReleased_t *r )
+{
+	const gentity_t *ent;
+
+	if ( r->number < 0 || r->number >= MAX_ENTITIESTOTAL )
+		return qfalse;
+	ent = &g_entities[r->number];
+	return ( ent->inuse && r->stamp && ent->rpLuaStamp == r->stamp && ent->rpLuaPlugin == RP_LUA_RELEASED ) ? qtrue : qfalse;
+}
+
+// every plugin's live vehicles and the released ones still about
+static int RP_LuaWorld_VehiclesOnServer( void )
+{
+	int i, n = 0;
+
+	for ( i = 0; i < RP_LUA_MAX_PLUGINS; i++ )
+	{
+		if ( rpLuaPlugins[i].inUse )
+			n += RP_LuaWorld_CountVehicles( &rpLuaPlugins[i] );
+	}
+	for ( i = 0; i < rpLuaNumReleased; i++ )
+	{
+		if ( RP_LuaWorld_ReleasedLive( &rpLuaReleased[i] ) )
 			n++;
 	}
 	return n;
@@ -86,7 +144,7 @@ rpLuaPlugin_t *RP_LuaWorld_OwnerOf( const gentity_t *ent )
 	return &rpLuaPlugins[slot];
 }
 
-static void RP_LuaWorld_Tag( rpLuaPlugin_t *p, gentity_t *ent, qboolean npc )
+static void RP_LuaWorld_Tag( rpLuaPlugin_t *p, gentity_t *ent, qboolean npc, qboolean vehicle )
 {
 	rpLuaEntity_t *e;
 
@@ -100,18 +158,48 @@ static void RP_LuaWorld_Tag( rpLuaPlugin_t *p, gentity_t *ent, qboolean npc )
 	e->number = ent - g_entities;
 	e->stamp = ent->rpLuaStamp;
 	e->npc = npc;
+	e->vehicle = vehicle;
 	e->removeQueued = qfalse;
 }
 
+// the plugin lets a ridden vehicle go: no plugin's now, still a script's, removed once empty
+static void RP_LuaWorld_Release( gentity_t *ent )
+{
+	int i, kept = 0;
+
+	for ( i = 0; i < rpLuaNumReleased; i++ )
+	{ // drop the ones gone since the last look first: the live ones and this one are within the server's cap
+		if ( RP_LuaWorld_ReleasedLive( &rpLuaReleased[i] ) )
+			rpLuaReleased[kept++] = rpLuaReleased[i];
+	}
+	rpLuaNumReleased = kept;
+	ent->rpLuaPlugin = RP_LUA_RELEASED;
+	if ( rpLuaNumReleased >= RP_LUA_VEHICLES_SERVER )
+	{ // cannot happen (released ones count toward the server's cap); it then stays until the map ends
+		G_LogPrintf( "[lua] released vehicle %d not tracked: the list is full\n", ent->s.number );
+		return;
+	}
+	rpLuaReleased[rpLuaNumReleased].number = ent->s.number;
+	rpLuaReleased[rpLuaNumReleased].stamp = ent->rpLuaStamp;
+	rpLuaNumReleased++;
+}
+
 // the one place an entity a script made is freed: at a frame end (RP_LuaWorld_Frame, RP_Lua_RunQueue) or
-// at the map's end (RP_Lua_Shutdown) -- never inside a script call
-static void RP_LuaWorld_FreeNow( rpLuaEntity_t *e )
+// at the map's end (RP_Lua_Shutdown) -- never inside a script call;
+// a ridden vehicle is never freed: with releaseRidden it is released, otherwise it stays the plugin's
+static void RP_LuaWorld_FreeNow( rpLuaEntity_t *e, qboolean releaseRidden )
 {
 	gentity_t *ent;
 
 	if ( !RP_LuaWorld_Live( e ) )
 		return;
 	ent = &g_entities[e->number];
+	if ( e->vehicle && RP_LuaWorld_Ridden( ent ) )
+	{
+		if ( releaseRidden )
+			RP_LuaWorld_Release( ent );
+		return;
+	}
 	if ( e->npc && ent->client )
 	{
 		RP_SpawnedRemove( ent );	// as /entundo of a spawner: silent, nothing fires, gone next frame
@@ -132,7 +220,10 @@ void RP_LuaWorld_Frame( rpLuaPlugin_t *p )
 	for ( i = 0; i < p->numEnts; i++ )
 	{
 		if ( p->ents[i].removeQueued )
-			RP_LuaWorld_FreeNow( &p->ents[i] );
+		{ // a vehicle boarded since World.remove stays the plugin's
+			RP_LuaWorld_FreeNow( &p->ents[i], qfalse );
+			p->ents[i].removeQueued = qfalse;
+		}
 	}
 	p->removesQueued = qfalse;
 	RP_LuaWorld_Compact( p );
@@ -143,9 +234,47 @@ void RP_LuaWorld_PluginClose( rpLuaPlugin_t *p )
 	int i;
 
 	for ( i = 0; i < p->numEnts; i++ )
-		RP_LuaWorld_FreeNow( &p->ents[i] );
+		RP_LuaWorld_FreeNow( &p->ents[i], qtrue );
 	p->numEnts = 0;
 	p->removesQueued = qfalse;
+}
+
+// from RP_Lua_Frame, every frame, looking every 500 ms: a released vehicle nobody rides goes (its droid with it);
+// one destroyed, removed by an admin or otherwise gone is dropped from the list
+void RP_LuaWorld_ReleasedFrame( void )
+{
+	int i, kept = 0;
+
+	if ( !rpLuaNumReleased || level.time < rpLuaReleasedCheck )
+		return;
+	rpLuaReleasedCheck = level.time + RP_LUA_RELEASED_CHECK_MS;
+	for ( i = 0; i < rpLuaNumReleased; i++ )
+	{
+		rpLuaReleased_t *r = &rpLuaReleased[i];
+		gentity_t *ent;
+
+		if ( !RP_LuaWorld_ReleasedLive( r ) )
+			continue;
+		ent = &g_entities[r->number];
+		if ( RP_LuaWorld_Ridden( ent ) )
+		{
+			rpLuaReleased[kept++] = *r;
+			continue;
+		}
+		if ( ent->client )
+			RP_SpawnedRemove( ent );	// not drawn, not solid, gone next frame; nobody aboard, so no EjectAll
+		else
+			G_FreeEntity( ent );
+		ent->rpLuaPlugin = 0;
+		ent->rpLuaStamp = 0;
+	}
+	rpLuaNumReleased = kept;
+}
+
+void RP_LuaWorld_Reset( void )
+{
+	rpLuaNumReleased = 0;
+	rpLuaReleasedCheck = 0;
 }
 
 /*
@@ -208,6 +337,32 @@ static int RP_LuaWorld_EntityIndex( lua_State *L )
 		lua_pushstring( L, ent->targetname ? ent->targetname : "" );
 	else if ( !strcmp( key, "health" ) )
 		lua_pushinteger( L, ent->health );
+	else if ( !strcmp( key, "vehicle_type" ) )
+	{
+		static const char *const names[] = { "none", "walker", "fighter", "speeder", "animal", "flier" };
+		int t = ( ent->m_pVehicle && ent->m_pVehicle->m_pVehicleInfo ) ? ent->m_pVehicle->m_pVehicleInfo->type : -1;
+
+		if ( t > VH_NONE && t < VH_NUM_VEHICLES )
+			lua_pushstring( L, names[t] );
+		else
+			lua_pushnil( L );
+	}
+	else if ( !strcmp( key, "pilot" ) )
+	{
+		const gentity_t *pilot = ent->m_pVehicle ? (const gentity_t *)ent->m_pVehicle->m_pPilot : NULL;
+
+		if ( pilot && pilot->client && pilot->s.number >= 0 && pilot->s.number < MAX_CLIENTS )
+			RP_LuaApi_PushPlayer( L, pilot->s.number );
+		else
+			lua_pushnil( L );
+	}
+	else if ( !strcmp( key, "passengers" ) )
+	{
+		if ( ent->m_pVehicle )
+			lua_pushinteger( L, ent->m_pVehicle->m_iNumPassengers );
+		else
+			lua_pushnil( L );
+	}
 	else if ( !strcmp( key, "origin" ) )
 	{
 		lua_createtable( L, 0, 3 );
@@ -588,7 +743,7 @@ static int RP_LuaWorld_Prop( lua_State *L )
 	}
 	for ( i = 0; i < n; i++ )
 		zyk_main_set_entity_field( e, pairs[i].key, pairs[i].value );
-	RP_LuaWorld_Tag( p, e, qfalse );
+	RP_LuaWorld_Tag( p, e, qfalse, qfalse );
 	level.rp_spawn_refusal[0] = '\0';
 	zyk_main_spawn_entity( e );
 	if ( !e->inuse )
@@ -626,7 +781,7 @@ static int RP_LuaWorld_Npc( lua_State *L )
 	if ( !RP_NpcTypeKnown( type ) )
 		return RP_LuaWorld_Refuse( L, "unknown NPC type" );
 	if ( RP_NpcTypeIsVehicle( type ) )
-		return RP_LuaWorld_Refuse( L, "vehicles cannot be spawned by a script" );
+		return RP_LuaWorld_Refuse( L, "a vehicle type: use World.vehicle" );
 	if ( RP_LuaWorld_CountLive( p, qtrue ) >= RP_LUA_MAX_NPCS )
 		return RP_LuaWorld_Refuse( L, "too many npcs" );
 	if ( p->npcSpawns >= RP_LUA_NPC_SPAWNS_MAP )
@@ -661,8 +816,79 @@ static int RP_LuaWorld_Npc( lua_State *L )
 		p->spawnsRefused++;
 		return RP_LuaWorld_Refuse( L, "no room" );
 	}
-	RP_LuaWorld_Tag( p, npc, qtrue );
+	RP_LuaWorld_Tag( p, npc, qtrue, qfalse );
 	RP_LuaWorld_PushEntity( L, npc );
+	return 1;
+}
+
+/*
+==================
+World.vehicle( type, origin, angles, opts )
+
+A spawner built as a map's NPC_Vehicle is (its classname is what makes NPC_Spawn_Do() build a vehicle), then
+what G_VehicleSpawn() does after: the yaw, and BS_CINEMATIC for all but animals, so it stands still until
+boarded. NPC_Spawn_Do() keeps its checks (three free slots past the reserve, RP_NPC_MAX_LIVE) and frees the
+spawner itself for a type with no vehicle file. The droid a vehicle brings spawns through the same checks,
+or not at all. A script never boards, drives or empties a vehicle.
+==================
+*/
+static int RP_LuaWorld_Vehicle( lua_State *L )
+{
+	rpLuaPlugin_t *p = rpLuaCurrent;
+	const char *type = luaL_checkstring( L, 1 );
+	vec3_t origin, angles;
+	char targetname[MAX_QPATH];
+	gentity_t *spawner, *veh;
+
+	if ( !type[0] || strlen( type ) >= 64 )
+		return luaL_error( L, "a vehicle type is 1 to 63 characters" );
+	RP_LuaWorld_Vec( L, 2, origin, "origin" );
+	RP_LuaWorld_Angles( L, 3, angles );
+	RP_LuaWorld_Targetname( L, 4, targetname, sizeof( targetname ) );
+	if ( !RP_NpcTypeKnown( type ) || !RP_NpcTypeIsVehicle( type ) )
+		return RP_LuaWorld_Refuse( L, "not a vehicle type" );
+	if ( RP_LuaWorld_CountVehicles( p ) >= RP_LUA_MAX_VEHICLES )
+		return RP_LuaWorld_Refuse( L, "too many vehicles" );
+	if ( p->vehicleSpawns >= RP_LUA_VEHICLE_SPAWNS_MAP )
+		return RP_LuaWorld_Refuse( L, "spawn limit for this map" );
+	if ( RP_LuaWorld_VehiclesOnServer() >= RP_LUA_VEHICLES_SERVER )
+		return RP_LuaWorld_Refuse( L, "too many vehicles on the server" );
+	if ( !G_EntitySlotsAvailable( 3 ) )
+	{
+		p->spawnsRefused++;
+		return RP_LuaWorld_Refuse( L, "no room" );
+	}
+	if ( !RP_LuaApi_TakeToken( p, 1 ) )
+		return RP_LuaWorld_Refuse( L, "too fast" );
+	p->vehicleSpawns++;
+
+	spawner = RP_SpawnForClassname( "npc_spawner", qfalse, qfalse );
+	spawner->classname = "NPC_Vehicle";	// as NPC_SpawnType() does for /npc spawn vehicle
+	spawner->think = G_FreeEntity;
+	spawner->nextthink = level.time + FRAMETIME;
+	G_SetOrigin( spawner, origin );
+	VectorCopy( spawner->r.currentOrigin, spawner->s.origin );
+	spawner->s.angles[YAW] = angles[YAW];
+	if ( !spawner->isLogical )
+		trap->LinkEntity( (sharedEntity_t *)spawner );
+	spawner->NPC_type = G_NewString( type );
+	if ( targetname[0] )
+		spawner->NPC_targetname = G_NewString( targetname );
+	spawner->count = 1;
+	spawner->delay = 0;
+
+	veh = NPC_Spawn_Do( spawner );
+	if ( !veh )
+	{ // no room, or the type has no vehicle file (NPC_Spawn_Do freed the spawner then)
+		p->spawnsRefused++;
+		return RP_LuaWorld_Refuse( L, "the spawn failed (no room, or no vehicle file for that type)" );
+	}
+	// G_VehicleSpawn()'s tail
+	veh->s.angles[YAW] = angles[YAW];
+	if ( veh->NPC && veh->m_pVehicle && veh->m_pVehicle->m_pVehicleInfo && veh->m_pVehicle->m_pVehicleInfo->type != VH_ANIMAL )
+		veh->NPC->behaviorState = BS_CINEMATIC;
+	RP_LuaWorld_Tag( p, veh, qtrue, qtrue );
+	RP_LuaWorld_PushEntity( L, veh );
 	return 1;
 }
 
@@ -679,6 +905,8 @@ static int RP_LuaWorld_Remove( lua_State *L )
 
 	if ( !ent )
 		return RP_LuaWorld_Refuse( L, "not a live entity of this plugin" );
+	if ( RP_LuaWorld_Ridden( ent ) )
+		return RP_LuaWorld_Refuse( L, "someone is riding it" );
 	for ( i = 0; i < p->numEnts; i++ )
 	{
 		if ( p->ents[i].number == ent - g_entities && p->ents[i].stamp == ent->rpLuaStamp )
@@ -759,7 +987,8 @@ static const luaL_Reg rpLuaEntityMeta[] = {
 	{ NULL, NULL }
 };
 static const luaL_Reg rpLuaWorldP2[] = {
-	{ "use", RP_LuaWorld_Use }, { "prop", RP_LuaWorld_Prop }, { "npc", RP_LuaWorld_Npc }, { "remove", RP_LuaWorld_Remove }, { NULL, NULL }
+	{ "use", RP_LuaWorld_Use }, { "prop", RP_LuaWorld_Prop }, { "npc", RP_LuaWorld_Npc }, { "vehicle", RP_LuaWorld_Vehicle },
+	{ "remove", RP_LuaWorld_Remove }, { NULL, NULL }
 };
 static const luaL_Reg rpLuaEffect[] = { { "play", RP_LuaWorld_EffectPlay }, { NULL, NULL } };
 static const luaL_Reg rpLuaSound[] = { { "play", RP_LuaWorld_SoundPlay }, { NULL, NULL } };

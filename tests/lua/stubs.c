@@ -51,7 +51,7 @@ void t_init( int maxclients )
 	trap = &imp;
 	imp.Print = s_Print; imp.Error = s_Error; imp.SendServerCommand = s_Send; imp.Milliseconds = s_Ms;
 	imp.LinkEntity = s_Link; imp.UnlinkEntity = s_Link; imp.Argc = s_Argc; imp.Argv = s_Argv; imp.Cvar_VariableStringBuffer = s_CvarStr; imp.Cvar_VariableIntegerValue = s_CvarInt;
-	for ( i = MAX_CLIENTS; i < MAX_ENTITIESTOTAL; i++ ) { if ( g_entities[i].inuse && g_entities[i].client && ( g_entities[i].client < g_clients_store || g_entities[i].client >= g_clients_store + MAX_CLIENTS ) ) free( g_entities[i].client ); }
+	for ( i = MAX_CLIENTS; i < MAX_ENTITIESTOTAL; i++ ) { if ( g_entities[i].inuse && g_entities[i].client && ( g_entities[i].client < g_clients_store || g_entities[i].client >= g_clients_store + MAX_CLIENTS ) ) free( g_entities[i].client ); if ( g_entities[i].inuse && g_entities[i].m_pVehicle ) free( g_entities[i].m_pVehicle ); if ( g_entities[i].inuse && g_entities[i].NPC ) free( g_entities[i].NPC ); }
 	memset( &level, 0, sizeof( level ) ); memset( g_entities, 0, sizeof( g_entities ) ); memset( g_clients_store, 0, sizeof( g_clients_store ) );
 	level.maxclients = maxclients; level.num_entities = MAX_CLIENTS; level.time = 1000;
 	Q_strncpyz( level.rawmapname, "testmap", sizeof( level.rawmapname ) );
@@ -94,8 +94,14 @@ static const char *s_exempt[] = { "misc_model_breakable", "misc_model_ghoul", "f
 qboolean RP_MapExemptClass( const char *classname ) { int i; for ( i = 0; s_exempt[i]; i++ ) if ( !Q_stricmp( classname, s_exempt[i] ) ) return qtrue; return qfalse; }
 static const char *s_vector[] = { "origin", "angles", "angles2", "mins", "maxs", "trdelta", "color", "offcolor", "modelscale_vec", "spinangles", "tint", NULL };
 qboolean RP_EntityVectorKey( const char *key ) { int i; for ( i = 0; s_vector[i]; i++ ) if ( !Q_stricmp( key, s_vector[i] ) ) return qtrue; return qfalse; }
-qboolean RP_NpcTypeKnown( const char *type ) { return ( !Q_stricmp( type, "jedi" ) || !Q_stricmp( type, "stormtrooper" ) || !Q_stricmp( type, "swoop" ) ) ? qtrue : qfalse; }
-qboolean RP_NpcTypeIsVehicle( const char *type ) { return !Q_stricmp( type, "swoop" ) ? qtrue : qfalse; }
+// vehicles: swoop (speeder), xwing (fighter), atst (walker), tauntaun (animal); "novehfile" is a vehicle type with no .veh file
+static int s_VehType( const char *type ) { if ( !Q_stricmp( type, "swoop" ) ) return VH_SPEEDER; if ( !Q_stricmp( type, "xwing" ) ) return VH_FIGHTER; if ( !Q_stricmp( type, "atst" ) ) return VH_WALKER; if ( !Q_stricmp( type, "tauntaun" ) ) return VH_ANIMAL; if ( !Q_stricmp( type, "novehfile" ) ) return VH_NONE; return -1; }
+qboolean RP_NpcTypeKnown( const char *type ) { return ( !Q_stricmp( type, "jedi" ) || !Q_stricmp( type, "stormtrooper" ) || s_VehType( type ) >= 0 ) ? qtrue : qfalse; }
+qboolean RP_NpcTypeIsVehicle( const char *type ) { return s_VehType( type ) >= 0 ? qtrue : qfalse; }
+static vehicleInfo_t s_vehInfo[VH_NUM_VEHICLES];
+int t_vehiclesAlive;
+// a stand-in rider: sets or clears the vehicle's pilot, and passengers
+void t_ride( gentity_t *veh, gentity_t *pilot, int passengers ) { veh->m_pVehicle->m_pPilot = (bgEntity_t *)pilot; veh->m_pVehicle->m_iNumPassengers = passengers; }
 void RP_NpcPrecacheByType( const char *type ) { (void)type; }
 static char *s_strings[65536]; static int s_numStrings;
 char *G_NewString( const char *s ) { char *d = strdup( s ); if ( s_numStrings < 65536 ) s_strings[s_numStrings++] = d; return d; }
@@ -110,7 +116,8 @@ gentity_t *RP_SpawnForRoute( const rpSpawnRoute_t *r ) { (void)r; return s_Spawn
 gentity_t *RP_SpawnForClassname( const char *classname, qboolean nological, qboolean hasScript ) { gentity_t *e = s_SpawnSlot(); (void)nological; (void)hasScript; if ( e ) e->classname = (char *)classname; return e; }
 void zyk_main_set_entity_field( gentity_t *ent, char *key, char *value ) { int n = ent->s.number; if ( !ent->inuse || t_recordCount[n] >= 64 ) return; Q_strncpyz( t_record[n][t_recordCount[n]][0], key, 260 ); Q_strncpyz( t_record[n][t_recordCount[n]][1], value, 260 ); t_recordCount[n]++; }
 static const char *s_RecordValue( int n, const char *key ) { int i; for ( i = 0; i < t_recordCount[n]; i++ ) if ( !Q_stricmp( t_record[n][i][0], key ) ) return t_record[n][i][1]; return NULL; }
-void G_FreeEntity( gentity_t *ed ) { int n = ed->s.number; if ( n >= MAX_CLIENTS ) t_freed++; if ( ed->client && n >= MAX_CLIENTS && ( ed->client < g_clients_store || ed->client >= g_clients_store + MAX_CLIENTS ) ) { free( ed->client ); t_npcsAlive--; } memset( ed, 0, sizeof( *ed ) ); ed->s.number = n; ed->classname = "freed"; t_recordCount[n] = 0; t_freeSlots++; }
+int t_freedRidden;	// G_FreeEntity on a vehicle someone rides: what must never happen (EjectAll)
+void G_FreeEntity( gentity_t *ed ) { int n = ed->s.number; if ( n >= MAX_CLIENTS ) t_freed++; if ( ed->m_pVehicle ) { if ( ed->m_pVehicle->m_pPilot || ed->m_pVehicle->m_iNumPassengers ) t_freedRidden++; free( ed->m_pVehicle ); t_vehiclesAlive--; } if ( ed->NPC ) free( ed->NPC ); if ( ed->client && n >= MAX_CLIENTS && ( ed->client < g_clients_store || ed->client >= g_clients_store + MAX_CLIENTS ) ) { free( ed->client ); t_npcsAlive--; } memset( ed, 0, sizeof( *ed ) ); ed->s.number = n; ed->classname = "freed"; t_recordCount[n] = 0; t_freeSlots++; }
 void zyk_main_spawn_entity( gentity_t *ent ) { int n = ent->s.number; const char *v; if ( !ent->inuse ) return; level.rp_spawn_refusal[0] = 0; ent->classname = G_NewString( s_RecordValue( n, "classname" ) ); if ( ( v = s_RecordValue( n, "targetname" ) ) ) ent->targetname = G_NewString( v ); if ( ( v = s_RecordValue( n, "origin" ) ) ) sscanf( v, "%f %f %f", &ent->r.currentOrigin[0], &ent->r.currentOrigin[1], &ent->r.currentOrigin[2] ); if ( ( v = s_RecordValue( n, "health" ) ) ) ent->health = atoi( v ); ent->use = (void *)1; if ( t_spawnRefuse ) { Q_strncpyz( level.rp_spawn_refusal, "the server does not have that model", sizeof( level.rp_spawn_refusal ) ); G_FreeEntity( ent ); } }
 int RP_FreeEntityChildren( gentity_t *maker ) { (void)maker; return 0; }
 const char *t_dialogGo[MAX_ENTITIESTOTAL][RP_DIALOG_OPTIONS];	// a stand-in target_dialog's go1..6
@@ -119,7 +126,12 @@ int RP_DialogOptionTargets( const gentity_t *ent, const char **names, int max ) 
 #endif
 qboolean RP_EntityIsCharacter( const gentity_t *e ) { return ( e && e->client ) ? qtrue : qfalse; }
 void G_SetOrigin( gentity_t *ent, vec3_t origin ) { VectorCopy( origin, ent->r.currentOrigin ); VectorCopy( origin, ent->s.origin ); }
-gentity_t *NPC_Spawn_Do( gentity_t *spawner ) { gentity_t *npc; if ( t_npcRefuse || !G_EntitySlotsAvailable( 3 ) ) return NULL; npc = s_SpawnSlot(); if ( !npc ) return NULL; npc->client = calloc( 1, sizeof( gclient_t ) ); npc->classname = "NPC"; npc->NPC_type = spawner->NPC_type; npc->targetname = spawner->NPC_targetname; VectorCopy( spawner->s.origin, npc->r.currentOrigin ); npc->health = 100; npc->use = (void *)1; t_npcsAlive++; return npc; }
+char t_lastSpawnerClass[64];
+gentity_t *NPC_Spawn_Do( gentity_t *spawner ) { gentity_t *npc; int vt = s_VehType( spawner->NPC_type ); Q_strncpyz( t_lastSpawnerClass, spawner->classname ? spawner->classname : "", sizeof( t_lastSpawnerClass ) ); if ( t_npcRefuse || !G_EntitySlotsAvailable( 3 ) ) return NULL;
+	if ( spawner->classname && !Q_stricmp( spawner->classname, "NPC_Vehicle" ) && vt <= VH_NONE ) { G_FreeEntity( spawner ); return NULL; }	// no vehicle file: the real one frees the spawner too
+	npc = s_SpawnSlot(); if ( !npc ) return NULL; npc->client = calloc( 1, sizeof( gclient_t ) ); npc->NPC = calloc( 1, sizeof( gNPC_t ) ); npc->classname = "NPC"; npc->NPC_type = spawner->NPC_type; npc->targetname = spawner->NPC_targetname; VectorCopy( spawner->s.origin, npc->r.currentOrigin ); npc->health = 100; npc->use = (void *)1; t_npcsAlive++;
+	if ( spawner->classname && !Q_stricmp( spawner->classname, "NPC_Vehicle" ) ) { npc->m_pVehicle = calloc( 1, sizeof( Vehicle_t ) ); s_vehInfo[vt].type = vt; npc->m_pVehicle->m_pVehicleInfo = &s_vehInfo[vt]; npc->NPC->behaviorState = BS_DEFAULT; t_vehiclesAlive++; }
+	return npc; }
 void RP_SpawnedRemove( gentity_t *e ) { e->takedamage = qfalse; e->health = 0; e->targetname = NULL; e->think = G_FreeEntity; e->nextthink = level.time + 100; t_removedSilently++; }
 int RP_ConfigstringIndexOf( const char *name, int start, int max ) { int b = ( start == CS_SOUNDS ) ? 0 : 1, i; (void)max; for ( i = 0; i < t_ncs[b]; i++ ) if ( !Q_stricmp( t_cs[b][i], name ) ) return i + 1; return 0; }
 gentity_t *G_PlayEffectID( const int fxID, vec3_t org, vec3_t ang ) { (void)ang; t_effects++; t_lastEffect = fxID; VectorCopy( org, t_lastEffectOrigin ); return NULL; }
@@ -148,5 +160,5 @@ void t_worldReset( void )
 	s_numStrings = 0;
 	t_freeSlots = 1000; t_poolFree = 1 << 20; t_spawnRefuse = qfalse; t_npcRefuse = qfalse;
 	memset( t_locked, 0, sizeof( t_locked ) ); memset( t_usedCount, 0, sizeof( t_usedCount ) ); memset( t_usedInCall, 0, sizeof( t_usedInCall ) ); memset( t_dialogGo, 0, sizeof( t_dialogGo ) ); memset( t_recordCount, 0, sizeof( t_recordCount ) );
-	t_useDepth = t_useChain = t_useRefused = 0; t_effects = t_sounds = 0; t_ncs[0] = t_ncs[1] = 0; t_freed = 0; t_npcsAlive = 0; t_removedSilently = 0;
+	t_useDepth = t_useChain = t_useRefused = 0; t_freedRidden = 0; t_vehiclesAlive = 0; t_effects = t_sounds = 0; t_ncs[0] = t_ncs[1] = 0; t_freed = 0; t_npcsAlive = 0; t_removedSilently = 0;
 }

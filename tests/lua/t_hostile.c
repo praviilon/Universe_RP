@@ -48,6 +48,10 @@ static const shape_t shapes[] = {
 	{ "bigvalue",	"pcall(World.prop, 'misc_model_breakable', {x=0,y=0,z=0}, nil, {model = ('x'):rep(100000)})" },
 	{ "rewardloop",	"local p = Players.get(0) for i = 1, 100000 do World.use('chest_btn', p) end" },
 	{ "nanorigin",	"pcall(World.prop, 'misc_model_breakable', {x=0/0, y=1/0, z=-1/0})" },
+	{ "vehloop",	"for i = 1, 100000 do World.vehicle('swoop', {x=0,y=0,z=0}) end" },
+	{ "vehtypes",	"for i = 1, 100000 do World.vehicle(({'swoop','jedi','novehfile','nosuch','atst'})[i % 5 + 1], {x=0,y=0,z=0}) end" },
+	{ "vehspawnrm",	"for i = 1, 100000 do local h = World.vehicle('tauntaun', {x=0,y=0,z=0}) if h then World.remove(h) World.remove(h) end end" },
+	{ "vehnpc",		"for i = 1, 100000 do World.npc('xwing', {x=0,y=0,z=0}) end" },
 	{ NULL, NULL }
 };
 
@@ -94,6 +98,25 @@ int main( void )
 		{ int n; for ( n = MAX_CLIENTS; n < level.num_entities; n++ ) if ( g_entities[n].inuse && g_entities[n].classname && !strcmp( g_entities[n].classname, "target_reward" ) ) CHECK( t_usedCount[n] == 0, "%s: a reward was used", shapes[i].name ); }
 		printf( "%-14s ok\n", shapes[i].name );
 	}
+	// a plugin reloaded over and over while players ride what it spawns: never anyone thrown out, the released
+	// ones bounded by the server's cap, all gone once everyone is off
+	{ int r, n, t0 = trap->Milliseconds(), took, maxReleased = 0;
+	  t_write_plugin( "h", "Events.on('init', function() for i = 1, 6 do World.vehicle('swoop', {x=0,y=0,z=0}) end end)\n" );
+	  t_start( "h" );
+	  for ( r = 0; r < 50; r++ )
+	  {
+		for ( n = MAX_CLIENTS; n < level.num_entities; n++ ) if ( g_entities[n].inuse && g_entities[n].m_pVehicle && g_entities[n].rpLuaPlugin ) t_ride( &g_entities[n], &g_entities[r % 24], 0 );
+		RP_Lua_QueueOp( "h", RPLOP_RELOAD ); t_frame( 50 ); t_runThinks();
+		{ int rel = 0; for ( n = MAX_CLIENTS; n < level.num_entities; n++ ) if ( g_entities[n].inuse && g_entities[n].rpLuaPlugin == RP_LUA_RELEASED ) rel++; if ( rel > maxReleased ) maxReleased = rel; }
+	  }
+	  took = trap->Milliseconds() - t0;
+	  CHECK( maxReleased <= RP_LUA_VEHICLES_SERVER && t_freedRidden == 0 && took < 50 * RP_LUA_LIMIT_MS, "ridden reloads: %d released at most, %d thrown out, %d ms", maxReleased, t_freedRidden, took );
+	  for ( n = MAX_CLIENTS; n < level.num_entities; n++ ) if ( g_entities[n].inuse && g_entities[n].m_pVehicle ) t_ride( &g_entities[n], NULL, 0 );
+	  t_frame( 600 ); t_frame( 50 ); t_frame( 150 ); t_runThinks();
+	  { int rel = 0; for ( n = MAX_CLIENTS; n < level.num_entities; n++ ) if ( g_entities[n].inuse && g_entities[n].rpLuaPlugin == RP_LUA_RELEASED ) rel++; CHECK( rel == 0, "everyone off: %d released left", rel ); }
+	  RP_LUA_SHUTDOWN(); t_frame( 100 ); t_runThinks();
+	  CHECK( t_vehiclesAlive == 0 && t_freedRidden == 0, "all vehicles gone: %d", t_vehiclesAlive );
+	  printf( "%-14s ok\n", "vehreload" ); }
 	printf( fails ? "%d FAILED\n" : "t_hostile: ALL OK\n", fails );
 	return fails != 0;
 }

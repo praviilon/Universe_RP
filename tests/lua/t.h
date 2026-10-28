@@ -9,7 +9,7 @@ extern char t_log[]; extern int t_logLen; extern char t_sent[MAX_CLIENTS][64][11
 extern char t_console[]; extern int t_ms; extern qboolean t_clockFrozen; extern int t_tick; extern int t_argc; extern char t_argv[64][256];
 extern int t_floodProtect; extern qboolean t_builtin;
 extern int t_freeSlots, t_poolFree, t_useDepth, t_useChain, t_useRefused, t_effects, t_sounds, t_lastEffect, t_lastSound, t_freed, t_npcsAlive, t_removedSilently; extern qboolean t_spawnRefuse, t_npcRefuse, t_locked[]; extern int t_usedCount[], t_usedInCall[]; extern const char *t_dialogGo[MAX_ENTITIESTOTAL][RP_DIALOG_OPTIONS]; extern gentity_t *t_usedActivator[], *t_usedOther[]; extern const char *t_cs[2][64]; extern int t_ncs[2]; extern char t_record[MAX_ENTITIESTOTAL][64][2][260]; extern int t_recordCount[];
-extern gclient_t g_clients_store[]; extern vec3_t t_lastEffectOrigin;
+extern gclient_t g_clients_store[]; extern int t_freedRidden, t_vehiclesAlive; extern char t_lastSpawnerClass[]; void t_ride( gentity_t *veh, gentity_t *pilot, int passengers ); extern vec3_t t_lastEffectOrigin;
 int t_mapEntity( const char *classname, const char *targetname, const char *target ); void t_runThinks( void );
 void t_init( int maxclients ); void t_player( int i, const char *name, qboolean loggedin, int charId ); void t_frame( int ms );
 
