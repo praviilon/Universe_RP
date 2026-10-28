@@ -723,7 +723,7 @@
 		itemDef
 		{
 			name                rpx_break
-			type                ITEM_TYPE_YESNO
+			type                ITEM_TYPE_MULTI
 			text                "Breakable:"
 			cvar                "ui_rpx_p_break"
 			rect                432 140 180 18
@@ -734,7 +734,13 @@
 			textscale           0.7
 			forecolor           1 1 1 1
 			visible             1
-			descText            "Spawned prop: it can be shot or cut to pieces"
+			descText            "Spawned prop: No never breaks, When used breaks when triggered, Yes can be broken by weapons too"
+			cvarFloatList
+			{
+				"No" 0
+				"When used" 2
+				"Yes" 1
+			}
 			action
 			{
 				play "sound/interface/button1.wav"

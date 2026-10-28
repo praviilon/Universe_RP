@@ -101,7 +101,7 @@ static const char * const rpxSoundChannels[] = {
 	X( "ui_rpx_p_scale",		"100" )		/* percent: 1 to 1023 (modelscale 0.01 to 10.23) */ \
 	X( "ui_rpx_p_solid",		"1" ) \
 	X( "ui_rpx_p_anim",			"0" ) \
-	X( "ui_rpx_p_break",		"0" ) \
+	X( "ui_rpx_p_break",		"0" )		/* RPX_BREAK_*: 0 never, 1 by damage too, 2 only when used */ \
 	X( "ui_rpx_p_health",		"100" ) \
 	X( "ui_rpx_p_light",		"0" ) \
 	X( "ui_rpx_p_lrad",			"200" ) \
@@ -194,6 +194,13 @@ static const char * const rpxSoundChannels[] = {
 	X( "ui_rpx_fxtime",			"0" )		/* cgame: its time, for the effect preview's render */ \
 	X( "ui_rpx_mapid",			"0" )		/* cgame: new at each cgame start; lists and prop previews from before are old */ \
 	X( "ui_rpx_viewyaw",		"0" )		/* cgame: the player's view yaw (0-359) while a menu is open, for the prop preview */
+
+// GLX_U: [Extras] MD3 Props' Breakable (ui_rpx_p_break), as the menu's list sets it (ingame_rpx_props.menu):
+// never (spawnflag 64, USE_NOT_BREAK), by damage too (its Health), or only when used, as vanilla's
+// misc_model_breakable without health -- a trigger or /enttrigger breaks it
+#define RPX_BREAK_NO		0
+#define RPX_BREAK_YES		1
+#define RPX_BREAK_USED		2
 
 // the effect preview: where the effect plays (far outside any map, so no map geometry or sky effect
 // is near it), how long after a Preview click it is drawn, and the camera

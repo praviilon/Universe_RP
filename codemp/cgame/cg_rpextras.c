@@ -595,7 +595,7 @@ static float RPX_PropSitLift( const char *path, float scale, int pitch, int yaw,
 
 static void RPX_SpawnProp( qboolean grab ) {
 	char folder[RPX_NAME_LEN], name[RPX_NAME_LEN], path[MAX_QPATH * 2], cmd[MAX_STRING_CHARS];
-	int pitch, yaw, roll, flags, offset;
+	int pitch, yaw, roll, flags, offset, breakable;
 	float scale, sentScale = 1.0f, lift = 0.0f;
 
 	if ( !RPX_Selected( RPX_MODELS, folder, sizeof( folder ), name, sizeof( name ) ) ) {
@@ -626,7 +626,11 @@ static void RPX_SpawnProp( qboolean grab ) {
 		sentScale = atof( sent );	// the scale the server spawns it at
 	}
 
+	breakable = RPX_CvarInt( "ui_rpx_p_break" );
 	flags = ( RPX_CvarInt( "ui_rpx_p_solid" ) ? 1 : 0 ) | ( RPX_CvarInt( "ui_rpx_p_anim" ) ? 2 : 0 );
+	if ( breakable == RPX_BREAK_NO ) {
+		flags |= 64;	// GLX_U: [Extras] USE_NOT_BREAK: being used (a trigger, /enttrigger) does not break it either
+	}
 	if ( !( flags & 1 ) && RPX_CvarInt( "ui_rpx_p_sit" ) ) {
 		lift = RPX_PropSitLift( path, sentScale, pitch, yaw, roll );	// GLX_U: [Extras] On surface
 	}
@@ -634,7 +638,7 @@ static void RPX_SpawnProp( qboolean grab ) {
 		Q_strcat( cmd, sizeof( cmd ), va( " spawnflags \"%d\"", flags ) );
 	}
 
-	if ( RPX_CvarInt( "ui_rpx_p_break" ) ) {
+	if ( breakable == RPX_BREAK_YES ) {	// shots and cuts break it too (and, as in vanilla, being used)
 		int health = RPX_CvarInt( "ui_rpx_p_health" );
 
 		if ( health < 1 ) health = 1;
