@@ -164,7 +164,10 @@ meets any lock on the entity (a script is not an admin), the stock chain
 limits apply, and what the entity does to its activator is what it does
 to anyone — a `target_teleporter` moves them, a `target_give` gives them
 the map's items, a `target_kill` kills them. NPCs, vehicles, held entities
-and entities with no use are skipped. It returns `used, skipped`.
+and entities with no use are skipped. It returns `used, skipped`. A name
+whose chain reaches a `target_reward` (through any number of relays,
+delays or counters) is refused with `false, "leads to a reward"`: scripts
+never pay credits or XP, not even through the map.
 
 `World.prop` spawns one of the Entity System's exempt classes — the ones
 `/entedit` and `/entremove` may touch even on the map's own entities:

@@ -35,6 +35,7 @@ void Svcmd_LuaList_f( void );
 int RP_AdminBitByTitle( const char *title );	// g_cmds.c: an admin power's bit by its /adminlist title, -1 for none
 qboolean RP_IsBuiltInCommand( const char *name );	// g_cmds.c: the name is in commands[]
 extern int rp_luaWatchCount;	// targetnames any plugin watches (RP_LUA_EVENT_USED's first test)
+extern int rp_luaInCall;		// a script call is on the stack: what must never happen for a script refuses (target_reward)
 
 #define RP_LUA_INIT()					do { if ( rp_lua.integer ) RP_Lua_Init(); } while ( 0 )
 #define RP_LUA_SHUTDOWN()				do { if ( rp_lua.integer ) RP_Lua_Shutdown(); } while ( 0 )
@@ -48,3 +49,4 @@ extern int rp_luaWatchCount;	// targetnames any plugin watches (RP_LUA_EVENT_USE
 #define RP_LUA_EVENT_ACCOUNT( e, n, x )	do { if ( rp_luaActive ) RP_Lua_EventAccount( e, n, x ); } while ( 0 )
 #define RP_LUA_COMMAND( e, c )			( rp_luaActive ? RP_Lua_Command( e, c ) : qfalse )
 #define RP_LUA_CHAR_REMOVED( id )		do { if ( rp_luaActive ) RP_Lua_CharacterRemoved( id ); } while ( 0 )
+#define RP_LUA_IN_CALL()				( rp_luaInCall != 0 )

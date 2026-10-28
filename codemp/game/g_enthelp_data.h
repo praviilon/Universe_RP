@@ -2058,6 +2058,21 @@ static const rpEntHelp_t rp_ent_help[] = {
 		"targetname||Using it fires its target.",
 		"target_relay targetname relay1 target door1 wait -1",
 		"common target target_random" },
+	{ "target_reward", 0, NULL,
+		"Pays credits and XP to the player who started the chain that used it: whoever walked into the trigger, pressed the button or finished the counter. The player must be logged in to a character in RPG mode; anyone else is paid nothing and nothing fires. The same rules as an NPC kill reward: credits stop at rp_max_rpg_credits, XP carries into as many levels as it covers and is not given at the maximum level, the character is saved at once, and every payout is logged. After paying it fires its target with the same activator, so a target_print or a sound can follow. Used through /entuse, the activator is the admin, and the log says so. A lock on it (/entlockadd) limits who it pays. Server-side scripts can never fire one: a plugin's use of anything that leads to a target_reward is refused.",
+		"1|ONCE_EACH|Pays each player once per map and per connection; a reconnect starts over.\n"
+		"2|ONCE|Pays once in all, fires its target, then removes itself.\n"
+		"4|SILENT|No line in the player's console (the log line stays).\n"
+		"128|INACTIVE|Starts inactive: it ignores every use, /entuse included, until a target_activate names it.",
+		"credits|0|Credits paid per use, 0 to 100000.\n"
+		"xp|0|XP paid per use, 0 to 100. Both credits and xp 0 (or missing): refused at spawn.\n"
+		"wait|0|Seconds before it pays anyone again. 0: no limit.\n"
+		"playerwait|0|Seconds before it pays the same player again. 0: no limit.\n"
+		"message|Reward|The first words of the player's line: \"<message>: +50 credits, +5 XP\".\n"
+		"target||Fired after a payout, with the same activator.\n"
+		"targetname||Using it pays the activator.",
+		"target_reward targetname chest_pay credits 250 spawnflags 1 target chest_msg",
+		"common target target_relay target_counter trigger_multiple npc_spawner" },
 	{ "target_remove_powerups", 0, NULL,
 		"Takes every powerup from the activator when used: a carried CTF flag goes back to its base, cloak is switched off properly, and all other powerups (speed, enlightenment, ysalamiri and the rest) are cleared.",
 		NULL,

@@ -79,7 +79,7 @@ int t_freeSlots = 1000;			// G_EntitySlotsAvailable: free slots past the reserve
 int t_poolFree = 1 << 20;		// G_AllocRoomFor
 qboolean t_spawnRefuse = qfalse;	// zyk_main_spawn_entity frees the entity with a reason
 qboolean t_locked[MAX_ENTITIESTOTAL];	// GlobalUse's lock: refuses every player activator
-int t_usedCount[MAX_ENTITIESTOTAL]; gentity_t *t_usedActivator[MAX_ENTITIESTOTAL], *t_usedOther[MAX_ENTITIESTOTAL];
+int t_usedCount[MAX_ENTITIESTOTAL], t_usedInCall[MAX_ENTITIESTOTAL]; gentity_t *t_usedActivator[MAX_ENTITIESTOTAL], *t_usedOther[MAX_ENTITIESTOTAL];
 int t_useDepth, t_useChain, t_useRefused;
 char t_record[MAX_ENTITIESTOTAL][64][2][260]; int t_recordCount[MAX_ENTITIESTOTAL];
 int t_effects, t_sounds; int t_lastEffect, t_lastSound; vec3_t t_lastEffectOrigin;
@@ -119,7 +119,7 @@ void RP_SpawnedRemove( gentity_t *e ) { e->takedamage = qfalse; e->health = 0; e
 int RP_ConfigstringIndexOf( const char *name, int start, int max ) { int b = ( start == CS_SOUNDS ) ? 0 : 1, i; (void)max; for ( i = 0; i < t_ncs[b]; i++ ) if ( !Q_stricmp( t_cs[b][i], name ) ) return i + 1; return 0; }
 gentity_t *G_PlayEffectID( const int fxID, vec3_t org, vec3_t ang ) { (void)ang; t_effects++; t_lastEffect = fxID; VectorCopy( org, t_lastEffectOrigin ); return NULL; }
 void G_SoundAtLoc( vec3_t loc, int channel, int soundIndex ) { (void)loc; (void)channel; t_sounds++; t_lastSound = soundIndex; }
-static void s_Use( gentity_t *self, gentity_t *other, gentity_t *activator ) { int n = self->s.number; t_usedCount[n]++; t_usedOther[n] = other; t_usedActivator[n] = activator; if ( self->target ) { gentity_t *t = NULL; while ( ( t = G_Find( t, FOFS( targetname ), self->target ) ) ) GlobalUse( t, self, activator ); } }
+static void s_Use( gentity_t *self, gentity_t *other, gentity_t *activator ) { int n = self->s.number; t_usedCount[n]++; t_usedInCall[n] = rp_luaInCall; t_usedOther[n] = other; t_usedActivator[n] = activator; if ( self->target ) { gentity_t *t = NULL; while ( ( t = G_Find( t, FOFS( targetname ), self->target ) ) ) GlobalUse( t, self, activator ); } }
 void GlobalUse( gentity_t *self, gentity_t *other, gentity_t *activator )
 { // the real one's shape: inactive, no use, the lock with a player activator, depth 128 / chain 2048, then use, then the Lua event
 	if ( !self || ( self->flags & FL_INACTIVE ) || !self->use ) return;
@@ -142,6 +142,6 @@ void t_worldReset( void )
 	for ( i = 0; i < s_numStrings; i++ ) free( s_strings[i] );
 	s_numStrings = 0;
 	t_freeSlots = 1000; t_poolFree = 1 << 20; t_spawnRefuse = qfalse; t_npcRefuse = qfalse;
-	memset( t_locked, 0, sizeof( t_locked ) ); memset( t_usedCount, 0, sizeof( t_usedCount ) ); memset( t_recordCount, 0, sizeof( t_recordCount ) );
+	memset( t_locked, 0, sizeof( t_locked ) ); memset( t_usedCount, 0, sizeof( t_usedCount ) ); memset( t_usedInCall, 0, sizeof( t_usedInCall ) ); memset( t_recordCount, 0, sizeof( t_recordCount ) );
 	t_useDepth = t_useChain = t_useRefused = 0; t_effects = t_sounds = 0; t_ncs[0] = t_ncs[1] = 0; t_freed = 0; t_npcsAlive = 0; t_removedSilently = 0;
 }

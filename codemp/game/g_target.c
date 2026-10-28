@@ -742,6 +742,130 @@ void SP_target_kill( gentity_t *self ) {
 	self->use = target_kill_use;
 }
 
+/*
+==================
+target_reward
+
+GLX_U: [Rewards] pays credits and XP to the player who started the chain that used it, through the one
+payout path the NPC kill reward uses (RP_PayReward(), g_cmds.c): RPG mode with a character, the credit cap,
+XP into levels, one save, one log line. Then it fires its target with the same activator, so a print, a
+sound or a door can follow. Used through /entuse, the activator is the admin, and that is logged too.
+
+"credits" 0..RP_REWARD_MAX_CREDITS, "xp" 0..RP_REWARD_MAX_XP (both 0: refused at spawn, logged). "wait"
+seconds before it pays anyone again; "playerwait" seconds before it pays the same player again; "message" the
+first words of the player's line ("Reward" by default). Spawnflags: 1 ONCE_EACH pays each player once per map
+and per connection, 2 ONCE pays once in all and removes itself, 4 SILENT no console line, 128 INACTIVE as every
+target. A lock on it (g_locks.c) limits who it pays, through GlobalUse() as for any entity.
+
+Never for a script: a plugin's World.use refuses a chain that reaches one (rp_lua_world.c), and this use
+refuses while a script call is on the stack (RP_LUA_IN_CALL), so a chain a script started cannot pay even
+if it got here. The per-player stamps are a G_Alloc block, made only when "playerwait" or ONCE_EACH needs
+one: {enterTime, time paid} per client, so a reconnect is a new player.
+==================
+*/
+#define RP_REWARD_ONCE_EACH	1
+#define RP_REWARD_ONCE		2
+#define RP_REWARD_SILENT	4
+
+static int *RP_RewardSlot( gentity_t *self, gentity_t *activator )
+{
+	int *slot;
+
+	if ( !self->rpRewardSlots )
+		return NULL;
+	slot = &self->rpRewardSlots[activator->s.number * 2];
+	if ( slot[0] != activator->client->pers.enterTime )
+	{ // another connection in this slot: a fresh record
+		slot[0] = activator->client->pers.enterTime;
+		slot[1] = 0;
+	}
+	return slot;
+}
+
+void target_reward_use( gentity_t *self, gentity_t *other, gentity_t *activator )
+{
+	int *slot;
+
+	if ( self->flags & FL_INACTIVE )
+		return;
+	if ( RP_LUA_IN_CALL() )
+		return;	// a script's use, or a chain one started: nothing for it here
+	if ( !activator || !activator->inuse || !activator->client || activator->s.number < 0 || activator->s.number >= MAX_CLIENTS )
+		return;
+	if ( self->wait > 0 && self->rpRewardLastPaid && level.time - self->rpRewardLastPaid < (int)( self->wait * 1000 ) )
+		return;
+	slot = RP_RewardSlot( self, activator );
+	if ( slot && slot[1] )
+	{
+		if ( self->spawnflags & RP_REWARD_ONCE_EACH )
+			return;
+		if ( self->rpRewardPlayerWait > 0 && level.time - slot[1] < self->rpRewardPlayerWait )
+			return;
+	}
+
+	G_ActivateBehavior( self, BSET_USE );
+	if ( !RP_PayReward( activator, self->rpRewardCredits, self->rpRewardXP, self->message ? self->message : "Reward",
+			va( "Reward: %s (%d) used", self->targetname ? self->targetname : "target_reward", self->s.number ),
+			( self->spawnflags & RP_REWARD_SILENT ) ? qtrue : qfalse ) )
+	{
+		return;	// not eligible (logged out, no character, not in RPG mode), or nothing could be given
+	}
+
+	self->rpRewardLastPaid = level.time;
+	if ( slot )
+		slot[1] = level.time ? level.time : 1;
+	if ( self->spawnflags & RP_REWARD_ONCE )
+	{ // as a target_relay with wait -1: gone next frame, after its target fired
+		self->use = NULL;
+		self->think = G_FreeEntity;
+		self->nextthink = level.time + FRAMETIME;
+	}
+	G_UseTargets( self, activator );
+}
+
+void SP_target_reward( gentity_t *self )
+{
+	int v;
+	float f;
+
+	self->rpRewardSlots = NULL;	// an /entedit respawn in place starts over
+	self->rpRewardLastPaid = 0;
+	G_SpawnInt( "credits", "0", &v );
+	self->rpRewardCredits = ( v < 0 ) ? 0 : ( v > RP_REWARD_MAX_CREDITS ) ? RP_REWARD_MAX_CREDITS : v;
+	if ( self->rpRewardCredits != v )
+		G_LogPrintf( "target_reward %d: credits %d brought to %d\n", self->s.number, v, self->rpRewardCredits );
+	G_SpawnInt( "xp", "0", &v );
+	self->rpRewardXP = ( v < 0 ) ? 0 : ( v > RP_REWARD_MAX_XP ) ? RP_REWARD_MAX_XP : v;
+	if ( self->rpRewardXP != v )
+		G_LogPrintf( "target_reward %d: xp %d brought to %d\n", self->s.number, v, self->rpRewardXP );
+	if ( self->rpRewardCredits <= 0 && self->rpRewardXP <= 0 )
+	{
+		G_LogPrintf( "target_reward %d (%s) pays nothing: no credits or xp key; removed\n", self->s.number, self->targetname ? self->targetname : "unnamed" );
+		Q_strncpyz( level.rp_spawn_refusal, "a target_reward needs credits or xp", sizeof( level.rp_spawn_refusal ) );
+		G_FreeEntity( self );
+		return;
+	}
+	if ( self->wait < 0 )
+		self->wait = 0;
+	G_SpawnFloat( "playerwait", "0", &f );
+	self->rpRewardPlayerWait = ( f > 0 ) ? (int)( f * 1000 ) : 0;
+	if ( self->rpRewardPlayerWait > 0 || ( self->spawnflags & RP_REWARD_ONCE_EACH ) )
+	{ // G_Alloc() ends the server when the pool is out: ask first, as the entity commands do
+		if ( !G_AllocRoomFor( MAX_CLIENTS * 2 * sizeof( int ) ) )
+		{
+			G_LogPrintf( "target_reward %d: no room in the memory pool for its per-player record; removed\n", self->s.number );
+			Q_strncpyz( level.rp_spawn_refusal, "the game's memory pool is nearly full", sizeof( level.rp_spawn_refusal ) );
+			G_FreeEntity( self );
+			return;
+		}
+		self->rpRewardSlots = (int *)G_Alloc( MAX_CLIENTS * 2 * sizeof( int ) );
+		memset( self->rpRewardSlots, 0, MAX_CLIENTS * 2 * sizeof( int ) );
+	}
+	if ( self->spawnflags & 128 )
+		self->flags |= FL_INACTIVE;
+	self->use = target_reward_use;
+}
+
 /*QUAKED target_position (0 0.5 0) (-4 -4 -4) (4 4 4)
 Used as a positional target for in-game calculation, like jumppad targets.
 */

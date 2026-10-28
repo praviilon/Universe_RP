@@ -40,6 +40,16 @@ int main( void )
 	// the bucket: 4 then refused
 	refill( p ); run( p, "use btn1" ); run( p, "use btn1" ); run( p, "use btn1" ); run( p, "use btn1" ); run( p, "use btn1" );
 	CHECK( !strcmp( get_str( p, "WHY" ), "too fast" ), "5th use refused: %s", get_str( p, "WHY" ) );
+	// rewards: a chain that reaches a target_reward is refused up front, however deep; the in-call flag is set
+	// for every use a script makes (target_reward_use refuses on it) and clear for a player's
+	{ int chest = t_mapEntity( "func_button", "chest_btn", "chest_relay" ); int rel = t_mapEntity( "target_relay", "chest_relay", "chest_delay" ); int del = t_mapEntity( "target_delay", "chest_delay", "chest_pay" ); int pay = t_mapEntity( "target_reward", "chest_pay", NULL );
+	  int plain = t_mapEntity( "func_button", "plain_btn", "plain_door" ); t_mapEntity( "func_door", "plain_door", NULL ); (void)rel; (void)del;
+	  refill( p ); run( p, "use chest_btn" ); CHECK( !strcmp( get_str( p, "WHY" ), "leads to a reward" ) && t_usedCount[chest] == 0 && t_usedCount[pay] == 0 && p->tokens == RP_LUA_TOKENS, "a chain to a reward refused before the token: %s", get_str( p, "WHY" ) );
+	  run( p, "use chest_relay" ); CHECK( !strcmp( get_str( p, "WHY" ), "leads to a reward" ), "from the middle of the chain too" );
+	  run( p, "use chest_pay" ); CHECK( !strcmp( get_str( p, "WHY" ), "leads to a reward" ), "the reward itself" );
+	  g_entities[del].target = "chest_relay"; run( p, "use chest_delay" ); CHECK( !strcmp( get_str( p, "WHY" ), "leads to a reward" ) || t_usedCount[pay] == 0, "a loop in the chain ends (%s)", get_str( p, "WHY" ) ); g_entities[del].target = "chest_pay";
+	  run( p, "use plain_btn" ); CHECK( get_int( p, "U" ) == 1 && t_usedCount[plain] == 1 && t_usedInCall[plain] == 1, "an unrelated chain still works, and inside a script call the flag is set (%d)", t_usedInCall[plain] );
+	  GlobalUse( &g_entities[plain], &g_entities[1], &g_entities[1] ); CHECK( t_usedInCall[plain] == 0 && rp_luaInCall == 0, "a player's use: flag clear" ); }
 	RP_LUA_SHUTDOWN();
 
 	// --- World.prop: classes, keys, name, handle, tag, refusal text, caps, no room

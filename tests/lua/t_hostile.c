@@ -46,6 +46,7 @@ static const shape_t shapes[] = {
 	{ "selfwatch",	"local p = Players.get(0) local h = World.prop('misc_model_breakable', {x=0,y=0,z=0}, nil, nil, {name='me'}) World.watch('lua.h.me') Events.on('entity_used', function() World.use('lua.h.me', p) end) World.use('lua.h.me', p)" },
 	{ "keysbomb",	"local t = {} for i = 1, 1000 do t['k' .. i] = ('v'):rep(255) end pcall(World.prop, 'misc_model_breakable', {x=0,y=0,z=0}, nil, t)" },
 	{ "bigvalue",	"pcall(World.prop, 'misc_model_breakable', {x=0,y=0,z=0}, nil, {model = ('x'):rep(100000)})" },
+	{ "rewardloop",	"local p = Players.get(0) for i = 1, 100000 do World.use('chest_btn', p) end" },
 	{ "nanorigin",	"pcall(World.prop, 'misc_model_breakable', {x=0/0, y=1/0, z=-1/0})" },
 	{ NULL, NULL }
 };
@@ -57,6 +58,7 @@ int main( void )
 	for ( c = 0; c < 24; c++ ) t_player( c, va( "P%d", c ), qtrue, 100 + c );
 	t_mapEntity( "func_button", "btn1", NULL ); t_mapEntity( "target_relay", "loop1", "loop2" ); t_mapEntity( "target_relay", "loop2", "loop1" );	// a use loop the chain limit cuts
 	t_cs[0][0] = "sound/a.wav"; t_ncs[0] = 1; t_cs[1][0] = "env/fire"; t_ncs[1] = 1;
+	t_mapEntity( "func_button", "chest_btn", "chest_relay" ); t_mapEntity( "target_relay", "chest_relay", "chest_pay" ); t_mapEntity( "target_reward", "chest_pay", NULL );
 	for ( i = 0; shapes[i].name; i++ )
 	{
 		rpLuaPlugin_t *p;
@@ -89,6 +91,7 @@ int main( void )
 		t_frame( 100 ); t_runThinks();
 		{ int n, left = 0; for ( n = MAX_CLIENTS; n < level.num_entities; n++ ) if ( g_entities[n].inuse && g_entities[n].rpLuaPlugin ) left++; CHECK( left == 0, "%s: %d script entities left", shapes[i].name, left ); }
 		CHECK( t_useDepth == 0, "%s: use depth %d", shapes[i].name, t_useDepth );
+		{ int n; for ( n = MAX_CLIENTS; n < level.num_entities; n++ ) if ( g_entities[n].inuse && g_entities[n].classname && !strcmp( g_entities[n].classname, "target_reward" ) ) CHECK( t_usedCount[n] == 0, "%s: a reward was used", shapes[i].name ); }
 		printf( "%-14s ok\n", shapes[i].name );
 	}
 	printf( fails ? "%d FAILED\n" : "t_hostile: ALL OK\n", fails );

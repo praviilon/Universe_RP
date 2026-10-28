@@ -524,6 +524,11 @@ struct gentity_s {
 	// matches. /entsave leaves these out. See rp_lua_world.c.
 	int			rpLuaPlugin;
 	int			rpLuaStamp;
+	// GLX_U: [Rewards] target_reward (g_target.c): "playerwait" in ms, level.time of the last payout, and, when
+	// "playerwait" or ONCE_EACH needs it, a G_Alloc'ed block of MAX_CLIENTS pairs {enterTime, time paid}
+	int			rpRewardPlayerWait;
+	int			rpRewardLastPaid;
+	int			*rpRewardSlots;
 
 	// GalaxyRP: [SP Maps] true on a misc_turret spawned on a single-player map as the turret that
 	// classname means there -- a misc_turretG2 (SP_misc_turret() in g_turret.c). It then behaves as
@@ -2564,6 +2569,7 @@ int			RP_BreakStringEdRefs( char *text );
 qboolean	RP_HasStringEdRef( const char *text );
 const char	*RP_ShownText( const char *text );
 void		RP_PayNpcKillReward( gentity_t *npc, gentity_t *killer );
+qboolean	RP_PayReward( gentity_t *player, int credits, int xp, const char *label, const char *logTag, qboolean silent );	// GLX_U: [Rewards] the one payout path (g_cmds.c)
 qboolean	RP_SoundSetKnown( const char *name );
 // GalaxyRP fix: [Shader Remap] /remapreset's worker -- returns how many remaps it cleared. See the
 // definition in g_utils.c for why it sends the configstring twice and in that order.

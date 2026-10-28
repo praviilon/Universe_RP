@@ -16776,6 +16776,47 @@ static const char *zyk_spawner_reward_problem( qboolean vehicle, const char *key
 	return NULL;
 }
 
+// GLX_U: [Rewards] what is wrong with a target_reward's key, or NULL: "credits" 0..RP_REWARD_MAX_CREDITS, "xp"
+// 0..RP_REWARD_MAX_XP, "wait" and "playerwait" a number of seconds, 0 or more. Removing a key is always fine
+// (SP_target_reward() refuses an entity left with neither credits nor xp, and says so). A value that reaches
+// the spawn another way -- a map, an entity file -- is brought into range and logged there. Used by /entadd
+// and /entedit, for that class only.
+static const char *zyk_reward_entity_problem( const char *key, const char *value )
+{
+	static char problem[256];
+	const char *p;
+	qboolean seconds = ( !Q_stricmp( key, "wait" ) || !Q_stricmp( key, "playerwait" ) ) ? qtrue : qfalse;
+	int max;
+
+	if ( !value || !value[0] || !Q_stricmp( value, "zykremovekey" ) )
+		return NULL;
+	if ( !Q_stricmp( key, "credits" ) )
+		max = RP_REWARD_MAX_CREDITS;
+	else if ( !Q_stricmp( key, "xp" ) )
+		max = RP_REWARD_MAX_XP;
+	else if ( seconds )
+		max = 86400;
+	else
+		return NULL;
+
+	for ( p = value; *p; p++ )
+	{
+		if ( ( *p < '0' || *p > '9' ) && !( seconds && *p == '.' ) )
+			break;
+		if ( p - value >= 9 )
+			break;
+	}
+	if ( *p || atof( value ) > max )
+	{
+		if ( seconds )
+			Com_sprintf( problem, sizeof( problem ), "^3%s %s^7: a number of seconds, ^30^7 to ^3%d^7.", key, zyk_shown_name( value ), max );
+		else
+			Com_sprintf( problem, sizeof( problem ), "^3%s %s^7: a whole number from ^30^7 to ^3%d^7 (%s per use).", key, zyk_shown_name( value ), max, !Q_stricmp( key, "credits" ) ? "credits" : "XP" );
+		return problem;
+	}
+	return NULL;
+}
+
 // DAJ_RP: [NPC Scale] what is wrong with an "npcscale" value on an NPC or vehicle spawner, or NULL: a whole number, digits
 // only, the size of each NPC or vehicle it makes in percent -- 0 none, one outside RP_NPC_SCALE_MIN..RP_NPC_SCALE_MAX
 // brought to the nearer end without a word (RP_NpcScaleValue(), NPC_spawn.c; RP_EntScaleValueStored() stores it so). An
@@ -17283,6 +17324,24 @@ static void zyk_entadd( gentity_t *ent, qboolean aim, qboolean grab ) {
 		{
 			trap->SendServerCommand( ent-g_entities, va("print \"%s\n\"", problem) );
 			return;
+		}
+	}
+
+	// GLX_U: [Rewards] a target_reward's numbers, as its spawn would bring them into range
+	if (!Q_stricmp(arg1, "target_reward"))
+	{
+		for (i = 2; i + 1 < number_of_args; i += 2)
+		{
+			const char *problem;
+
+			trap->Argv( i, key, sizeof( key ) );
+			trap->Argv( i + 1, arg2, sizeof( arg2 ) );
+			problem = zyk_reward_entity_problem( key, arg2 );
+			if (problem)
+			{
+				trap->SendServerCommand( ent-g_entities, va("print \"%s\n\"", problem) );
+				return;
+			}
 		}
 	}
 
@@ -17857,6 +17916,24 @@ void Cmd_EntEdit_f( gentity_t *ent ) {
 			{
 				trap->SendServerCommand( ent-g_entities, va("print \"Entity %d: the classname cannot be changed with /entedit. Use ^3/entremove^7 and ^3/entadd^7 the new class instead.\n\"", entity_id) );
 				return;
+			}
+		}
+
+		// GLX_U: [Rewards] a target_reward's numbers, as /entadd checks them
+		if (!Q_stricmp(this_ent->classname, "target_reward"))
+		{
+			for (i = first_pair; i + 1 < number_of_args; i += 2)
+			{
+				const char *problem;
+
+				trap->Argv(i, key, sizeof(key));
+				trap->Argv(i + 1, arg2, sizeof(arg2));
+				problem = zyk_reward_entity_problem(key, arg2);
+				if (problem)
+				{
+					trap->SendServerCommand( ent-g_entities, va("print \"%s\n\"", problem) );
+					return;
+				}
 			}
 		}
 
@@ -21537,6 +21614,82 @@ static int RP_LevelUpFromXP( gentity_t *ent )
 
 /*
 ==================
+RP_PayReward
+
+GLX_U: [Rewards] the one path that pays credits and XP for something done in the world: the NPC kill reward
+below and target_reward (g_target.c). The player must be connected, in RPG mode with a character; anyone
+else is paid nothing and qfalse comes back. Credits go through add_credits() (rp_max_rpg_credits caps
+them, the shortfall is said), XP carries over level by level through RP_LevelUpFromXP() unless the player is
+at rp_rpg_max_level. One console line ("<label>: +50 credits, +5 XP"; none when silent), one save of
+credits, XP, level and skillpoints together, one log line "<logTag>: <player> ...: N credits, M XP".
+qtrue when anything was paid.
+==================
+*/
+qboolean RP_PayReward( gentity_t *player, int credits, int xp, const char *label, const char *logTag, qboolean silent )
+{
+	int credits_given = 0, xp_given = 0;
+	char line[512];
+
+	if ( credits <= 0 && xp <= 0 )
+		return qfalse;
+	if ( !player || !player->inuse || !player->client || player->s.number < 0 || player->s.number >= MAX_CLIENTS ||
+		player->client->pers.connected != CON_CONNECTED || player->client->sess.amrpgmode != 2 || player->client->pers.CharID <= 0 )
+		return qfalse;
+
+	Com_sprintf( line, sizeof( line ), "^3%s^3:", label );
+
+	if ( credits > 0 )
+	{
+		const int before = player->client->pers.credits;
+
+		add_credits( player, credits );
+		credits_given = player->client->pers.credits - before;
+
+		if ( credits_given <= 0 )
+			Q_strcat( line, sizeof( line ), " ^7no credits (already at the maximum)" );
+		else if ( credits_given < credits )
+			Q_strcat( line, sizeof( line ), va( " ^2+%d credits ^7(the maximum)", credits_given ) );
+		else
+			Q_strcat( line, sizeof( line ), va( " ^2+%d credits", credits_given ) );
+	}
+
+	if ( xp > 0 )
+	{
+		if ( credits > 0 )
+			Q_strcat( line, sizeof( line ), "^3," );
+
+		if ( player->client->pers.level >= rp_rpg_max_level.integer )
+		{
+			Q_strcat( line, sizeof( line ), " ^7no XP (maximum level)" );
+		}
+		else
+		{
+			xp_given = xp;
+			player->client->pers.xp += xp;
+			Q_strcat( line, sizeof( line ), va( " ^2+%d XP", xp ) );
+		}
+	}
+
+	if ( !silent )
+		trap->SendServerCommand( player->s.number, va( "print \"%s\n\"", line ) );
+
+	// zyk: each level the XP covers, granted at once -- see RP_LevelUpFromXP()
+	if ( xp_given > 0 )
+	{
+		RP_LevelUpFromXP( player );
+	}
+
+	if ( credits_given > 0 || xp_given > 0 )
+	{
+		update_chars_table_row_with_current_values( player );
+		G_LogPrintf( "%s: %s^7: %d credits, %d XP\n", logTag, player->client->pers.netname, credits_given, xp_given );
+		return qtrue;
+	}
+	return qfalse;
+}
+
+/*
+==================
 RP_PayNpcKillReward
 
 DAJ_RP: [NPC Rewards] called from player_die() (g_combat.c) for everything that dies, with the attacker it
@@ -21546,17 +21699,12 @@ if it is a player logged in to a character; anyone else, logged out, an NPC, the
 Whatever its team: a reward is the admin's choice for that spawner. The reward is cleared either way, so
 it is paid at most once.
 
-Credits go through add_credits(), so rp_max_rpg_credits caps them. XP carries over from level to level, as
-many levels as it covers, through RP_LevelUpFromXP() as /givexp's does; at rp_rpg_max_level there is nothing
-for XP to do and it is not given, the same refusal /givexp makes. One
-write saves credits, XP, level and skillpoints together, and one console line tells the player.
+The payout itself is RP_PayReward() above (GLX_U: shared with target_reward since 2026-10-28).
 ==================
 */
 void RP_PayNpcKillReward( gentity_t *npc, gentity_t *killer )
 {
 	int credits, xp;
-	int credits_given = 0, xp_given = 0;
-	char line[512];
 	const char *name;
 
 	if ( !npc || !npc->NPC || !npc->client )
@@ -21573,58 +21721,8 @@ void RP_PayNpcKillReward( gentity_t *npc, gentity_t *killer )
 	if ( npc->client->NPC_class == CLASS_VEHICLE )
 		return;
 
-	if ( !killer || !killer->inuse || !killer->client || killer->s.number < 0 || killer->s.number >= MAX_CLIENTS ||
-		killer->client->pers.connected != CON_CONNECTED || killer->client->sess.amrpgmode != 2 || killer->client->pers.CharID <= 0 )
-		return;
-
 	name = ( npc->NPC_type && npc->NPC_type[0] ) ? npc->NPC_type : "an NPC";
-	Com_sprintf( line, sizeof( line ), "^3Reward for killing ^7%s^3:", name );
-
-	if ( credits > 0 )
-	{
-		const int before = killer->client->pers.credits;
-
-		add_credits( killer, credits );
-		credits_given = killer->client->pers.credits - before;
-
-		if ( credits_given <= 0 )
-			Q_strcat( line, sizeof( line ), " ^7no credits (already at the maximum)" );
-		else if ( credits_given < credits )
-			Q_strcat( line, sizeof( line ), va( " ^2+%d credits ^7(the maximum)", credits_given ) );
-		else
-			Q_strcat( line, sizeof( line ), va( " ^2+%d credits", credits_given ) );
-	}
-
-	if ( xp > 0 )
-	{
-		if ( credits > 0 )
-			Q_strcat( line, sizeof( line ), "^3," );
-
-		if ( killer->client->pers.level >= rp_rpg_max_level.integer )
-		{
-			Q_strcat( line, sizeof( line ), " ^7no XP (maximum level)" );
-		}
-		else
-		{
-			xp_given = xp;
-			killer->client->pers.xp += xp;
-			Q_strcat( line, sizeof( line ), va( " ^2+%d XP", xp ) );
-		}
-	}
-
-	trap->SendServerCommand( killer->s.number, va( "print \"%s\n\"", line ) );
-
-	// zyk: each level the XP covers, granted at once -- see RP_LevelUpFromXP()
-	if ( xp_given > 0 )
-	{
-		RP_LevelUpFromXP( killer );
-	}
-
-	if ( credits_given > 0 || xp_given > 0 )
-	{
-		update_chars_table_row_with_current_values( killer );
-		G_LogPrintf( "NPC reward: %s^7 killed %s (%d): %d credits, %d XP\n", killer->client->pers.netname, name, npc->s.number, credits_given, xp_given );
-	}
+	RP_PayReward( killer, credits, xp, va( "Reward for killing ^7%s", name ), va( "NPC reward: killed %s (%d)", name, npc->s.number ), qfalse );
 }
 
 /*

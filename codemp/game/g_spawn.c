@@ -332,6 +332,7 @@ void SP_target_score( gentity_t *ent );
 void SP_target_teleporter( gentity_t *ent );
 void SP_target_relay (gentity_t *ent);
 void SP_target_kill (gentity_t *ent);
+void SP_target_reward (gentity_t *ent);	// GLX_U: [Rewards]
 void SP_target_position (gentity_t *ent);
 void SP_target_location (gentity_t *ent);
 void SP_target_counter (gentity_t *self);
@@ -800,6 +801,7 @@ spawn_t	spawns[] = {
 	{ "target_push",						SP_target_push, qtrue },
 	{ "target_random",						SP_target_random, qtrue },
 	{ "target_relay",						SP_target_relay, qtrue },
+	{ "target_reward",						SP_target_reward, qtrue },	// GLX_U: [Rewards] g_target.c
 	{ "target_secret",						SP_target_secret, qtrue },
 	{ "target_remove_powerups",				SP_target_remove_powerups, qtrue },
 	{ "target_score",						SP_target_score, qtrue },

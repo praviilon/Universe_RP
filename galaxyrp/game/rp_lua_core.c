@@ -19,6 +19,7 @@ int rpLuaFrameMsLeft = RP_LUA_FRAME_MS;
 int rpLuaGen[MAX_CLIENTS];
 int rp_luaActive = 0;
 int rp_luaWatchCount = 0;
+int rp_luaInCall = 0;
 
 static char rpLuaLoadQueue[RP_LUA_MAX_PLUGINS][RP_LUA_NAME_LEN + 1];
 static int rpLuaNumLoadQueued = 0;
@@ -170,7 +171,9 @@ qboolean RP_Lua_Call( rpLuaPlugin_t *p, int nargs, int nresults )
 	p->deadline = start + RP_LUA_CALL_MS;
 	lua_sethook( L, RP_Lua_Hook, LUA_MASKCOUNT, RP_LUA_HOOK_COUNT );
 
+	rp_luaInCall++;
 	status = lua_pcall( L, nargs, nresults, base );
+	rp_luaInCall--;
 
 	lua_sethook( L, NULL, 0, 0 );
 	p->inCall = qfalse;
@@ -659,6 +662,7 @@ void RP_Lua_Init( void )
 	rpLuaNumLoadQueued = 0;
 	rp_luaActive = 0;
 	rp_luaWatchCount = 0;
+	rp_luaInCall = 0;
 	rpLuaCurrent = NULL;
 	RP_LuaApi_Reset();
 

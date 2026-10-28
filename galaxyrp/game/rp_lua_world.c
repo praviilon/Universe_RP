@@ -329,6 +329,58 @@ after it. NPCs and vehicles (using one boards it), held entities and those witho
 /entuse skips them. The entity_used event does not fire for a use made by a script (rpLuaCurrent).
 ==================
 */
+// GLX_U: [Rewards] a target_reward reachable from these entities through the keys a use follows (target,
+// target2..6, and a mover's open/close/pain targets): a script may not pull a trigger that pays anyone,
+// however many relays, delays or counters sit in between. A bounded walk with a visited set, over the
+// networked and the logical region both (G_Find searches both).
+static qboolean RP_LuaWorld_ChainReachesReward( const int *start, int numStart )
+{
+	static byte visited[MAX_ENTITIESTOTAL];
+	static int queue[MAX_ENTITIESTOTAL];
+	int head = 0, tail = 0, steps = 0, i;
+
+	memset( visited, 0, sizeof( visited ) );
+	for ( i = 0; i < numStart; i++ )
+	{
+		if ( start[i] >= 0 && start[i] < MAX_ENTITIESTOTAL && !visited[start[i]] )
+		{
+			visited[start[i]] = 1;
+			queue[tail++] = start[i];
+		}
+	}
+	while ( head < tail && steps++ < 2048 )
+	{
+		gentity_t *e = &g_entities[queue[head++]];
+		const char *names[9];
+		int n;
+
+		if ( !e->inuse )
+			continue;
+		if ( e->classname && !Q_stricmp( e->classname, "target_reward" ) )
+			return qtrue;
+		names[0] = e->target; names[1] = e->target2; names[2] = e->target3; names[3] = e->target4; names[4] = e->target5;
+		names[5] = e->target6; names[6] = e->closetarget; names[7] = e->opentarget; names[8] = e->paintarget;
+		for ( n = 0; n < 9; n++ )
+		{
+			gentity_t *t = NULL;
+
+			if ( !names[n] || !names[n][0] )
+				continue;
+			while ( ( t = G_Find( t, FOFS( targetname ), names[n] ) ) != NULL && tail < MAX_ENTITIESTOTAL )
+			{
+				int num = t - g_entities;
+
+				if ( num >= 0 && num < MAX_ENTITIESTOTAL && !visited[num] )
+				{
+					visited[num] = 1;
+					queue[tail++] = num;
+				}
+			}
+		}
+	}
+	return qfalse;
+}
+
 static int RP_LuaWorld_Use( lua_State *L )
 {
 	rpLuaPlugin_t *p = rpLuaCurrent;
@@ -346,6 +398,8 @@ static int RP_LuaWorld_Use( lua_State *L )
 		found[numFound++] = e - g_entities;
 	if ( !numFound )
 		return RP_LuaWorld_Refuse( L, "nothing has that targetname" );
+	if ( RP_LuaWorld_ChainReachesReward( found, numFound ) )
+		return RP_LuaWorld_Refuse( L, "leads to a reward" );
 	if ( !RP_LuaApi_TakeToken( p, 1 ) )
 		return RP_LuaWorld_Refuse( L, "too fast" );
 
