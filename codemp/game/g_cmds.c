@@ -17102,6 +17102,19 @@ static const char *const zyk_vector_keys[] = {
 	"tint"														// GLX_U: misc_model_ghoul's (RP_GhoulTint() in g_misc.c)
 };
 
+// GLX_U: [Lua] the same test for a script's keys (rp_lua_world.c)
+qboolean RP_EntityVectorKey( const char *key )
+{
+	int k;
+
+	for ( k = 0; k < (int)ARRAY_LEN( zyk_vector_keys ); k++ )
+	{
+		if ( !Q_stricmp( key, zyk_vector_keys[k] ) )
+			return qtrue;
+	}
+	return qfalse;
+}
+
 static const char *zyk_entity_pairs_problem( int first, int count, qboolean edit )
 {
 	static char problem[256];
@@ -18556,6 +18569,11 @@ void Cmd_EntSave_f( gentity_t *ent ) {
 		// placed yet, and written it would load as a prop on top of the static model it copies (g_entgrab.c)
 		// DAJ_RP: [Entity System] and /entaddgrab's new entity, held: not placed yet, its record has no origin
 		if (RP_EntHeldUnplaced(this_ent))
+		{
+			continue;
+		}
+		// GLX_U: [Lua] nor a script's prop or NPC: the plugin that made it makes it again (rp_lua_world.c)
+		if (this_ent->rpLuaPlugin)
 		{
 			continue;
 		}

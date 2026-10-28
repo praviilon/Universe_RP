@@ -78,6 +78,9 @@ static void RP_LuaAdmin_Stats( gentity_t *ent, const char *name )
 			continue;
 		RP_LuaAdmin_Out( ent, va( "^3%s^7: %d calls, %d ms in all, %d errors; sent %d, refused %d (bucket) + %d (player busy); timers deferred %d; tokens now %d; stored %d KB\n",
 			p->name, p->calls, p->callMs, p->errorsTotal, p->sent, p->refusedTokens, p->refusedRecipients, p->deferredTimers, p->tokens, (int)( p->storeBytes / 1024 ) ) );
+		if ( p->L )
+			RP_LuaAdmin_Out( ent, va( "   world: %d props and %d NPCs alive (%d and %d spawned this map, %d refused); %d uses, %d effects, %d sounds\n",
+				RP_LuaWorld_CountLive( p, qfalse ), RP_LuaWorld_CountLive( p, qtrue ), p->propSpawns, p->npcSpawns, p->spawnsRefused, p->uses, p->effects, p->sounds ) );
 	}
 }
 

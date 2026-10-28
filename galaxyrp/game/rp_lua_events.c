@@ -90,12 +90,42 @@ static void RP_Lua_FillDeath( lua_State *L, void *ctx )
 	lua_setfield( L, -2, "mod" );
 }
 
+// P2: npc_death, to the plugin that spawned the NPC and no other
+static void RP_Lua_FillNpcDeath( lua_State *L, void *ctx )
+{
+	rpLuaEventCtx_t *c = (rpLuaEventCtx_t *)ctx;
+
+	RP_LuaWorld_PushEntity( L, c->ent );
+	lua_setfield( L, -2, "entity" );
+	lua_pushstring( L, c->ent->NPC_type ? c->ent->NPC_type : "" );
+	lua_setfield( L, -2, "npc_type" );
+	if ( c->other && c->other->client && c->other - g_entities < MAX_CLIENTS )
+	{
+		RP_LuaApi_PushPlayer( L, c->other - g_entities );
+		lua_setfield( L, -2, "killer" );
+	}
+	lua_pushinteger( L, c->mode );
+	lua_setfield( L, -2, "mod" );
+}
+
 void RP_Lua_EventDeath( gentity_t *victim, gentity_t *attacker, int mod )
 {
 	rpLuaEventCtx_t c = { victim, attacker, mod, 0, NULL };
 
-	if ( !victim || !victim->client || victim - g_entities >= MAX_CLIENTS )
-		return;	// NPCs die through player_die too; P1 reports players only
+	if ( !victim || !victim->client )
+		return;
+	if ( victim - g_entities >= MAX_CLIENTS )
+	{ // NPCs die through player_die too: only one a script spawned is reported, to that script
+		rpLuaPlugin_t *p = RP_LuaWorld_OwnerOf( victim );
+
+		if ( !p || !p->L || rpLuaCurrent || p->handlers[RPLE_NPC_DEATH] == LUA_NOREF )
+			return;
+		lua_rawgeti( p->L, LUA_REGISTRYINDEX, p->handlers[RPLE_NPC_DEATH] );
+		lua_newtable( p->L );
+		RP_Lua_FillNpcDeath( p->L, &c );
+		RP_Lua_Call( p, 1, 0 );
+		return;
+	}
 	RP_Lua_FireEvent( RPLE_PLAYER_DEATH, RP_Lua_FillDeath, &c );
 }
 

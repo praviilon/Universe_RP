@@ -1,0 +1,130 @@
+// TEST ONLY: P2 -- World.use through GlobalUse (locks, skips, counts, no self-event), World.prop and
+// World.npc (classes, keys, names, caps, refusals, tags, handles), World.remove queued, unload cleanup,
+// Effect/Sound lookup-only, every action a token.
+#include "t.h"
+
+static int get_int( rpLuaPlugin_t *p, const char *name ) { int v; lua_getglobal( p->L, name ); v = lua_isboolean( p->L, -1 ) ? lua_toboolean( p->L, -1 ) : (int)lua_tointeger( p->L, -1 ); lua_pop( p->L, 1 ); return v; }
+static const char *get_str( rpLuaPlugin_t *p, const char *name ) { static char b[512]; lua_getglobal( p->L, name ); Q_strncpyz( b, lua_tostring( p->L, -1 ) ? lua_tostring( p->L, -1 ) : "(nil)", sizeof( b ) ); lua_pop( p->L, 1 ); return b; }
+static void run( rpLuaPlugin_t *p, const char *cmd ) { (void)p; t_args( cmd ); RP_LUA_COMMAND( &g_entities[0], t_argv[0] ); }
+static void refill( rpLuaPlugin_t *p ) { p->tokens = RP_LUA_TOKENS; }
+
+int main( void )
+{
+	rpLuaPlugin_t *p;
+	int fails = 0, button, relay, door, locked, npcEnt;
+
+	// --- World.use: through GlobalUse, the player as activator and other; locked refused; NPC, held, inert skipped
+	t_init( 8 ); t_player( 0, "Alice", qtrue, 7 ); t_player( 1, "Bob", qtrue, 8 );
+	button = t_mapEntity( "func_button", "btn1", "relay1" ); relay = t_mapEntity( "target_relay", "relay1", "door1" ); door = t_mapEntity( "func_door", "door1", NULL );
+	locked = t_mapEntity( "func_door", "vault", NULL ); t_locked[locked] = qtrue;
+	npcEnt = t_mapEntity( "NPC", "guard", NULL ); g_entities[npcEnt].client = &g_clients_store[7];
+	t_mapEntity( "misc_model", "held", NULL ); g_entities[level.num_entities - 1].rpHeldBy = 1;
+	t_mapEntity( "info_null", "inert", NULL ); g_entities[level.num_entities - 1].use = NULL;
+	t_write_plugin( "w", "N = 0 World.watch('btn1') World.watch('door1') Events.on('entity_used', function(e) N = N + 1 end)\n"
+		"Commands.add('use', function(p, a) U, S = World.use(a[1], p) if U == false then WHY = S end end)\n"
+		"Commands.add('usebob', function(p, a) U, S = World.use(a[1], Players.get(1)) end)\n" );
+	t_start( "w" ); p = RP_Lua_Find( "w" ); CHECK( p && p->L, "w loaded" );
+	run( p, "use btn1" ); CHECK( get_int( p, "U" ) == 1 && get_int( p, "S" ) == 0, "button used: %d used %d skipped", get_int( p, "U" ), get_int( p, "S" ) );
+	CHECK( t_usedCount[button] == 1 && t_usedCount[relay] == 1 && t_usedCount[door] == 1, "the chain ran: %d %d %d", t_usedCount[button], t_usedCount[relay], t_usedCount[door] );
+	CHECK( t_usedActivator[door] == &g_entities[0] && t_usedOther[button] == &g_entities[0], "the player is activator and other" );
+	CHECK( get_int( p, "N" ) == 0, "no entity_used for a script's own use (and its chain): %d", get_int( p, "N" ) );
+	CHECK( p->tokens == RP_LUA_TOKENS - 1 && p->uses == 1, "one token: %d", p->tokens );
+	run( p, "use vault" ); CHECK( get_int( p, "U" ) == 1 && t_usedCount[locked] == 0, "a locked door: counted as used by the call, refused by the lock (%d)", t_usedCount[locked] );
+	run( p, "use guard" ); CHECK( get_int( p, "U" ) == 0 && get_int( p, "S" ) == 1, "an NPC is skipped (%d/%d)", get_int( p, "U" ), get_int( p, "S" ) );
+	run( p, "use held" ); CHECK( get_int( p, "S" ) == 1, "held skipped" );
+	refill( p ); run( p, "use inert" ); CHECK( get_int( p, "S" ) == 1, "no use: skipped (U %d S %s WHY %s)", get_int( p, "U" ), get_str( p, "S" ), get_str( p, "WHY" ) );
+	refill( p ); run( p, "use nothing" ); CHECK( !strcmp( get_str( p, "WHY" ), "nothing has that targetname" ), "unknown name: %s", get_str( p, "WHY" ) );
+	refill( p ); run( p, "usebob door1" ); CHECK( t_usedActivator[door] == &g_entities[1], "another player as activator" );
+	// a player pressing the button fires entity_used as before
+	GlobalUse( &g_entities[button], &g_entities[1], &g_entities[1] ); CHECK( get_int( p, "N" ) == 2, "a player's use fires (button and door): %d", get_int( p, "N" ) );
+	// the bucket: 4 then refused
+	refill( p ); run( p, "use btn1" ); run( p, "use btn1" ); run( p, "use btn1" ); run( p, "use btn1" ); run( p, "use btn1" );
+	CHECK( !strcmp( get_str( p, "WHY" ), "too fast" ), "5th use refused: %s", get_str( p, "WHY" ) );
+	RP_LUA_SHUTDOWN();
+
+	// --- World.prop: classes, keys, name, handle, tag, refusal text, caps, no room
+	t_init( 8 ); t_player( 0, "Alice", qtrue, 7 );
+	t_write_plugin( "pr", "H = {} Commands.add('prop', function(p, a) local h, why = World.prop(a[1], {x=10,y=20,z=30}, {x=0,y=90,z=0}, {model='models/map_objects/crate.md3', health=50}, {name=a[2]}) if h then H[#H+1] = h NUM = h.number CLS = h.classname TN = h.targetname OX = h.origin.x HP = h.health OK = true else OK = false WHY = why end end)\n"
+		"Commands.add('bad', function(p, a) OK2, E = pcall(World.prop, a[1], {x=0,y=0,z=0}, nil, {[a[2]] = a[3]}) E = tostring(E) end)\n"
+		"Commands.add('rmv', function(p, a) R = World.remove(H[tonumber(a[1])]) INUSE = H[tonumber(a[1])]:valid() end)\n"
+		"Commands.add('valid', function(p, a) V = H[tonumber(a[1])]:valid() N2 = tostring(H[tonumber(a[1])].number) end)\n"
+		"Commands.add('loop', function(p) for i = 1, 100 do local h, why = World.prop('misc_model_breakable', {x=0,y=0,z=0}) if not h then WHY = why return end end end)\n" );
+	t_start( "pr" ); p = RP_Lua_Find( "pr" );
+	run( p, "prop misc_model_breakable crate" ); CHECK( get_int( p, "OK" ) == 1, "spawned: %s / %s", get_str( p, "WHY" ), strstr( t_log, "error" ) ? strstr( t_log, "error" ) : "-" );
+	CHECK( !strcmp( get_str( p, "CLS" ), "misc_model_breakable" ) && !strcmp( get_str( p, "TN" ), "lua.pr.crate" ) && get_int( p, "OX" ) == 10 && get_int( p, "HP" ) == 50, "handle fields: %s %s %d", get_str( p, "CLS" ), get_str( p, "TN" ), get_int( p, "HP" ) );
+	{ int n = get_int( p, "NUM" ); CHECK( g_entities[n].rpLuaPlugin == (int)( p - rpLuaPlugins ) + 1 && g_entities[n].rpLuaStamp > 0, "tagged" );
+	  CHECK( t_recordCount[n] == 6 && !strcmp( t_record[n][0][0], "classname" ) && !strcmp( t_record[n][3][0], "targetname" ), "record: %d pairs, %s %s", t_recordCount[n], t_record[n][0][0], t_record[n][3][0] ); }
+	CHECK( p->tokens == RP_LUA_TOKENS - 1 && p->propSpawns == 1, "a token and a spawn counted" );
+	run( p, "bad func_door model x" ); CHECK( get_int( p, "OK2" ) == 0 && strstr( get_str( p, "E" ), "not a class" ), "func_door refused: %s", get_str( p, "E" ) );
+	run( p, "bad misc_model_ghoul target door1" ); CHECK( get_int( p, "OK2" ) == 0 && strstr( get_str( p, "E" ), "not allowed" ), "target refused: %s", get_str( p, "E" ) );
+	run( p, "bad misc_model_ghoul rpLock x" ); CHECK( strstr( get_str( p, "E" ), "not allowed" ), "rpLock refused" );
+	run( p, "bad misc_model_ghoul npcxp 5" ); CHECK( strstr( get_str( p, "E" ), "not allowed" ), "npcxp refused" );
+	run( p, "bad misc_model_ghoul targetname x" ); CHECK( strstr( get_str( p, "E" ), "not allowed" ), "targetname key refused" );
+	run( p, "bad misc_model_ghoul mins 1_2" ); CHECK( strstr( get_str( p, "E" ), "three numbers" ), "vector key checked: %s", get_str( p, "E" ) );
+	run( p, "bad misc_model_ghoul 9key x" ); CHECK( strstr( get_str( p, "E" ), "not a key" ), "key syntax: %s", get_str( p, "E" ) );
+	run( p, "bad misc_model_ghoul model a\"b" ); CHECK( strstr( get_str( p, "E" ), "quote" ), "quote in a value refused" );
+	CHECK( p->propSpawns == 1 && p->tokens == RP_LUA_TOKENS - 1, "argument errors cost nothing" );
+	t_spawnRefuse = qtrue; refill( p ); run( p, "prop fx_runner fx" ); t_spawnRefuse = qfalse;
+	CHECK( get_int( p, "OK" ) == 0 && !strcmp( get_str( p, "WHY" ), "the server does not have that model" ), "the game's refusal passed through: %s", get_str( p, "WHY" ) );
+	CHECK( p->spawnsRefused == 1 && RP_LuaWorld_CountLive( p, qfalse ) == 1, "refused spawn not in the list: %d live", RP_LuaWorld_CountLive( p, qfalse ) );
+	t_freeSlots = 3; refill( p ); run( p, "prop weapon_blaster" ); CHECK( !strcmp( get_str( p, "WHY" ), "no room" ) && p->tokens == RP_LUA_TOKENS, "no room, no token taken" ); t_freeSlots = 1000;
+	// remove: queued, gone at the frame end; a stale handle
+	run( p, "rmv 1" ); CHECK( get_int( p, "R" ) == 1 && get_int( p, "INUSE" ) == 1 && g_entities[get_int( p, "NUM" )].inuse, "remove queued, still there inside the call" );
+	t_frame( 50 ); CHECK( !g_entities[get_int( p, "NUM" )].inuse && t_freed == 2, "freed at the frame end (freed %d)", t_freed );
+	run( p, "valid 1" ); CHECK( get_int( p, "V" ) == 0 && !strcmp( get_str( p, "N2" ), "nil" ), "stale handle: valid false, fields nil" );
+	run( p, "rmv 1" ); CHECK( get_int( p, "R" ) == 0, "removing a stale handle refused" );
+	// caps: 32 live, then 128 per map; the bucket paces the loop
+	{ int i; for ( i = 0; i < 40; i++ ) { refill( p ); run( p, "loop" ); if ( !strcmp( get_str( p, "WHY" ), "too many props" ) ) break; } }
+	CHECK( RP_LuaWorld_CountLive( p, qfalse ) == RP_LUA_MAX_PROPS && !strcmp( get_str( p, "WHY" ), "too many props" ), "32 live then refused: %d, %s", RP_LuaWorld_CountLive( p, qfalse ), get_str( p, "WHY" ) );
+	RP_LuaWorld_PluginClose( p ); t_frame( 50 ); CHECK( RP_LuaWorld_CountLive( p, qfalse ) == 0, "all removed by the plugin close" );
+	{ int i; for ( i = 0; i < 200; i++ ) { refill( p ); run( p, "loop" ); if ( !strcmp( get_str( p, "WHY" ), "spawn limit for this map" ) ) break; if ( RP_LuaWorld_CountLive( p, qfalse ) >= 30 ) { RP_LuaWorld_PluginClose( p ); } } }
+	CHECK( p->propSpawns == RP_LUA_PROP_SPAWNS_MAP && !strcmp( get_str( p, "WHY" ), "spawn limit for this map" ), "128 spawns a map: %d, %s", p->propSpawns, get_str( p, "WHY" ) );
+	RP_LUA_SHUTDOWN(); CHECK( t_npcsAlive == 0, "nothing left" );
+
+	// --- World.npc: types, caps, the spawner, removal via RP_SpawnedRemove, npc_death to the owner only
+	t_init( 8 ); t_player( 0, "Alice", qtrue, 7 );
+	t_write_plugin( "np", "H = {} Events.on('npc_death', function(e) DEAD = e.npc_type .. ' by ' .. (e.killer and e.killer.name or '-') end)\n"
+		"Commands.add('npc', function(p, a) local h, why = World.npc(a[1], {x=1,y=2,z=3}, {x=0,y=45,z=0}, {name=a[2]}) if h then H[#H+1] = h NUM = h.number T = h.npc_type TN = h.targetname OK = true else OK = false WHY = why end end)\n"
+		"Commands.add('rmv', function(p, a) R = World.remove(H[tonumber(a[1])]) end)\n" );
+	t_write_plugin( "other", "Events.on('npc_death', function(e) OTHER = 1 end)\n" );
+	t_start( "np other" ); p = RP_Lua_Find( "np" );
+	run( p, "npc jedi guard" ); CHECK( get_int( p, "OK" ) == 1 && !strcmp( get_str( p, "T" ), "jedi" ) && !strcmp( get_str( p, "TN" ), "lua.np.guard" ), "npc spawned: %s %s %s", get_str( p, "WHY" ), get_str( p, "T" ), get_str( p, "TN" ) );
+	{ int n = get_int( p, "NUM" ); CHECK( g_entities[n].client && g_entities[n].rpLuaPlugin, "an NPC, tagged" ); CHECK( g_entities[n].r.currentOrigin[0] == 1 && g_entities[n].r.currentOrigin[1] == 2, "at the origin" );
+	  CHECK( t_npcsAlive == 1 && p->npcSpawns == 1 && p->tokens == RP_LUA_TOKENS - 1, "counted, one token" );
+	  // the spawner: a think of G_FreeEntity next frame
+	  { int i, spawners = 0; for ( i = MAX_CLIENTS; i < level.num_entities; i++ ) if ( g_entities[i].inuse && g_entities[i].think == G_FreeEntity && !g_entities[i].client ) spawners++; CHECK( spawners == 1, "the spawner goes next frame: %d", spawners ); }
+	  t_frame( 100 ); t_runThinks(); CHECK( g_entities[n].inuse, "the NPC stays" );
+	  // death: to the owner only, with the killer
+	  RP_LUA_EVENT_DEATH( &g_entities[n], &g_entities[0], 3 ); CHECK( !strcmp( get_str( p, "DEAD" ), "jedi by Alice" ), "npc_death: %s", get_str( p, "DEAD" ) );
+	  { rpLuaPlugin_t *o = RP_Lua_Find( "other" ); CHECK( get_int( o, "OTHER" ) == 0, "not to another plugin" ); }
+	  // a map NPC's death reports nothing
+	  { int m = t_mapEntity( "NPC", "mapnpc", NULL ); g_entities[m].client = &g_clients_store[6]; lua_pushstring( p->L, "x" ); lua_setglobal( p->L, "DEAD" ); RP_LUA_EVENT_DEATH( &g_entities[m], &g_entities[0], 3 ); CHECK( !strcmp( get_str( p, "DEAD" ), "x" ), "a map NPC: no event" ); g_entities[m].client = NULL; }
+	  run( p, "rmv 1" ); CHECK( get_int( p, "R" ) == 1 && g_entities[n].inuse, "remove queued" ); t_frame( 50 ); CHECK( t_removedSilently == 1 && g_entities[n].think == G_FreeEntity && g_entities[n].rpLuaPlugin == 0, "RP_SpawnedRemove'd at the frame end, untagged" ); t_frame( 100 ); t_runThinks(); CHECK( !g_entities[n].inuse, "gone next frame" ); }
+	run( p, "npc swoop" ); CHECK( get_int( p, "OK" ) == 0 && strstr( get_str( p, "WHY" ), "vehicle" ), "a vehicle refused: %s", get_str( p, "WHY" ) );
+	run( p, "npc nosuch" ); CHECK( strstr( get_str( p, "WHY" ), "unknown" ), "unknown type refused" );
+	t_freeSlots = 2; run( p, "npc jedi" ); CHECK( !strcmp( get_str( p, "WHY" ), "no room" ) && p->tokens == RP_LUA_TOKENS - 1, "no room before the token" ); t_freeSlots = 1000;
+	t_npcRefuse = qtrue; run( p, "npc jedi" ); t_npcRefuse = qfalse; CHECK( !strcmp( get_str( p, "WHY" ), "no room" ) && p->spawnsRefused == 2, "NPC_Spawn_Do's refusal: %d", p->spawnsRefused );
+	{ int i; for ( i = 0; i < 12; i++ ) { refill( p ); run( p, "npc stormtrooper" ); } }
+	CHECK( RP_LuaWorld_CountLive( p, qtrue ) == RP_LUA_MAX_NPCS && !strcmp( get_str( p, "WHY" ), "too many npcs" ), "8 NPCs then refused: %d %s", RP_LuaWorld_CountLive( p, qtrue ), get_str( p, "WHY" ) );
+	// unload takes them all, silently, after shutdown
+	RP_Lua_QueueOp( "np", RPLOP_UNLOAD ); t_frame( 50 ); CHECK( t_removedSilently == 1 + RP_LUA_MAX_NPCS, "unload removed every NPC: %d", t_removedSilently ); t_frame( 100 ); t_runThinks(); CHECK( t_npcsAlive == 0, "all gone" );
+	RP_LUA_SHUTDOWN();
+
+	// --- Effect.play / Sound.play: lookup only, slot check, a token each
+	t_init( 8 ); t_player( 0, "Alice", qtrue, 7 ); t_cs[0][0] = "sound/a.wav"; t_ncs[0] = 1; t_cs[1][0] = "env/fire"; t_cs[1][1] = "env/smoke"; t_ncs[1] = 2;
+	t_write_plugin( "fx", "Commands.add('eff', function(p, a) OK, WHY = Effect.play(a[1], {x=5,y=5,z=5}, nil) WHY = tostring(WHY) end) Commands.add('snd', function(p, a) OK, WHY = Sound.play(a[1], {x=0,y=0,z=0}) WHY = tostring(WHY) end)\n"
+		"Commands.add('far', function(p) OK2, E = pcall(Effect.play, 'env/fire', {x=1e9,y=0,z=0}) E = tostring(E) end)\n" );
+	t_start( "fx" ); p = RP_Lua_Find( "fx" );
+	run( p, "eff env/smoke" ); CHECK( get_int( p, "OK" ) == 1 && t_effects == 1 && t_lastEffect == 2 && t_lastEffectOrigin[0] == 5, "effect played by its index" );
+	run( p, "eff env/rain" ); CHECK( get_int( p, "OK" ) == 0 && strstr( get_str( p, "WHY" ), "not registered" ) && t_ncs[1] == 2, "unregistered effect refused, nothing registered" );
+	run( p, "snd sound/a.wav" ); CHECK( get_int( p, "OK" ) == 1 && t_sounds == 1 && t_lastSound == 1, "sound played" );
+	run( p, "snd sound/b.wav" ); CHECK( get_int( p, "OK" ) == 0 && t_sounds == 1, "unregistered sound refused" );
+	CHECK( p->tokens == RP_LUA_TOKENS - 2 && p->effects == 1 && p->sounds == 1, "two tokens: %d", p->tokens );
+	t_freeSlots = 0; run( p, "eff env/fire" ); CHECK( !strcmp( get_str( p, "WHY" ), "no room" ), "no slot for the temp entity" ); t_freeSlots = 1000;
+	run( p, "far" ); CHECK( get_int( p, "OK2" ) == 0 && strstr( get_str( p, "E" ), "out of the map" ), "origin bounds: %s", get_str( p, "E" ) );
+	run( p, "eff env/fire" ); run( p, "eff env/fire" ); run( p, "eff env/fire" ); CHECK( !strcmp( get_str( p, "WHY" ), "too fast" ), "the bucket: %s", get_str( p, "WHY" ) );
+	RP_LUA_SHUTDOWN();
+
+	printf( fails ? "%d FAILED\n" : "t_world: ALL OK\n", fails );
+	return fails ? 1 : 0;
+}

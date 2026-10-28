@@ -9,7 +9,7 @@ int main( void )
 	// --- removed functions and the sandbox
 	t_write_plugin( "sb", "R = {} for _, n in ipairs{'dofile','loadfile','loadstring','require','io','os','package','debug','coroutine'} do R[n] = _G[n] == nil end\n"
 		"R.load_text = (load('return 1') ~= nil) R.load_bin = (load(string.dump(function() end)) == nil) R.gc = pcall(collectgarbage, 'collect') == false R.gccount = type(collectgarbage('count')) == 'number'\n"
-		"R.strmeta = (getmetatable('') == false) R.api = PLUGIN_NAME == 'sb' and API_VERSION == 1 and type(Events.on) == 'function' and type(Storage.char.get) == 'function'\n"
+		"R.strmeta = (getmetatable('') == false) R.api = PLUGIN_NAME == 'sb' and API_VERSION == 2 and type(Events.on) == 'function' and type(Storage.char.get) == 'function' and type(World.use) == 'function' and type(Effect.play) == 'function'\n"
 		"print('hello', 1)\n" );
 	t_start( "sb" );
 	p = RP_Lua_Find( "sb" ); CHECK( p && p->L, "sb loaded" );

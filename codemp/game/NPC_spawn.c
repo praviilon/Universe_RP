@@ -65,6 +65,7 @@ extern void NPC_GalakMech_Init( gentity_t *ent );
 extern void NPC_Protocol_Precache( void );
 extern void Boba_Precache( void );
 extern void NPC_Wampa_Precache( void );
+
 gentity_t *NPC_SpawnType( gentity_t *ent, char *npc_type, char *targetname, qboolean isVehicle );
 
 extern void Rancor_SetBolts( gentity_t *self );
@@ -2388,7 +2389,7 @@ extern void Rancor_DropVictim( gentity_t *self );
 // an NPC or vehicle taken away as BS_REMOVE takes one (NPC_RemoveIfOutOfPlayersPVS()), but at once and firing
 // nothing: not drawn, not solid, gone next frame -- with the saber it carries, as the removal of a body frees
 // it (NPC.c), and with the droid a vehicle carries
-static void RP_SpawnedRemove( gentity_t *e )
+void RP_SpawnedRemove( gentity_t *e )
 {
 	int saberNum = e->client->ps.saberEntityNum;
 
@@ -5256,6 +5257,84 @@ void SP_NPC_Droid_Protocol( gentity_t *self)
 NPC_Spawn_f
 */
 
+// GLX_U: [Lua] the per-type precaches /npc spawn ran inline here, shared with a script's World.npc
+// (rp_lua_world.c); the map classes run their own after SP_NPC_spawner()
+void RP_NpcPrecacheByType( const char *type )
+{
+	if ( !Q_stricmp( "gonk", type))
+	{
+		NPC_Gonk_Precache();
+	}
+	else if ( !Q_stricmp( "mouse", type))
+	{
+		NPC_Mouse_Precache();
+	}
+	else if ( !Q_strncmp( "r2d2", type, 4))
+	{
+		NPC_R2D2_Precache();
+	}
+	else if ( !Q_stricmp( "atst", type))
+	{
+		NPC_ATST_Precache();
+	}
+	else if ( !Q_strncmp( "r5d2", type, 4))
+	{
+		NPC_R5D2_Precache();
+	}
+	else if ( !Q_stricmp( "mark1", type))
+	{
+		NPC_Mark1_Precache();
+	}
+	else if ( !Q_stricmp( "mark2", type))
+	{
+		NPC_Mark2_Precache();
+	}
+	else if ( !Q_stricmp( "interrogator", type))
+	{
+		NPC_Interrogator_Precache(NULL);
+	}
+	else if ( !Q_stricmp( "probe", type))
+	{
+		NPC_Probe_Precache();
+	}
+	else if ( !Q_stricmp( "seeker", type))
+	{
+		NPC_Seeker_Precache();
+	}
+	else if ( !Q_stricmp( "remote", type))
+	{
+		NPC_Remote_Precache();
+	}
+	else if ( !Q_strncmp( "shadowtrooper", type, 13 ) )
+	{
+		NPC_ShadowTrooper_Precache();
+	}
+	else if ( !Q_stricmp( "minemonster", type ))
+	{
+		NPC_MineMonster_Precache();
+	}
+	else if ( !Q_stricmp( "howler", type ))
+	{
+		NPC_Howler_Precache();
+	}
+	else if ( !Q_stricmp( "sentry", type ))
+	{
+		NPC_Sentry_Precache();
+	}
+	else if ( !Q_stricmp( "protocol", type ))
+	{
+		NPC_Protocol_Precache();
+	}
+	else if ( !Q_stricmp( "galak_mech", type ))
+	{
+		NPC_GalakMech_Precache();
+	}
+	else if ( !Q_stricmp( "wampa", type ))
+	{
+		NPC_Wampa_Precache();
+	}
+}
+
 gentity_t *NPC_SpawnType( gentity_t *ent, char *npc_type, char *targetname, qboolean isVehicle )
 {
 	gentity_t		*NPCspawner;
@@ -5354,79 +5433,7 @@ gentity_t *NPC_SpawnType( gentity_t *ent, char *npc_type, char *targetname, qboo
 		NPCspawner->classname = "NPC_Vehicle";
 	}
 
-	//call precache funcs for James' builds
-	if ( !Q_stricmp( "gonk", NPCspawner->NPC_type))
-	{
-		NPC_Gonk_Precache();
-	}
-	else if ( !Q_stricmp( "mouse", NPCspawner->NPC_type))
-	{
-		NPC_Mouse_Precache();
-	}
-	else if ( !Q_strncmp( "r2d2", NPCspawner->NPC_type, 4))
-	{
-		NPC_R2D2_Precache();
-	}
-	else if ( !Q_stricmp( "atst", NPCspawner->NPC_type))
-	{
-		NPC_ATST_Precache();
-	}
-	else if ( !Q_strncmp( "r5d2", NPCspawner->NPC_type, 4))
-	{
-		NPC_R5D2_Precache();
-	}
-	else if ( !Q_stricmp( "mark1", NPCspawner->NPC_type))
-	{
-		NPC_Mark1_Precache();
-	}
-	else if ( !Q_stricmp( "mark2", NPCspawner->NPC_type))
-	{
-		NPC_Mark2_Precache();
-	}
-	else if ( !Q_stricmp( "interrogator", NPCspawner->NPC_type))
-	{
-		NPC_Interrogator_Precache(NULL);
-	}
-	else if ( !Q_stricmp( "probe", NPCspawner->NPC_type))
-	{
-		NPC_Probe_Precache();
-	}
-	else if ( !Q_stricmp( "seeker", NPCspawner->NPC_type))
-	{
-		NPC_Seeker_Precache();
-	}
-	else if ( !Q_stricmp( "remote", NPCspawner->NPC_type))
-	{
-		NPC_Remote_Precache();
-	}
-	else if ( !Q_strncmp( "shadowtrooper", NPCspawner->NPC_type, 13 ) )
-	{
-		NPC_ShadowTrooper_Precache();
-	}
-	else if ( !Q_stricmp( "minemonster", NPCspawner->NPC_type ))
-	{
-		NPC_MineMonster_Precache();
-	}
-	else if ( !Q_stricmp( "howler", NPCspawner->NPC_type ))
-	{
-		NPC_Howler_Precache();
-	}
-	else if ( !Q_stricmp( "sentry", NPCspawner->NPC_type ))
-	{
-		NPC_Sentry_Precache();
-	}
-	else if ( !Q_stricmp( "protocol", NPCspawner->NPC_type ))
-	{
-		NPC_Protocol_Precache();
-	}
-	else if ( !Q_stricmp( "galak_mech", NPCspawner->NPC_type ))
-	{
-		NPC_GalakMech_Precache();
-	}
-	else if ( !Q_stricmp( "wampa", NPCspawner->NPC_type ))
-	{
-		NPC_Wampa_Precache();
-	}
+	RP_NpcPrecacheByType( NPCspawner->NPC_type );
 
 	return (NPC_Spawn_Do( NPCspawner ));
 }

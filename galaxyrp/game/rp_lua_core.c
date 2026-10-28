@@ -26,7 +26,8 @@ static qboolean rpLuaStoreReady = qfalse;
 
 const char *rpLuaEventNames[RPLE_COUNT] = {
 	"init", "shutdown", "frame", "client_begin", "client_disconnect", "chat",
-	"player_death", "login", "logout", "character_select", "level_up", "entity_used"
+	"player_death", "login", "logout", "character_select", "level_up", "entity_used",
+	"npc_death"
 };
 
 /*
@@ -275,6 +276,7 @@ static void RP_Lua_OpenSandbox( rpLuaPlugin_t *p )
 
 	RP_LuaApi_Open( p );
 	RP_LuaStore_OpenLib( p );
+	RP_LuaWorld_OpenLib( p );
 }
 
 /*
@@ -384,6 +386,7 @@ static void RP_Lua_ClosePlugin( rpLuaPlugin_t *p, qboolean keepSlot )
 	int errorsTotal = p->errorsTotal;
 
 	Q_strncpyz( name, p->name, sizeof( name ) );
+	RP_LuaWorld_PluginClose( p );	// its props and NPCs go with it (runs at a frame end or map end only)
 	if ( p->L )
 	{
 		RP_LuaApi_ClosePlugin( p );
@@ -707,6 +710,11 @@ void RP_Lua_Frame( void )
 		RP_Lua_RefillTokens( p );
 		RP_LuaApi_RunTimers( p );
 		RP_LuaStore_Frame( p );
+	}
+	for ( i = 0; i < RP_LUA_MAX_PLUGINS; i++ )
+	{
+		if ( rpLuaPlugins[i].inUse && rpLuaPlugins[i].removesQueued )
+			RP_LuaWorld_Frame( &rpLuaPlugins[i] );	// World.remove, after every call of the frame
 	}
 	RP_Lua_RunQueue();
 }

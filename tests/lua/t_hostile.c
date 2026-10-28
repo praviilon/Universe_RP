@@ -35,6 +35,18 @@ static const shape_t shapes[] = {
 	{ "deep",		"local t = {} local c = t for i = 1, 100000 do c.n = {} c = c.n end" },
 	{ "utf8",		"local s = ('\\xF0\\x9F\\x98\\x80'):rep(50000) for i = 1, 100 do utf8.len(s) end" },
 	{ "tostringloop","local t = {} for i = 1, 100000 do t[i] = tostring(i) .. tostring({}) end" },
+	// P2: the world
+	{ "proploop",	"for i = 1, 100000 do World.prop('misc_model_breakable', {x=0,y=0,z=0}) end" },
+	{ "npcloop",	"for i = 1, 100000 do World.npc('jedi', {x=0,y=0,z=0}) end" },
+	{ "spawnrm",	"for i = 1, 100000 do local h = World.prop('misc_model_breakable', {x=0,y=0,z=0}) if h then World.remove(h) end end" },
+	{ "useloop",	"local p = Players.get(0) for i = 1, 100000 do World.use('btn1', p) end" },
+	{ "usechain",	"local p = Players.get(0) for i = 1, 100 do World.use('loop1', p) end" },
+	{ "effectloop",	"for i = 1, 100000 do Effect.play('env/fire', {x=0,y=0,z=0}) Sound.play('sound/a.wav', {x=0,y=0,z=0}) end" },
+	{ "rmhandler",	"local h = World.prop('misc_model_breakable', {x=0,y=0,z=0}) Events.on('client_disconnect', function() World.remove(h) World.remove(h) end) Timer.after(50, function() World.remove(h) end)" },
+	{ "selfwatch",	"local p = Players.get(0) local h = World.prop('misc_model_breakable', {x=0,y=0,z=0}, nil, nil, {name='me'}) World.watch('lua.h.me') Events.on('entity_used', function() World.use('lua.h.me', p) end) World.use('lua.h.me', p)" },
+	{ "keysbomb",	"local t = {} for i = 1, 1000 do t['k' .. i] = ('v'):rep(255) end pcall(World.prop, 'misc_model_breakable', {x=0,y=0,z=0}, nil, t)" },
+	{ "bigvalue",	"pcall(World.prop, 'misc_model_breakable', {x=0,y=0,z=0}, nil, {model = ('x'):rep(100000)})" },
+	{ "nanorigin",	"pcall(World.prop, 'misc_model_breakable', {x=0/0, y=1/0, z=-1/0})" },
 	{ NULL, NULL }
 };
 
@@ -43,6 +55,8 @@ int main( void )
 	int i, c;
 	t_fresh(); t_init( 24 );
 	for ( c = 0; c < 24; c++ ) t_player( c, va( "P%d", c ), qtrue, 100 + c );
+	t_mapEntity( "func_button", "btn1", NULL ); t_mapEntity( "target_relay", "loop1", "loop2" ); t_mapEntity( "target_relay", "loop2", "loop1" );	// a use loop the chain limit cuts
+	t_cs[0][0] = "sound/a.wav"; t_ncs[0] = 1; t_cs[1][0] = "env/fire"; t_ncs[1] = 1;
 	for ( i = 0; shapes[i].name; i++ )
 	{
 		rpLuaPlugin_t *p;
@@ -72,6 +86,9 @@ int main( void )
 		took = trap->Milliseconds() - t0;
 		CHECK( took < RP_LUA_LIMIT_MS * 2, "%s: shutdown took %d ms", shapes[i].name, took );
 		CHECK( rp_luaActive == 0 && rp_luaWatchCount == 0, "%s: clean after shutdown (%d %d)", shapes[i].name, rp_luaActive, rp_luaWatchCount );
+		t_frame( 100 ); t_runThinks();
+		{ int n, left = 0; for ( n = MAX_CLIENTS; n < level.num_entities; n++ ) if ( g_entities[n].inuse && g_entities[n].rpLuaPlugin ) left++; CHECK( left == 0, "%s: %d script entities left", shapes[i].name, left ); }
+		CHECK( t_useDepth == 0, "%s: use depth %d", shapes[i].name, t_useDepth );
 		printf( "%-14s ok\n", shapes[i].name );
 	}
 	printf( fails ? "%d FAILED\n" : "t_hostile: ALL OK\n", fails );

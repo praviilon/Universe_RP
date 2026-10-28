@@ -519,6 +519,11 @@ struct gentity_s {
 	// /entcut, 0 otherwise. Zeroed with the entity, so a freed or reused slot can never pass for the
 	// held one. See g_entgrab.c.
 	int			rpHeldBy;
+	// GLX_U: [Lua] 1 + the plugin slot of the script that spawned this entity (a prop or an NPC), 0
+	// otherwise, with the stamp its handle carries; a freed slot is zeroed, so a stale handle never
+	// matches. /entsave leaves these out. See rp_lua_world.c.
+	int			rpLuaPlugin;
+	int			rpLuaStamp;
 
 	// GalaxyRP: [SP Maps] true on a misc_turret spawned on a single-player map as the turret that
 	// classname means there -- a misc_turretG2 (SP_misc_turret() in g_turret.c). It then behaves as
@@ -2935,6 +2940,10 @@ gentity_t *G_ScreenShake(vec3_t org, gentity_t *target, float intensity, int dur
 void	G_MuteSound( int entnum, int channel );
 void	G_Sound( gentity_t *ent, int channel, int soundIndex );
 void	G_SoundAtLoc( vec3_t loc, int channel, int soundIndex );
+int		RP_ConfigstringIndexOf( const char *name, int start, int max );	// GLX_U: [Lua] the slot a name has, 0 for none: never registers (g_utils.c)
+qboolean RP_EntityVectorKey( const char *key );	// GLX_U: [Lua] a key /entadd reads as three numbers (g_cmds.c)
+void	RP_NpcPrecacheByType( const char *type );	// GLX_U: [Lua] the per-type precaches /npc spawn runs (NPC_spawn.c)
+void	RP_SpawnedRemove( gentity_t *e );	// an NPC taken away silently, gone next frame (NPC_spawn.c)
 void	G_EntitySound( gentity_t *ent, int channel, int soundIndex );
 // GalaxyRP: [Space] an NPC's per-frame trigger_space check -- see g_trigger.c
 void	RP_NpcSpaceFrame( gentity_t *ent );

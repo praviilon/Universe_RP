@@ -43,10 +43,22 @@ three cvars (rp_lua, rp_lua_plugins, rp_lua_memkb) are in g_xcvar.h.
 #define RP_LUA_STORE_FLUSH_ROWS	64		// rows written per frame of a flush
 #define RP_LUA_PENDING_MAX		2048	// pending writes per plugin (bounded by RP_LUA_STORE_MAX anyway)
 #define RP_LUA_RADIUS_MAX		8192.0f
+// P2: the world
+#define RP_LUA_MAX_PROPS		32		// a plugin's props alive at once
+#define RP_LUA_MAX_NPCS			8		// and its NPCs
+#define RP_LUA_MAX_ENTS			( RP_LUA_MAX_PROPS + RP_LUA_MAX_NPCS )
+#define RP_LUA_PROP_SPAWNS_MAP	128		// spawns per plugin per map: the key/value pool (G_Alloc) and the
+#define RP_LUA_NPC_SPAWNS_MAP	32		// spawner strings are never freed within a map
+#define RP_LUA_MAX_KEYS			24		// key/value pairs a World.prop may carry (ZYK_MAX_SPAWN_STRING_SLOTS/2 is 64)
+#define RP_LUA_KEY_NAME_MAX		32
+#define RP_LUA_KEY_VALUE_MAX	256
+#define RP_LUA_ENT_NAME_MAX		32		// the <name> part of lua.<plugin>.<name>
+#define RP_LUA_MAP_SIZE			131072.0f	// an origin past this is refused (MAX_MAP_AREA_BYTES-scale maps are 2^17)
 
 typedef enum {
 	RPLE_INIT, RPLE_SHUTDOWN, RPLE_FRAME, RPLE_CLIENT_BEGIN, RPLE_CLIENT_DISCONNECT, RPLE_CHAT,
 	RPLE_PLAYER_DEATH, RPLE_LOGIN, RPLE_LOGOUT, RPLE_CHARACTER_SELECT, RPLE_LEVEL_UP, RPLE_ENTITY_USED,
+	RPLE_NPC_DEATH,
 	RPLE_COUNT
 } rpLuaEvent_t;
 
@@ -67,6 +79,14 @@ typedef struct {
 } rpLuaPending_t;
 
 typedef enum { RPLOP_NONE, RPLOP_DISABLE, RPLOP_UNLOAD, RPLOP_RELOAD } rpLuaOp_t;
+
+// P2: an entity a plugin spawned. Live while g_entities[number] is in use with this stamp.
+typedef struct {
+	int			number;
+	int			stamp;
+	qboolean	npc;
+	qboolean	removeQueued;	// World.remove: freed at the frame end
+} rpLuaEntity_t;
 
 typedef struct rpLuaPlugin_s {
 	char			name[RP_LUA_NAME_LEN + 1];
@@ -112,8 +132,15 @@ typedef struct rpLuaPlugin_s {
 	// queued for the end of the frame
 	rpLuaOp_t		pendingOp;
 
+	// P2: the world
+	rpLuaEntity_t	ents[RP_LUA_MAX_ENTS];
+	int				numEnts;
+	int				propSpawns, npcSpawns;	// this map (this load)
+	qboolean		removesQueued;
+
 	// stats
 	int				calls, callMs, errorsTotal, refusedTokens, refusedRecipients, deferredTimers, sent;
+	int				uses, effects, sounds, spawnsRefused;
 } rpLuaPlugin_t;
 
 extern rpLuaPlugin_t rpLuaPlugins[RP_LUA_MAX_PLUGINS];
@@ -144,6 +171,14 @@ void RP_LuaApi_ClosePlugin( rpLuaPlugin_t *p );
 qboolean RP_LuaApi_TakeToken( rpLuaPlugin_t *p, int n );
 qboolean RP_LuaApi_SendRoom( int clientNum );
 void RP_LuaApi_Sent( int clientNum );
+
+// world (P2)
+void RP_LuaWorld_OpenLib( rpLuaPlugin_t *p );
+void RP_LuaWorld_Frame( rpLuaPlugin_t *p );		// queued removes
+void RP_LuaWorld_PluginClose( rpLuaPlugin_t *p );	// every entity it made, now (frame end or map end only)
+int RP_LuaWorld_CountLive( rpLuaPlugin_t *p, qboolean npcs );
+rpLuaPlugin_t *RP_LuaWorld_OwnerOf( const gentity_t *ent );	// the plugin that spawned it, or NULL
+void RP_LuaWorld_PushEntity( lua_State *L, const gentity_t *ent );	// a handle for an entity it owns
 
 // store
 qboolean RP_LuaStore_Open( void );

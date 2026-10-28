@@ -3,10 +3,11 @@
 GLX_U: [Lua] server-side scripting -- what the game code sees.
 
 Plugins (lua/plugins/<name>/plugin.lua in the mod folder, loose files only) run in a Lua state of their
-own, told what happens through the events below, and able to answer only with messages, commands,
-timers and stored data. Nothing a P1 script does changes the world: the design (and why) is in the
-project's Lua v2 plan. Every hook here is one compare when rp_lua is 0 or no plugin is loaded, and none
-of them changes what the game does -- except RP_LUA_COMMAND, which answers a command no built-in has.
+own, told what happens through the events below, and able to answer with messages, commands, timers and
+stored data (P1), and, as a player would, with uses of named entities, props and NPCs of their own, and
+effects and sounds already registered (P2, rp_lua_world.c). The design (and why) is in the project's Lua
+v2 plan. Every hook here is one compare when rp_lua is 0 or no plugin is loaded, and none of them changes
+what the game does -- except RP_LUA_COMMAND, which answers a command no built-in has.
 ===========================================================================
 */
 #pragma once

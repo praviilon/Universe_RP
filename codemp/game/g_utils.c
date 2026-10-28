@@ -1408,6 +1408,27 @@ int	G_IconIndex( const char* name )
 	return G_FindConfigstringIndex (name, CS_ICONS, MAX_ICONS, qtrue);
 }
 
+// GLX_U: [Lua] the index a sound, effect or model name already has in its configstring block, 0 when
+// it has none. A scan like RP_SoundRegistered()'s (g_spawn.c): scripts may play what the map, the Entity
+// System or /playsound registered, and never register anything themselves.
+int RP_ConfigstringIndexOf( const char *name, int start, int max )
+{
+	char s[MAX_STRING_CHARS];
+	int i;
+
+	if ( !name || !name[0] )
+		return 0;
+	for ( i = 1; i < max; i++ )
+	{
+		trap->GetConfigstring( start + i, s, sizeof( s ) );
+		if ( !s[0] )
+			return 0;
+		if ( !Q_stricmp( s, name ) )
+			return i;
+	}
+	return 0;
+}
+
 int G_SoundIndex( const char *name ) {
 	assert(name && name[0]);
 	return G_FindConfigstringIndex (name, CS_SOUNDS, MAX_SOUNDS, qtrue);
