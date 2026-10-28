@@ -4,7 +4,8 @@
 // cgame broke at 572 px / textscale 0.58 with the ergoec widths, up to six options. A click or the keys
 // 1-6 run rpDialogChoose <n> (ui_rpdialog.c); Esc closes it, and onClose sends the walk-away. The panel is
 // the Extras' look. The textscale and the 572-wide column are what cg_rpdialog.c measures against: change
-// one, change the other.
+// one, change the other. The values in a showCvar list are separated with ';': the menu reader joins string
+// literals that stand side by side, as C does, so { "2" "3" } would be the one value "23" (tests/client).
 //----------------------------------------------------------------------------------------------
 {
 	menuDef
@@ -221,7 +222,7 @@
 			backcolor           0 0 0 0
 			visible             1
 			cvarTest            "ui_rpdlg_count"
-			showCvar            { "2" "3" "4" "5" "6" }
+			showCvar            { "2" ; "3" ; "4" ; "5" ; "6" }
 			mouseEnter
 			{
 				setitemcolor rpdlg_opt2 backcolor 1 .682 0 .25
@@ -253,7 +254,7 @@
 			backcolor           0 0 0 0
 			visible             1
 			cvarTest            "ui_rpdlg_count"
-			showCvar            { "3" "4" "5" "6" }
+			showCvar            { "3" ; "4" ; "5" ; "6" }
 			mouseEnter
 			{
 				setitemcolor rpdlg_opt3 backcolor 1 .682 0 .25
@@ -285,7 +286,7 @@
 			backcolor           0 0 0 0
 			visible             1
 			cvarTest            "ui_rpdlg_count"
-			showCvar            { "4" "5" "6" }
+			showCvar            { "4" ; "5" ; "6" }
 			mouseEnter
 			{
 				setitemcolor rpdlg_opt4 backcolor 1 .682 0 .25
@@ -317,7 +318,7 @@
 			backcolor           0 0 0 0
 			visible             1
 			cvarTest            "ui_rpdlg_count"
-			showCvar            { "5" "6" }
+			showCvar            { "5" ; "6" }
 			mouseEnter
 			{
 				setitemcolor rpdlg_opt5 backcolor 1 .682 0 .25

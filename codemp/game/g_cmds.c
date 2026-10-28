@@ -17658,12 +17658,43 @@ static void zyk_entadd( gentity_t *ent, qboolean aim, qboolean grab ) {
 	}
 }
 
+/*
+==================
+RP_EntLongLineNote
+
+GLX_U: [Entity System] the console's input line holds 255 characters, so a longer /entadd or /entedit typed
+there reaches the server cut, with nothing said (a long target_dialog is the usual one). A command this long
+(the line rebuilt from its arguments, quotes only where needed, so a little shorter than typed) may be one of
+them: a note after the command's own result, for an admin with the Entity System power. Nothing is refused:
+a line run from a .cfg with exec arrives whole.
+==================
+*/
+#define RP_ENT_LONG_LINE	240
+
+static void RP_EntLongLineNote( gentity_t *ent )
+{
+	char arg[MAX_STRING_CHARS];
+	int i, len = 0, argc = trap->Argc();
+
+	for ( i = 0; i < argc; i++ )
+	{
+		trap->Argv( i, arg, sizeof( arg ) );
+		len += (int)strlen( arg ) + ( i ? 1 : 0 ) + ( ( !arg[0] || strchr( arg, ' ' ) ) ? 2 : 0 );
+	}
+	if ( len < RP_ENT_LONG_LINE || !check_admin_command( ent, ADM_ENTITYSYSTEM, qfalse ) )
+		return;
+	trap->SendServerCommand( ent - g_entities, "print \"^3Note: ^7the console takes 255 characters per line, so a longer command typed there is cut. "
+		"Check the entity with ^3/entedit <id>^7, add the rest with ^3/entedit <id> <key> <value> ...^7, or put the whole line in a .cfg and ^3exec^7 it.\n\"" );
+}
+
 void Cmd_EntAdd_f( gentity_t *ent ) {
 	zyk_entadd( ent, qfalse, qfalse );
+	RP_EntLongLineNote( ent );	// GLX_U: [Entity System]
 }
 
 void Cmd_EntAddAim_f( gentity_t *ent ) {
 	zyk_entadd( ent, qtrue, qfalse );
+	RP_EntLongLineNote( ent );	// GLX_U: [Entity System]
 }
 
 /*
@@ -17690,6 +17721,7 @@ void Cmd_EntAddGrab_f( gentity_t *ent ) {
 	}
 
 	zyk_entadd( ent, qtrue, qtrue );
+	RP_EntLongLineNote( ent );	// GLX_U: [Entity System]
 }
 
 /*
@@ -17697,7 +17729,14 @@ void Cmd_EntAddGrab_f( gentity_t *ent ) {
 Cmd_EntEdit_f
 ==================
 */
+static void RP_EntEdit( gentity_t *ent );
+
 void Cmd_EntEdit_f( gentity_t *ent ) {
+	RP_EntEdit( ent );
+	RP_EntLongLineNote( ent );	// GLX_U: [Entity System]
+}
+
+static void RP_EntEdit( gentity_t *ent ) {
 	gentity_t *this_ent = NULL;
 	int number_of_args = trap->Argc();
 	int entity_id = -1;
