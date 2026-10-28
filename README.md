@@ -2,7 +2,7 @@
 
 Universe RP turns Jedi Academy multiplayer into a true sandbox for roleplay communities.
 
-Every player has an account with characters that keep their level, skills, credits, sabers and looks. Chat carries as far as a voice would, with actions, descriptions, shouts, whispers and alien languages. Admins and builders shape the world in game: they place props, NPCs, lights and effects, lock doors to chosen players, and save it all for the next session.
+Every player has an account with characters that keep their level, skills, credits, sabers and looks. Chat carries as far as a voice would, with actions, descriptions, shouts, whispers and alien languages. Admins and builders shape the world in game: they place props, NPCs, lights and effects, lock doors to chosen players, write quests with dialogues and rewards, and save it all for the next session.
 
 The mod continues GalaxyRP by Alex, rebuilt to run natively on the modern TaystJK engine, with its Rend2 and Vulkan renderers and its logical entities, on Windows, Linux and macOS, 32-bit and 64-bit, Intel and ARM.
 
@@ -65,12 +65,13 @@ Claude Code is being used to develop the project.
 - Entity bounds shown, and commands to copy, cut and rotate entities
 - More entity classes and a logical entity pool
 - Door and trigger locks, set per entity, with a list of the accounts allowed through and custom lock messages
+- Dialogues with up to six answers, as a menu or in the console, that open doors, pay XP and credit rewards or lead on to the next talk, with per-player quest flags deciding what each player is offered
 - Spawner settings: scale NPCs and vehicles on the go, set their team, hats and capes, and XP and credit rewards for defeating them
 - Shader remaps, and better single player map support (Jedi Academy and Jedi Outcast), with votes for SP maps
 
 ### [Running a server](https://praviilon.github.io/Universe_RP/features.html#admin)
 - Admin commands, given one by one to each account
-- Server tools
+- Server-side Lua plugins, sandboxed and rate-limited, for events, commands, quests, NPCs and timed content
 - A news system
 - Many customisable server cvars, with an [online calculator](https://praviilon.github.io/Universe_RP/calculator.html) for the bit-value ones
 
