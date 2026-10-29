@@ -134,6 +134,18 @@ void zyk_main_spawn_entity( gentity_t *ent ) { int n = ent->s.number; const char
 	else if ( !strcmp( ent->classname, "target_dialog" ) || !strcmp( ent->classname, "target_flag" ) ) { t_spawnReal( ent ); }
 	if ( t_spawnRefuse ) { Q_strncpyz( level.rp_spawn_refusal, "the server does not have that model", sizeof( level.rp_spawn_refusal ) ); G_FreeEntity( ent ); } }
 int RP_FreeEntityChildren( gentity_t *maker ) { (void)maker; return 0; }
+// spawn keys for the next SP_ call (the real target_dialog, target_flag and target_lua spawn functions read them)
+static const char *t_keys[32][2]; static int t_nkeys;
+void t_key( const char *k, const char *v ) { if ( t_nkeys < 32 ) { t_keys[t_nkeys][0] = k; t_keys[t_nkeys][1] = v; t_nkeys++; } }
+void t_keysClear( void ) { t_nkeys = 0; }
+qboolean G_SpawnString( const char *key, const char *def, char **out ) { int i; for ( i = 0; i < t_nkeys; i++ ) if ( !Q_stricmp( t_keys[i][0], key ) ) { *out = (char *)t_keys[i][1]; return qtrue; } *out = (char *)def; return qfalse; }
+qboolean G_SpawnFloat( const char *key, const char *def, float *out ) { char *s; qboolean r = G_SpawnString( key, def, &s ); *out = atof( s ); return r; }
+qboolean G_ActivateBehavior( gentity_t *self, int bset ) { (void)self; (void)bset; return qfalse; }
+void RP_SpawnSaysWhy( gentity_t *ent, const char *reason ) { (void)ent; Q_strncpyz( level.rp_spawn_refusal, reason, sizeof( level.rp_spawn_refusal ) ); }
+// "made by the entity commands": t_esMade says so for the next spawns (the real test is the record and the slot, g_spawn.c)
+char *vtos( const vec3_t v ) { static char b[64]; Com_sprintf( b, sizeof( b ), "(%d %d %d)", (int)v[0], (int)v[1], (int)v[2] ); return b; }
+qboolean t_esMade; qboolean RP_EntitySystemMade( const gentity_t *ent ) { (void)ent; return t_esMade; }
+qboolean RP_RefuseAtRuntime( gentity_t *ent, const char *reason ) { if ( !ent || !RP_EntitySystemMade( ent ) ) return qfalse; RP_SpawnSaysWhy( ent, reason ); G_FreeEntity( ent ); return qtrue; }
 qboolean RP_EntityIsCharacter( const gentity_t *e ) { return ( e && e->client ) ? qtrue : qfalse; }
 void G_SetOrigin( gentity_t *ent, vec3_t origin ) { VectorCopy( origin, ent->r.currentOrigin ); VectorCopy( origin, ent->s.origin ); }
 char t_lastSpawnerClass[64];
@@ -210,5 +222,5 @@ void t_worldReset( void )
 	s_numStrings = 0;
 	t_freeSlots = 1000; t_poolFree = 1 << 20; t_spawnRefuse = qfalse; t_npcRefuse = qfalse;
 	memset( t_locked, 0, sizeof( t_locked ) ); memset( t_usedCount, 0, sizeof( t_usedCount ) ); memset( t_usedInCall, 0, sizeof( t_usedInCall ) ); memset( t_recordCount, 0, sizeof( t_recordCount ) );
-	t_useDepth = t_useChain = t_useRefused = 0; t_teleports = 0; t_teleportedTo = -1; t_freedRidden = 0; t_vehiclesAlive = 0; t_effects = t_sounds = 0; t_ncs[0] = t_ncs[1] = 0; t_freed = 0; t_npcsAlive = 0; t_removedSilently = 0;
+	t_useDepth = t_useChain = t_useRefused = 0; t_teleports = 0; t_teleportedTo = -1; t_esMade = qfalse; t_nkeys = 0; t_freedRidden = 0; t_vehiclesAlive = 0; t_effects = t_sounds = 0; t_ncs[0] = t_ncs[1] = 0; t_freed = 0; t_npcsAlive = 0; t_removedSilently = 0;
 }

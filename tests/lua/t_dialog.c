@@ -5,17 +5,11 @@
 #include "t.h"
 #include <math.h>
 
-// spawn keys for the next SP_ call
-static const char *t_keys[32][2]; static int t_nkeys;
-static void t_key( const char *k, const char *v ) { t_keys[t_nkeys][0] = k; t_keys[t_nkeys][1] = v; t_nkeys++; }
-qboolean G_SpawnString( const char *key, const char *def, char **out ) { int i; for ( i = 0; i < t_nkeys; i++ ) if ( !Q_stricmp( t_keys[i][0], key ) ) { *out = (char *)t_keys[i][1]; return qtrue; } *out = (char *)def; return qfalse; }
-qboolean G_SpawnFloat( const char *key, const char *def, float *out ) { char *s; qboolean r = G_SpawnString( key, def, &s ); *out = atof( s ); return r; }
+// spawn keys for the next SP_ call: t_key() and t_keysClear() (stubs.c)
 static char s_pool[1 << 16]; static int s_poolUsed;
 void *G_Alloc( int size ) { void *p = &s_pool[s_poolUsed]; s_poolUsed += ( size + 31 ) & ~31; return p; }
 void G_UseTargets2( gentity_t *ent, gentity_t *activator, const char *string ) { gentity_t *t = NULL; while ( ( t = G_Find( t, FOFS( targetname ), string ) ) ) GlobalUse( t, ent, activator ); }
 void G_UseTargets( gentity_t *ent, gentity_t *activator ) { if ( ent->target ) G_UseTargets2( ent, activator, ent->target ); }
-qboolean G_ActivateBehavior( gentity_t *self, int bset ) { (void)self; (void)bset; return qfalse; }
-void RP_SpawnSaysWhy( gentity_t *ent, const char *reason ) { (void)ent; Q_strncpyz( level.rp_spawn_refusal, reason, sizeof( level.rp_spawn_refusal ) ); }
 int ClientNumberFromString( gentity_t *to, const char *s, qboolean allowconnecting ) { (void)to; (void)allowconnecting; return atoi( s ); }
 static int t_knocked[MAX_CLIENTS]; qboolean BG_InKnockDown( int anim ) { return anim == 999 ? qtrue : qfalse; }
 
@@ -23,12 +17,12 @@ static int t_knocked[MAX_CLIENTS]; qboolean BG_InKnockDown( int anim ) { return 
 void SP_target_dialog( gentity_t *ent ); void SP_target_flag( gentity_t *ent );
 // World.prop's target_dialog and target_flag spawned for real: the record's keys become the spawn keys
 void t_spawnReal( gentity_t *ent ) { int n = ent->s.number, i; const char *keys[] = { "title", "message", "option1", "go1", "need1", "option2", "go2", "need2", "option3", "go3", "need3", "timeout", "range", "speaker", "flag", "targetname", NULL };
-	t_nkeys = 0; for ( i = 0; keys[i]; i++ ) { const char *v = t_recordValue( n, keys[i] ); if ( v ) t_key( keys[i], v ); } ent->use = NULL;
-	if ( !strcmp( ent->classname, "target_dialog" ) ) SP_target_dialog( ent ); else SP_target_flag( ent ); t_nkeys = 0; }
+	t_keysClear(); for ( i = 0; keys[i]; i++ ) { const char *v = t_recordValue( n, keys[i] ); if ( v ) t_key( keys[i], v ); } ent->use = NULL;
+	if ( !strcmp( ent->classname, "target_dialog" ) ) SP_target_dialog( ent ); else SP_target_flag( ent ); t_keysClear(); }
 static int spawn_dialog( const char *targetname, const char *target, int spawnflags )
-{ gentity_t *e = &g_entities[t_mapEntity( "target_dialog", targetname, target )]; e->spawnflags = spawnflags; e->use = NULL; t_key( "targetname", targetname ); SP_target_dialog( e ); t_nkeys = 0; return e->inuse ? e->s.number : -1; }
+{ gentity_t *e = &g_entities[t_mapEntity( "target_dialog", targetname, target )]; e->spawnflags = spawnflags; e->use = NULL; t_key( "targetname", targetname ); SP_target_dialog( e ); t_keysClear(); return e->inuse ? e->s.number : -1; }
 static int spawn_flag( const char *targetname, const char *flag, int spawnflags )
-{ gentity_t *e = &g_entities[t_mapEntity( "target_flag", targetname, NULL )]; e->spawnflags = spawnflags; e->use = NULL; t_key( "flag", flag ); SP_target_flag( e ); t_nkeys = 0; return e->inuse ? e->s.number : -1; }
+{ gentity_t *e = &g_entities[t_mapEntity( "target_flag", targetname, NULL )]; e->spawnflags = spawnflags; e->use = NULL; t_key( "flag", flag ); SP_target_flag( e ); t_keysClear(); return e->inuse ? e->s.number : -1; }
 static const char *last_sent( int c ) { return t_nsent[c] ? t_sent[c][t_nsent[c] - 1] : ""; }
 static const char *sent_with( int c, const char *word ) { int i; for ( i = t_nsent[c] - 1; i >= 0; i-- ) if ( strstr( t_sent[c][i], word ) ) return t_sent[c][i]; return ""; }
 static void clear_sent( void ) { memset( t_nsent, 0, sizeof( t_nsent ) ); }

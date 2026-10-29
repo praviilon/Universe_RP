@@ -470,20 +470,41 @@ rpLuaPlugin_t *RP_Lua_Find( const char *name )
 	return NULL;
 }
 
-// the plugin's file, from the mod folder on disk (never a pk3: a download must not bring code)
+// the plugin's file, in the mod folder on disk (never a pk3: a download must not bring code)
+static void RP_Lua_PluginPath( const char *name, char *path, int size )
+{
+	char home[MAX_OSPATH] = { 0 };
+
+	trap->Cvar_VariableStringBuffer( "fs_homepath", home, sizeof( home ) );
+	if ( home[0] )
+		Com_sprintf( path, size, "%s/%s/lua/plugins/%s/plugin.lua", home, RP_MOD_FOLDER, name );
+	else
+		Com_sprintf( path, size, "%s/lua/plugins/%s/plugin.lua", RP_MOD_FOLDER, name );
+}
+
+qboolean RP_Lua_PluginFileExists( const char *name )
+{
+	char path[MAX_OSPATH * 2];
+	FILE *f;
+
+	if ( !RP_Lua_ValidName( name ) )
+		return qfalse;
+	RP_Lua_PluginPath( name, path, sizeof( path ) );
+	f = fopen( path, "rb" );
+	if ( !f )
+		return qfalse;
+	fclose( f );
+	return qtrue;
+}
+
 static char *RP_Lua_ReadPlugin( const char *name, size_t *len )
 {
-	char home[MAX_OSPATH] = { 0 }, path[MAX_OSPATH * 2];
+	char path[MAX_OSPATH * 2];
 	FILE *f;
 	long size;
 	char *buf;
 
-	trap->Cvar_VariableStringBuffer( "fs_homepath", home, sizeof( home ) );
-	if ( home[0] )
-		Com_sprintf( path, sizeof( path ), "%s/%s/lua/plugins/%s/plugin.lua", home, RP_MOD_FOLDER, name );
-	else
-		Com_sprintf( path, sizeof( path ), "%s/lua/plugins/%s/plugin.lua", RP_MOD_FOLDER, name );
-
+	RP_Lua_PluginPath( name, path, sizeof( path ) );
 	f = fopen( path, "rb" );
 	if ( !f )
 		return NULL;

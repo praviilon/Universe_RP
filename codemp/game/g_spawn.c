@@ -796,6 +796,7 @@ spawn_t	spawns[] = {
 	{ "target_kill",						SP_target_kill, qtrue },
 	{ "target_laser",						SP_target_laser },
 	{ "target_level_change",				SP_target_level_change, qtrue },
+	{ "target_lua",							SP_target_lua, qtrue },	// GLX_U: [Lua] rp_lua_admin.c
 	{ "target_location",					SP_target_location, qtrue },
 	{ "target_play_music",					SP_target_play_music, qtrue },
 	{ "target_position",					SP_target_position, qtrue },

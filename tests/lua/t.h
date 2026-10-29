@@ -13,6 +13,7 @@ extern gclient_t g_clients_store[]; extern int t_freedRidden, t_vehiclesAlive; e
 int t_mapEntity( const char *classname, const char *targetname, const char *target ); void t_runThinks( void );
 int t_rewardEntity( const char *targetname, const char *target, int credits, int spawnflags ); extern int t_paidCredits[MAX_CLIENTS], t_payouts, t_musicChanges, t_teleports, t_teleportedTo;
 const char *t_recordValue( int n, const char *key ); void t_spawnReal( gentity_t *ent );
+void t_key( const char *k, const char *v ); void t_keysClear( void ); extern qboolean t_esMade;	// spawn keys for the next SP_ call
 void t_init( int maxclients ); void t_player( int i, const char *name, qboolean loggedin, int charId ); void t_frame( int ms );
 
 static int fails;

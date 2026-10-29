@@ -82,9 +82,9 @@ static void RP_LuaAdmin_Stats( gentity_t *ent, const char *name )
 			RP_LuaAdmin_Out( ent, va( "   world: %d props, %d NPCs and %d vehicles alive (%d, %d and %d spawned this map, %d of the props dialogues, %d refused); %d uses, %d effects, %d sounds\n",
 				RP_LuaWorld_CountLive( p, qfalse ), RP_LuaWorld_CountLive( p, qtrue ), RP_LuaWorld_CountVehicles( p ), p->propSpawns, p->npcSpawns, p->vehicleSpawns,
 				p->dialogSpawns, p->spawnsRefused, p->uses, p->effects, p->sounds ) );
-		if ( p->L && ( p->usesBusy || p->cmdsHeld || p->dbRefused || p->eventsShort || p->eventsSkipped ) )
-			RP_LuaAdmin_Out( ent, va( "   guards: %d uses refused (player busy), %d commands held back, %d payouts skipped (database writes); past the frame budget: %d event calls shortened, %d not run\n",
-				p->usesBusy, p->cmdsHeld, p->dbRefused, p->eventsShort, p->eventsSkipped ) );
+		if ( p->L && ( p->usesBusy || p->cmdsHeld || p->dbRefused || p->eventsShort || p->eventsSkipped || p->luaUsesHeld ) )
+			RP_LuaAdmin_Out( ent, va( "   guards: %d uses refused (player busy), %d commands held back, %d payouts skipped (database writes), %d target_lua uses refused; past the frame budget: %d event calls shortened, %d not run\n",
+				p->usesBusy, p->cmdsHeld, p->dbRefused, p->luaUsesHeld, p->eventsShort, p->eventsSkipped ) );
 	}
 }
 
@@ -108,6 +108,56 @@ static void RP_LuaAdmin_Help( gentity_t *ent )
 		RP_LuaAdmin_Out( ent, "No plugin adds a command.\n" );
 }
 
+/*
+==================
+The three actions, shared by /scripts and target_lua: each only queues (nothing here opens or closes a
+state), and answers with the line the admin sees or the log gets
+==================
+*/
+static const char *RP_LuaAdmin_Load( const char *arg )
+{
+	rpLuaPlugin_t *p = RP_Lua_Find( arg );
+
+	if ( p && p->L )
+		return va( "%s is already running.\n", p->name );
+	if ( !RP_Lua_QueueLoad( arg ) )
+		return "That is not a plugin name (letters, digits, '_' and '-', up to 32).\n";
+	return va( "Loading %s at the end of this frame; see the log if it does not appear in /scripts list.\n", arg );
+}
+
+static const char *RP_LuaAdmin_Unload( const char *arg, rpLuaOp_t op )
+{
+	rpLuaPlugin_t *p = RP_Lua_Find( arg );
+
+	if ( p && !p->L && op == RPLOP_UNLOAD )
+	{ // switched off: nothing to close, the slot goes
+		memset( p, 0, sizeof( *p ) );
+		return va( "%s unloaded.\n", arg );
+	}
+	if ( !RP_Lua_QueueOp( arg, op ) )
+		return va( "%s is not running.\n", arg );
+	return va( "%s will be %s at the end of this frame.\n", arg, op == RPLOP_UNLOAD ? "unloaded" : "switched off" );
+}
+
+static const char *RP_LuaAdmin_Reload( const char *arg )
+{
+	int i, n = 0;
+
+	for ( i = 0; i < RP_LUA_MAX_PLUGINS; i++ )
+	{
+		rpLuaPlugin_t *p = &rpLuaPlugins[i];
+
+		if ( !p->inUse || ( Q_stricmp( arg, "all" ) && Q_stricmp( p->name, arg ) ) )
+			continue;
+		if ( p->L )
+			p->pendingOp = RPLOP_RELOAD;
+		else
+			RP_Lua_QueueLoad( p->name );
+		n++;
+	}
+	return n ? va( "%d plugin%s reloading at the end of this frame.\n", n, n == 1 ? "" : "s" ) : va( "%s is not loaded.\n", arg );
+}
+
 // the shared body: ent NULL for rcon
 static void RP_LuaAdmin_Scripts( gentity_t *ent, const char *sub, const char *arg )
 {
@@ -118,49 +168,11 @@ static void RP_LuaAdmin_Scripts( gentity_t *ent, const char *sub, const char *ar
 	else if ( !Q_stricmp( sub, "help" ) )
 		RP_LuaAdmin_Help( ent );
 	else if ( !Q_stricmp( sub, "load" ) || !Q_stricmp( sub, "enable" ) )
-	{
-		rpLuaPlugin_t *p = RP_Lua_Find( arg );
-
-		if ( p && p->L )
-			RP_LuaAdmin_Out( ent, va( "%s is already running.\n", p->name ) );
-		else if ( !RP_Lua_QueueLoad( arg ) )
-			RP_LuaAdmin_Out( ent, "That is not a plugin name (letters, digits, '_' and '-', up to 32).\n" );
-		else
-			RP_LuaAdmin_Out( ent, va( "Loading %s at the end of this frame; see the log if it does not appear in /scripts list.\n", arg ) );
-	}
+		RP_LuaAdmin_Out( ent, RP_LuaAdmin_Load( arg ) );
 	else if ( !Q_stricmp( sub, "unload" ) || !Q_stricmp( sub, "disable" ) )
-	{
-		rpLuaOp_t op = Q_stricmp( sub, "unload" ) ? RPLOP_DISABLE : RPLOP_UNLOAD;
-		rpLuaPlugin_t *p = RP_Lua_Find( arg );
-
-		if ( p && !p->L && op == RPLOP_UNLOAD )
-		{ // switched off: nothing to close, the slot goes
-			memset( p, 0, sizeof( *p ) );
-			RP_LuaAdmin_Out( ent, va( "%s unloaded.\n", arg ) );
-		}
-		else if ( !RP_Lua_QueueOp( arg, op ) )
-			RP_LuaAdmin_Out( ent, va( "%s is not running.\n", arg ) );
-		else
-			RP_LuaAdmin_Out( ent, va( "%s will be %s at the end of this frame.\n", arg, op == RPLOP_UNLOAD ? "unloaded" : "switched off" ) );
-	}
+		RP_LuaAdmin_Out( ent, RP_LuaAdmin_Unload( arg, Q_stricmp( sub, "unload" ) ? RPLOP_DISABLE : RPLOP_UNLOAD ) );
 	else if ( !Q_stricmp( sub, "reload" ) )
-	{
-		int i, n = 0;
-
-		for ( i = 0; i < RP_LUA_MAX_PLUGINS; i++ )
-		{
-			rpLuaPlugin_t *p = &rpLuaPlugins[i];
-
-			if ( !p->inUse || ( Q_stricmp( arg, "all" ) && Q_stricmp( p->name, arg ) ) )
-				continue;
-			if ( p->L )
-				p->pendingOp = RPLOP_RELOAD;
-			else
-				RP_Lua_QueueLoad( p->name );
-			n++;
-		}
-		RP_LuaAdmin_Out( ent, n ? va( "%d plugin%s reloading at the end of this frame.\n", n, n == 1 ? "" : "s" ) : va( "%s is not loaded.\n", arg ) );
-	}
+		RP_LuaAdmin_Out( ent, RP_LuaAdmin_Reload( arg ) );
 	else
 		RP_LuaAdmin_Out( ent, "^3/scripts ^7[list] | stats [name] | help | load <name> | unload <name> | reload <name|all> | enable <name> | disable <name>\n" );
 }
@@ -274,4 +286,103 @@ void Svcmd_Lua_f( void )
 	else
 		trap->Print( "(error: see the log)\n" );
 	RP_Lua_CloseScratch( p );
+}
+
+/*
+==================
+target_lua
+
+GLX_U: [Lua] a map entity that does what /scripts load | unload | reload <name> does, when it is used -- by a
+button, a trigger, a relay, a dialogue option, ICARUS, /entuse. "plugin" is the folder name, checked as
+/scripts checks it; "action" is load (the default), unload or reload. Spawnflags: 1 ONCE does it once per
+map, 128 INACTIVE as every target. It fires no target of its own: a load is only queued here, and the
+plugin's init is where what happens next belongs.
+
+It never runs script code and never touches a state: the use records the operation in the queue that
+/scripts uses, and RP_Lua_RunQueue carries it out at the end of the frame, outside any use chain and
+any script call (the first attempt's target_lua called into running scripts from the use chain; that is
+the nested-call path v2 has no more). A script cannot set one off: World.use skips the class
+(rp_lua_world.c), and a use made while a script call is on the stack -- a chain a World.use started --
+is refused here and counted. Whoever placed it had the power to (the mapper, the host's entity file,
+an admin with the Entity System power); /scripts keeps its own power check. With rp_lua off the use
+logs and does nothing, so a map with target_luas runs as it always did.
+==================
+*/
+#define RP_TLUA_ONCE	1
+
+static const char *const rpTargetLuaActions[] = { "load", "unload", "reload", NULL };	// ent->count
+
+void target_lua_use( gentity_t *self, gentity_t *other, gentity_t *activator )
+{
+	const char *who = ( activator && activator->client ) ? activator->client->pers.netname : "the map";
+	const char *tn = self->targetname ? self->targetname : "unnamed";
+	const char *said;
+
+	(void)other;
+	if ( self->flags & FL_INACTIVE )
+		return;
+	if ( RP_LUA_IN_CALL() )
+	{ // a script's World.use, or a chain one started: plugins are chosen by people (rp_lua_plugins, /scripts, this entity)
+		if ( rpLuaCurrent )
+			rpLuaCurrent->luaUsesHeld++;
+		G_LogPrintf( "target_lua %s (%d) refused: used from a script (%s)\n", tn, self->s.number, rpLuaCurrent ? rpLuaCurrent->name : "?" );
+		return;
+	}
+	if ( !rp_lua.integer )
+	{
+		G_LogPrintf( "target_lua %s (%d) used by %s^7: rp_lua is off, nothing done\n", tn, self->s.number, who );
+		return;
+	}
+	if ( ( self->spawnflags & RP_TLUA_ONCE ) && self->genericValue1 )
+		return;
+	G_ActivateBehavior( self, BSET_USE );
+	switch ( self->count )
+	{
+	case 1:		said = RP_LuaAdmin_Unload( self->message, RPLOP_UNLOAD ); break;
+	case 2:		said = RP_LuaAdmin_Reload( self->message ); break;
+	default:	said = RP_LuaAdmin_Load( self->message ); break;
+	}
+	G_LogPrintf( "target_lua %s (%d) used by %s^7, %s %s: %s", tn, self->s.number, who, rpTargetLuaActions[self->count], self->message, said );
+	if ( self->spawnflags & RP_TLUA_ONCE )
+		self->genericValue1 = 1;
+}
+
+void SP_target_lua( gentity_t *self )
+{
+	char *s;
+	int i;
+
+	G_SpawnString( "plugin", "", &s );
+	if ( !RP_Lua_ValidName( s ) )
+	{
+		G_LogPrintf( "target_lua at %s: \"%s\" is not a plugin name; not spawned\n", vtos( self->s.origin ), s );
+		RP_SpawnSaysWhy( self, "a target_lua needs a plugin name (letters, digits, '_' and '-', up to 32)" );
+		G_FreeEntity( self );
+		return;
+	}
+	self->message = G_NewString( s );
+	G_SpawnString( "action", "load", &s );
+	for ( i = 0; rpTargetLuaActions[i]; i++ )
+	{
+		if ( !Q_stricmp( s, rpTargetLuaActions[i] ) )
+			break;
+	}
+	if ( !rpTargetLuaActions[i] )
+	{
+		G_LogPrintf( "target_lua at %s: \"%s\" is not an action; not spawned\n", vtos( self->s.origin ), s );
+		RP_SpawnSaysWhy( self, "a target_lua's action is load, unload or reload" );
+		G_FreeEntity( self );
+		return;
+	}
+	self->count = i;
+	if ( RP_EntitySystemMade( self ) && i == 0 && !RP_Lua_PluginFileExists( self->message ) )
+	{ // one the entity commands place: the file now, as a target_level_change's map is checked; the map's own is logged at load
+		if ( RP_RefuseAtRuntime( self, va( "this server has no plugin \"%s\" (lua/plugins/%s/plugin.lua)", self->message, self->message ) ) )
+			return;
+	}
+	self->genericValue1 = 0;
+	if ( self->spawnflags & 128 )
+		self->flags |= FL_INACTIVE;
+	G_SetOrigin( self, self->s.origin );
+	self->use = target_lua_use;
 }

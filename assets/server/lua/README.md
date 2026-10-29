@@ -50,6 +50,14 @@ Stored data goes to `<mod folder>/database/lua.db`, beside `accounts.db`.
 Loads, unloads and reloads happen at the end of the current server frame,
 never inside a running script.
 
+A map, an entity file or `/entadd` can do the same with a **`target_lua`**
+entity (`plugin <name>`, `action load|unload|reload`, spawnflag 1 ONCE): a
+button, a trigger, a dialogue option or `/entuse` that uses it loads the
+plugin as `/scripts load` would, through the same checks, at the end of the
+frame. A quest plugin a map button starts, for example. A script cannot set
+one off: `World.use` skips it, and a chain a script started is refused when
+it reaches it. See `/enthelp target_lua`.
+
 From rcon: `lua_list [subcommand]` (the whole `/scripts` from the console),
 `lua_reload [name]`, and `lua <code>`, which runs one line in a throwaway
 state under the same rules and prints what it returns.

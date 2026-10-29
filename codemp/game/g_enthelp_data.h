@@ -2024,6 +2024,15 @@ static const rpEntHelp_t rp_ent_help[] = {
 		"targetname||Using it changes the map.",
 		"target_level_change targetname exit mapname mp/ffa1",
 		"common target" },
+	{ "target_lua", 0, NULL,
+		"Loads, unloads or reloads a server-side Lua plugin when it is used -- by a button, a trigger, a relay, a dialogue option, an ICARUS script or /entuse -- exactly as /scripts load|unload|reload does: the plugin is checked and started at the end of the frame, for this map (rp_lua_plugins is not changed). Who tripped it is logged. It fires no target of its own: the plugin's init is what happens next. A script cannot set it off: a plugin's World.use skips it, and a chain a script started is refused when it reaches it (logged); a target_delay in between fires later and is not refused, so do not put one behind a delay a script can reach. With rp_lua off it logs and does nothing.",
+		"1|ONCE|Does its action once per map, then ignores further uses.\n"
+		"128|INACTIVE|Does nothing until a target_activate wakes it.",
+		"plugin||Required: the plugin's folder name under lua/plugins (letters, digits, '_' and '-', up to 32). Placed with the entity commands, the server must have lua/plugins/<name>/plugin.lua, or it is refused.\n"
+		"action|load|load, unload or reload.\n"
+		"targetname||Using it does the action.",
+		"target_lua targetname startquest plugin quest",
+		"common target" },
 	{ "target_location", RP_EH_MAPONLY, "It only registers its name and removes itself at once, so there is nothing for the Entity System to keep, edit or save: locations belong in the map.",
 		"Names the area around it: team chat (say_team, and tells between teammates) and scripts asking for a location get the name of the nearest target_location in view (PVS). It registers the name and removes itself, so /entadd says it did not survive spawning and there is no entity left to edit or remove: the name stays until the map changes. At most 64 per map. With a targetname it is only a position marker instead.",
 		NULL,

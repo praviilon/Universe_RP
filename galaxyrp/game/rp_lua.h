@@ -30,6 +30,9 @@ qboolean RP_Lua_Command( struct gentity_s *ent, const char *cmd );
 void RP_Lua_CharacterRemoved( int charId );
 void RP_Lua_EventDialog( struct gentity_s *player, const char *dialogName, int dialogNum, int choice, const char *option, const char *reason );	// g_dialog.c: an answer, or why it closed
 void Cmd_Scripts_f( struct gentity_s *ent );
+void SP_target_lua( struct gentity_s *self );	// rp_lua_admin.c: the map entity that loads, unloads or reloads a plugin (g_spawn.c spawns[])
+void target_lua_use( struct gentity_s *self, struct gentity_s *other, struct gentity_s *activator );
+qboolean RP_Lua_ValidName( const char *name );	// a plugin folder name: letters, digits, '_' and '-', up to 32
 void Svcmd_Lua_f( void );
 void Svcmd_LuaReload_f( void );
 void Svcmd_LuaList_f( void );

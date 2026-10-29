@@ -95,6 +95,49 @@ int main( void )
 	rp_luaInCall--;
 	RP_LUA_SHUTDOWN();
 
+	// --- target_lua: the map entity that loads, unloads or reloads a plugin as /scripts does, queued for the frame end;
+	// spawn checks; ONCE and INACTIVE; refused from inside a script call and skipped by World.use; rp_lua off logs only
+	t_init( 8 ); t_player( 0, "Alice", qtrue, 7 );
+	t_write_plugin( "qst", "Events.on('init', function() Log.info('qst up') end)\n" );
+	t_write_plugin( "usr", "Commands.add('poke', function(p, a) U, S = World.use(a[1], p) end)\n" );
+	t_start( "usr" ); p = RP_Lua_Find( "usr" ); CHECK( p && p->L, "usr loaded" );
+	{ gentity_t *e; int tl, tlOnce, tlOff, k;
+	  // spawn checks
+	  t_keysClear(); e = &g_entities[t_mapEntity( "target_lua", "nolua", NULL )]; SP_target_lua( e ); CHECK( !e->inuse && strstr( level.rp_spawn_refusal, "plugin name" ), "no plugin key: refused (%s)", level.rp_spawn_refusal );
+	  t_keysClear(); t_key( "plugin", "../x" ); e = &g_entities[t_mapEntity( "target_lua", "badlua", NULL )]; SP_target_lua( e ); CHECK( !e->inuse, "a bad plugin name refused" );
+	  t_keysClear(); t_key( "plugin", "qst" ); t_key( "action", "explode" ); e = &g_entities[t_mapEntity( "target_lua", "badact", NULL )]; SP_target_lua( e ); CHECK( !e->inuse && strstr( level.rp_spawn_refusal, "action" ), "a bad action refused (%s)", level.rp_spawn_refusal );
+	  t_esMade = qtrue; t_keysClear(); t_key( "plugin", "nosuch" ); e = &g_entities[t_mapEntity( "target_lua", "nofile", NULL )]; SP_target_lua( e ); CHECK( !e->inuse && strstr( level.rp_spawn_refusal, "no plugin" ), "entity commands: a missing file refused (%s)", level.rp_spawn_refusal ); t_esMade = qfalse;
+	  t_keysClear(); t_key( "plugin", "nosuch" ); e = &g_entities[t_mapEntity( "target_lua", "mapnofile", NULL )]; SP_target_lua( e ); CHECK( e->inuse && e->use == target_lua_use, "the map's own with a missing file spawns (logged at use)" );
+	  // the real one
+	  t_keysClear(); t_key( "plugin", "qst" ); tl = t_mapEntity( "target_lua", "ql", NULL ); e = &g_entities[tl]; e->use = NULL; SP_target_lua( e ); CHECK( e->inuse && e->use == target_lua_use && e->count == 0 && !strcmp( e->message, "qst" ), "target_lua ql spawned (load qst)" );
+	  t_keysClear(); t_key( "plugin", "qst" ); t_key( "action", "unload" ); tlOnce = t_mapEntity( "target_lua", "qu", NULL ); e = &g_entities[tlOnce]; e->spawnflags = 1; e->use = NULL; SP_target_lua( e ); CHECK( e->inuse && e->count == 1, "qu: unload, ONCE" );
+	  t_keysClear(); t_key( "plugin", "qst" ); tlOff = t_mapEntity( "target_lua", "qi", NULL ); e = &g_entities[tlOff]; e->spawnflags = 128; e->use = NULL; SP_target_lua( e ); CHECK( e->inuse && ( e->flags & FL_INACTIVE ), "qi: INACTIVE" );
+	  // a player's use (a button): queued, loaded at the frame end, with the plugin's own init
+	  t_logLen = 0; t_log[0] = 0; GlobalUse( &g_entities[tl], &g_entities[0], &g_entities[0] );
+	  CHECK( !RP_Lua_Find( "qst" ) && t_log_has( "used by Alice" ) && t_log_has( "Loading qst" ), "used: queued, not loaded yet (%s)", t_log );
+	  t_frame( 50 ); CHECK( RP_Lua_Find( "qst" ) && RP_Lua_Find( "qst" )->L && t_log_has( "[lua:qst] qst up" ), "loaded at the frame end, init ran" );
+	  GlobalUse( &g_entities[tl], &g_entities[0], &g_entities[0] ); CHECK( t_log_has( "already running" ), "used again: already running" );
+	  // from inside a script call: refused and counted, not queued; World.use skips the class
+	  t_logLen = 0; t_log[0] = 0; p->tokens = RP_LUA_TOKENS; t_args( "poke ql" ); RP_LUA_COMMAND( &g_entities[0], "poke" );
+	  CHECK( get_int( p, "U" ) == 0 && get_int( p, "S" ) == 1 && !t_log_has( "target_lua" ), "World.use skips a target_lua (U %d S %d)", get_int( p, "U" ), get_int( p, "S" ) );
+	  rp_luaInCall++; rpLuaCurrent = p; GlobalUse( &g_entities[tlOnce], &g_entities[0], &g_entities[0] ); rpLuaCurrent = NULL; rp_luaInCall--;
+	  CHECK( t_log_has( "refused: used from a script (usr)" ) && p->luaUsesHeld == 1 && RP_Lua_Find( "qst" )->pendingOp == RPLOP_NONE && !g_entities[tlOnce].genericValue1, "a chain inside a script call: refused, counted, ONCE not spent" );
+	  // INACTIVE does nothing; ONCE does its unload once
+	  GlobalUse( &g_entities[tlOff], &g_entities[0], &g_entities[0] ); CHECK( RP_Lua_Find( "qst" )->pendingOp == RPLOP_NONE, "inactive: nothing" );
+	  GlobalUse( &g_entities[tlOnce], &g_entities[0], &g_entities[0] ); CHECK( RP_Lua_Find( "qst" )->pendingOp == RPLOP_UNLOAD && t_log_has( "will be unloaded" ), "qu: unload queued" );
+	  t_frame( 50 ); CHECK( !RP_Lua_Find( "qst" ), "unloaded at the frame end" );
+	  GlobalUse( &g_entities[tl], &g_entities[0], &g_entities[0] ); t_frame( 50 ); CHECK( RP_Lua_Find( "qst" ) && RP_Lua_Find( "qst" )->L, "loaded again by ql" );
+	  GlobalUse( &g_entities[tlOnce], &g_entities[0], &g_entities[0] ); CHECK( RP_Lua_Find( "qst" )->pendingOp == RPLOP_NONE, "qu is ONCE: the second use does nothing" );
+	  // reload
+	  t_keysClear(); t_key( "plugin", "qst" ); t_key( "action", "reload" ); k = t_mapEntity( "target_lua", "qr", NULL ); e = &g_entities[k]; e->use = NULL; SP_target_lua( e );
+	  { lua_State *L0 = RP_Lua_Find( "qst" )->L; GlobalUse( e, &g_entities[0], &g_entities[0] ); CHECK( RP_Lua_Find( "qst" )->pendingOp == RPLOP_RELOAD, "qr: reload queued" ); t_frame( 50 ); CHECK( RP_Lua_Find( "qst" )->L && RP_Lua_Find( "qst" )->L != L0, "reloaded: a fresh state" ); }
+	  // the map's own with a missing file: the load fails at the frame end, logged, nothing else
+	  t_logLen = 0; t_log[0] = 0;
+	  { gentity_t *m = NULL; while ( ( m = G_Find( m, FOFS( targetname ), "mapnofile" ) ) ) GlobalUse( m, &g_entities[0], &g_entities[0] ); } t_frame( 50 ); CHECK( t_log_has( "nosuch not loaded" ) && !RP_Lua_Find( "nosuch" ), "missing file: logged at the frame end" );
+	  // rp_lua off: logs, does nothing
+	  rp_lua.integer = 0; t_logLen = 0; t_log[0] = 0; GlobalUse( &g_entities[tl], &g_entities[0], &g_entities[0] ); CHECK( t_log_has( "rp_lua is off" ), "rp_lua off: logged" ); rp_lua.integer = 1; }
+	RP_LUA_SHUTDOWN();
+
 	printf( fails ? "%d FAILED\n" : "t_api: ALL OK\n", fails );
 	return fails != 0;
 }

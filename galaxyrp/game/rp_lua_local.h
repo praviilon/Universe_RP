@@ -161,6 +161,7 @@ typedef struct rpLuaPlugin_s {
 	int				uses, effects, sounds, spawnsRefused;
 	int				usesBusy, cmdsHeld, dbRefused;	// the stability guards (rp_lua_api.c)
 	int				eventsShort, eventsSkipped;		// event calls past the frame budget: with the 1 ms deadline, and not made
+	int				luaUsesHeld;					// target_lua uses made from inside this plugin's calls, refused
 } rpLuaPlugin_t;
 
 extern rpLuaPlugin_t rpLuaPlugins[RP_LUA_MAX_PLUGINS];
@@ -181,7 +182,7 @@ rpLuaPlugin_t *RP_Lua_NoPlugin( lua_State *L );	// raises: an API function reach
 void RP_Lua_Error( rpLuaPlugin_t *p, const char *msg );
 qboolean RP_Lua_QueueOp( const char *name, rpLuaOp_t op );
 qboolean RP_Lua_QueueLoad( const char *name );
-qboolean RP_Lua_ValidName( const char *name );
+qboolean RP_Lua_PluginFileExists( const char *name );	// lua/plugins/<name>/plugin.lua in the mod folder
 void RP_Lua_FireEvent( rpLuaEvent_t ev, void (*fill)( lua_State *L, void *ctx ), void *ctx );
 void RP_Lua_RefillTokens( rpLuaPlugin_t *p );
 void RP_Lua_FirePlugin( rpLuaPlugin_t *p, rpLuaEvent_t ev, void (*fill)( lua_State *L, void *ctx ), void *ctx );	// one plugin's handler

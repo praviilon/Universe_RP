@@ -660,8 +660,8 @@ World.use( targetname, player )
 
 Every entity with that targetname, through GlobalUse() with the player as activator: the lock check with
 the player's account (no bypass, no pass mark), the stock depth and chain limits, the map's own chain
-after it. NPCs and vehicles (using one boards it), held entities and those without a use are skipped, as
-/entuse skips them. The entity_used event does not fire for a use made by a script (rpLuaCurrent).
+after it. NPCs and vehicles (using one boards it), held entities, those without a use and target_luas (a script may
+not load plugins) are skipped, as /entuse skips the first ones. The entity_used event does not fire for a use made by a script (rpLuaCurrent).
 A chain may reach a target_reward or a target_dialog: it pays or opens for the player, as for a button --
 how much and how often is the server host's design. Every use takes room in the player's allowance
 (RP_LUA_SENDS_PER_SEC, shared with Msg.*), and what the chain sends that player, or writes to the database,
@@ -699,8 +699,8 @@ static int RP_LuaWorld_Use( lua_State *L )
 		e = &g_entities[found[i]];
 		if ( !e->inuse || !e->targetname || Q_stricmp( e->targetname, name ) )
 			continue;	// gone, or another entity now, since the search
-		if ( RP_EntityIsCharacter( e ) || e->rpHeldBy || !e->use )
-		{
+		if ( RP_EntityIsCharacter( e ) || e->rpHeldBy || !e->use || ( e->classname && !Q_stricmp( e->classname, "target_lua" ) ) )
+		{ // a target_lua loads plugins: people choose those (rp_lua_plugins, /scripts, the entity itself), never a script
 			skipped++;
 			continue;
 		}
