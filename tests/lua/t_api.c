@@ -145,6 +145,7 @@ int main( void )
 	  // rp_lua off: logs, does nothing
 	  rp_lua.integer = 0; t_logLen = 0; t_log[0] = 0; GlobalUse( &g_entities[tl], &g_entities[0], &g_entities[0] ); CHECK( t_log_has( "rp_lua is off" ), "rp_lua off: logged" ); rp_lua.integer = 1; }
 	RP_LUA_SHUTDOWN();
+	t_init( 8 );	// TEST ONLY: frees what the stubs still hold (G_NewString copies): valgrind ends with nothing reachable
 
 	printf( fails ? "%d FAILED\n" : "t_api: ALL OK\n", fails );
 	return fails != 0;
