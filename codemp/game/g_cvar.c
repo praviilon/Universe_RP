@@ -437,6 +437,35 @@ void RP_CVU_jediVmerc(void)
 	trap->Cvar_Update(&g_jediVmerc);
 }
 
+// GLX_U: [Flood Protection] the engine's sv_floodProtect is pinned at RP_FLOOD_PROTECT_MS (150, rp_public.h).
+// The engine (TaystJK, as OpenJK) ignores a command a client sends within that many milliseconds of its
+// previous one; 1, its default, means 1000. The mod is built for 150: a menu answer (/dialog), the
+// dialogue chains, the client's Extras list paging (RPX_FloodGap, cg_rpextras.c, paces by the same
+// constant) and the Lua action bucket (one token per sv_floodProtect ms, rp_lua_core.c) all assume it,
+// and at 1000 a quick answer is lost while the menu has already closed. It used to be a line in the
+// server config that a host could leave out or raise; now the game holds it, as it holds g_debugMelee.
+//
+// The cvar is the engine's: the game registers it with the engine's own flag (CVAR_ARCHIVE in TaystJK,
+// which keeps it out of the serverinfo -- the client does not read it from there) and sets it through
+// Cvar_VM_Set(), which refuses only CVAR_PROTECTED cvars. The engine reads sv_floodProtect->integer on
+// every client command, so a value put back here applies at once.
+//
+// Written like RP_CVU_debugMelee: guarded, and silent. sv_floodProtect is not CVAR_LATCH, so a wrong
+// value is already in force when this runs and there is nothing queued to clear (the reason
+// RP_CVU_jediVmerc is unconditional does not apply). The test is on the string, so "150.5", "0150" or
+// junk are put back too. G_RegisterCvars() runs it at registration, at the top of G_InitGame() before
+// any client spawns, so a config line or an archived value is corrected before the first frame; a change
+// from the console or rcon is put back by G_UpdateCvars() on the next frame. Its own Cvar_Set() bumps the
+// modification count once more; the next call finds the value right and does nothing.
+void RP_CVU_floodProtect(void)
+{
+	if (strcmp(sv_floodProtect.string, XSTRING(RP_FLOOD_PROTECT_MS)))
+	{
+		trap->Cvar_Set("sv_floodProtect", XSTRING(RP_FLOOD_PROTECT_MS));
+		trap->Cvar_Update(&sv_floodProtect);
+	}
+}
+
 // GalaxyRP fix: [Scoreboard] timelimit, fraglimit, capturelimit and duel_fraglimit are pinned at 0.
 // Maps on an RP server are not meant to end on their own, and since the scoreboard switched to
 // downs/deaths the kill score these limits were built around is no longer counted (AddScore() in

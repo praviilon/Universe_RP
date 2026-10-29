@@ -248,6 +248,7 @@ XCVAR_DEF( pmove_float,					"0",			NULL,				CVAR_SYSTEMINFO|CVAR_ARCHIVE,					qt
 XCVAR_DEF( pmove_msec,					"8",			NULL,				CVAR_SYSTEMINFO|CVAR_ARCHIVE,					qtrue )
 XCVAR_DEF( RMG,							"0",			NULL,				CVAR_NONE,										qtrue )
 XCVAR_DEF( sv_cheats,					"1",			NULL,				CVAR_NONE,										qfalse )
+XCVAR_DEF( sv_floodProtect,				XSTRING( RP_FLOOD_PROTECT_MS ),	RP_CVU_floodProtect,	CVAR_ARCHIVE,				qfalse )	// GLX_U: [Flood Protection] the engine's, held at RP_FLOOD_PROTECT_MS (g_cvar.c); not announced: a wrong value is put back on the next frame
 XCVAR_DEF( sv_fps,						"40",			NULL,				CVAR_ARCHIVE|CVAR_SERVERINFO,					qtrue )
 XCVAR_DEF( sv_maxclients,				"8",			NULL,				CVAR_SERVERINFO|CVAR_LATCH|CVAR_ARCHIVE,		qfalse )
 // GalaxyRP: [Saber RGB] capability advertisement for TaystJK clients, which is what most players

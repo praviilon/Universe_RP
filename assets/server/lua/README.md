@@ -76,7 +76,7 @@ however written, costs the server a bounded amount.
 | all calls in one frame | 20 ms (50 ms for all plugins together) | timers wait for the next frame; events and commands still run, with a 1 ms deadline; past twice the budget they are not run (`init` and `shutdown` always are) |
 | memory | `rp_lua_memkb` | "not enough memory" in the call |
 | errors | 20 in 60 s | the plugin is switched off (`/scripts enable` brings it back) |
-| actions (`Msg.*`, `World.use/prop/npc/vehicle`, `Effect.play`, `Sound.play`) | one bucket of 4, one token back per `sv_floodProtect` ms | `false, "too fast"` |
+| actions (`Msg.*`, `World.use/prop/npc/vehicle`, `Effect.play`, `Sound.play`) | one bucket of 4, one token back every 150 ms (`sv_floodProtect`, fixed by the game) | `false, "too fast"` |
 | props / NPCs / vehicles alive | 32 / 8 / 6 | `false, "too many props"` / `"too many npcs"` / `"too many vehicles"` |
 | spawns per map | 128 props (16 of them dialogues) / 32 NPCs / 24 vehicles | `false, "spawn limit for this map"` |
 | script vehicles on the server | 24, all plugins and released ones together | `false, "too many vehicles on the server"` |

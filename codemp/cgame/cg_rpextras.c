@@ -7,7 +7,7 @@ two work together. Here:
 - "rpx list <kind>": gets the listing of the kind's current folder (ui_rpx_dir_<kind>) from the server
   (/rpxlist, g_rplist.c), keeps it until the map changes, and hands it to the ui through a list file
   (rpxListFiles in rp_extras.h). The server sends a listing in batches and the next batch is asked for only when one
-  has arrived, spaced by the server's sv_floodProtect: a request that comes sooner is ignored by the
+  has arrived, spaced by the server's sv_floodProtect (RP_FLOOD_PROTECT_MS, which the game holds it at): a request that comes sooner is ignored by the
   server without a word. A request with no answer is sent again; "busy" (the server is building
   another listing) is asked again a moment later.
 - "rpx do <action>": the command a menu button stands for, built here from the menu's cvars and
@@ -141,26 +141,17 @@ static int RPX_KindByName( const char *name ) {
 	return -1;
 }
 
-// the gap the server's sv_floodProtect wants between two commands from one client, with room to spare
+// the gap the server's sv_floodProtect wants between two commands from one client, with room to spare.
+// GLX_U: [Flood Protection] the game holds sv_floodProtect at RP_FLOOD_PROTECT_MS (rp_public.h), so the
+// value is known here. It used to be read from the serverinfo, which TaystJK's engine does not put it
+// in: the client found nothing, paced at 50 ms, and the server ignored the requests that came too soon.
 static int RPX_FloodGap( void ) {
-	const char *info = CG_ConfigString( CS_SERVERINFO );
-	int v = atoi( Info_ValueForKey( info, "sv_floodProtect" ) );
-
-	if ( v <= 0 ) {
-		return 50;
-	}
-	if ( v == 1 ) {
-		v = 1000;
-	}
-	if ( v > 20000 ) {
-		v = 20000;
-	}
-	return v + 60;
+	return RP_FLOOD_PROTECT_MS + 60;
 }
 
 // the gap is from the last command to the server this client sent, and not only the ones sent from
 // here count: the ui stamps ui_rpx_sent when a menu of its sends one (the Galaxy RP menu's "zykmod"
-// as it opens). With sv_floodProtectSlow a command that comes too soon is not only ignored, it
+// as it opens). With sv_floodProtectSlow (TaystJK: sv_newfloodProtect) a command that comes too soon is not only ignored, it
 // starts the wait again.
 static qboolean RPX_CanSend( int now ) {
 	int gap = RPX_FloodGap();

@@ -3291,6 +3291,7 @@ void RP_CVU_rpgMaxLevel(void);
 void RP_CVU_startingShield(void);
 void RP_CVU_debugMelee(void);
 void RP_CVU_jediVmerc(void);
+void RP_CVU_floodProtect(void);	// GLX_U: [Flood Protection] sv_floodProtect held at RP_FLOOD_PROTECT_MS
 void RP_CVU_timelimit(void);
 void RP_CVU_fraglimit(void);
 void RP_CVU_capturelimit(void);
