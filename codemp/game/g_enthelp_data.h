@@ -2131,7 +2131,7 @@ static const rpEntHelp_t rp_ent_help[] = {
 		"target_screenshake targetname quake intensity 20 duration 1500",
 		"common target" },
 	{ "target_scriptrunner", 0, NULL,
-		"Runs its usescript (an ICARUS script) when used, on itself or, with RUNONACTIVATOR, on whoever used it. It runs count times at most, can wait delay seconds before running, and ignores uses during its wait.",
+		"Runs its usescript (an ICARUS script) when used, on itself or, with RUNONACTIVATOR, on whoever used it. It runs count times at most, can wait delay seconds before running, and ignores uses during its wait. A server-side script cannot set it off: a plugin's World.use skips it.",
 		"1|RUNONACTIVATOR|Runs the script on the activator instead of on the scriptrunner. Works on any activator: players, NPCs and any networked entity, which is prepared for scripts if it is not yet (given a script name). Not on a logical entity, nor the world.\n"
 		"128|INACTIVE|Starts inactive: other entities cannot use it until a target_activate names it.",
 		"usescript||The script to run, given without the scripts/ folder (it is added).\n"

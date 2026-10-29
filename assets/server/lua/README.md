@@ -191,11 +191,11 @@ Sound.play("sound/x.wav", origin)
 meets any lock on the entity (a script is not an admin), the stock chain
 limits apply, and what the entity does to its activator is what it does
 to anyone — a `target_teleporter` moves them, a `target_give` gives them
-the map's items, a `target_kill` kills them. NPCs, vehicles, held entities
-and entities with no use are skipped. It returns `used, skipped`. A chain
-may reach a `target_reward` (it pays the player, as a button would: its own
-`wait`, `playerwait`, ONCE and ONCE_EACH apply, and the log line names the
-plugin) or a `target_dialog` (it opens for the player; the answer is the
+the map's items, a `target_kill` kills them. NPCs, vehicles, held entities,
+entities with no use, `target_lua` and `target_scriptrunner` are skipped.
+It returns `used, skipped`. A chain may reach a `target_reward` (it pays
+the player, as a button would: its own `wait`, `playerwait`, ONCE and
+ONCE_EACH apply, and the log line names the plugin) or a `target_dialog` (it opens for the player; the answer is the
 player's own `/dialog`, so whatever the option fires runs as their action).
 Each `World.use` takes one of the player's four a second (`"player busy"`).
 
@@ -207,11 +207,12 @@ weapons, ammo, items, dispensers and racks, `misc_model_breakable`,
 `target_dialog`, `target_reward`, `target_flag`, `target_play_music`,
 `target_teleporter`, `target_position` and `target_level_change` (see
 `/enthelp` for their keys). The keys are the class's own, as for
-`/entadd`, except `targetname`, `script_targetname`, `team`, `lock` and
-the spawner reward keys, which are refused. A script's entity is named
-`lua.<plugin>.<name>` when `{name=...}` is given, so it can never take a map
-entity's name; admins reach it by that name (`/npc kill lua.quest.guard`,
-`/entuse`).
+`/entadd`, except `targetname`, `script_targetname`, `team`, `lock`,
+the spawner reward keys and the ICARUS keys (any ending in `script`,
+`parm1`-`parm16`, `delayscripttime`, `roffname`, `rofftarget`), which are
+refused. A script's entity is named `lua.<plugin>.<name>` when
+`{name=...}` is given, so it can never take a map entity's name; admins
+reach it by that name (`/npc kill lua.quest.guard`, `/entuse`).
 
 **A script's entities link only to each other.** Every link key — `target`
 to `target6`, `paintarget`, `opentarget`, `closetarget`, `npc_target`, and a

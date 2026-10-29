@@ -144,6 +144,9 @@ int main( void )
 	run( p, "bad misc_model_ghoul lock x" ); CHECK( strstr( get_str( p, "E" ), "not allowed" ), "lock (the spawn key of rpLock) refused" );
 	run( p, "bad misc_model_ghoul npcxp 5" ); CHECK( strstr( get_str( p, "E" ), "not allowed" ), "npcxp refused" );
 	run( p, "bad misc_model_ghoul targetname x" ); CHECK( strstr( get_str( p, "E" ), "not allowed" ), "targetname key refused" );
+	// AUDIT 3 H1: no ICARUS from a script's entity: any key ending in "script", any starting with "parm", and three by name
+	{ static const char *icarus[] = { "spawnscript", "usescript", "deathscript", "victoryscript", "SpawnScript", "parm1", "parm16", "delayscripttime", "roffname", "rofftarget", NULL };
+	  int k; for ( k = 0; icarus[k]; k++ ) { run( p, va( "bad misc_model_breakable %s vjun3/outro", icarus[k] ) ); CHECK( get_int( p, "OK2" ) == 0 && strstr( get_str( p, "E" ), "not allowed" ), "%s refused: %s", icarus[k], get_str( p, "E" ) ); } }
 	run( p, "bad misc_model_ghoul mins 1_2" ); CHECK( strstr( get_str( p, "E" ), "three numbers" ), "vector key checked: %s", get_str( p, "E" ) );
 	run( p, "bad misc_model_ghoul 9key x" ); CHECK( strstr( get_str( p, "E" ), "not a key" ), "key syntax: %s", get_str( p, "E" ) );
 	run( p, "bad misc_model_ghoul model a\"b" ); CHECK( strstr( get_str( p, "E" ), "quote" ), "quote in a value refused" );
@@ -166,6 +169,12 @@ int main( void )
 	    CHECK( n >= 0 && v && !strcmp( v, "lua.pr.vault_door" ), "%s prefixed: %s", keys[k], v ? v : "(none)" ); } }
 	  refill( p ); run( p, "bad fx_runner npc_target2 door.1" ); CHECK( strstr( get_str( p, "E" ), "'npc_target2' is a name" ), "a dotted npc_target2 refused" ); }
 	// AUDIT 2 H1: the shader remap keys are refused
+	// AUDIT 3 H1: World.use skips a target_scriptrunner (ICARUS is the map's and the admins' choice), as it skips a target_lua
+	{ int sr = t_mapEntity( "target_scriptrunner", "runner", NULL ), rl = t_mapEntity( "target_relay", "runner", NULL );
+	  t_frame( 1000 ); refill( p ); run( p, "use runner" );
+	  CHECK( get_int( p, "U" ) == 1 && get_int( p, "S" ) == 1 && t_usedCount[sr] == 0 && t_usedCount[rl] == 1, "World.use: the relay used, the scriptrunner skipped (U %d S %d, %d %d)", get_int( p, "U" ), get_int( p, "S" ), t_usedCount[sr], t_usedCount[rl] );
+	  GlobalUse( &g_entities[sr], &g_entities[0], &g_entities[0] ); CHECK( t_usedCount[sr] == 1, "a player's own use of it still goes through" ); }
+	refill( p ); run( p, "bad misc_model_breakable scriptless 1" ); CHECK( get_int( p, "OK2" ) == 1 && !strstr( get_str( p, "E" ), "not allowed" ), "a key only containing the word is not refused: %s", get_str( p, "E" ) );	// (AUDIT 3 H1)
 	run( p, "bad misc_model_ghoul targetshadername textures/x" ); CHECK( strstr( get_str( p, "E" ), "not allowed" ), "targetshadername refused" );
 	run( p, "bad misc_model_ghoul targetShaderNewName textures/y" ); CHECK( strstr( get_str( p, "E" ), "not allowed" ), "targetshadernewname refused" );
 	// AUDIT M9: the option tables are read raw: an __index metamethod never runs inside a spawn

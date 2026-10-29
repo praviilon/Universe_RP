@@ -660,8 +660,8 @@ World.use( targetname, player )
 
 Every entity with that targetname, through GlobalUse() with the player as activator: the lock check with
 the player's account (no bypass, no pass mark), the stock depth and chain limits, the map's own chain
-after it. NPCs and vehicles (using one boards it), held entities, those without a use and target_luas (a script may
-not load plugins) are skipped, as /entuse skips the first ones. The entity_used event does not fire for a use made by a script (rpLuaCurrent).
+after it. NPCs and vehicles (using one boards it), held entities, those without a use, target_luas (a script may
+not load plugins) and target_scriptrunners (nor run ICARUS) are skipped, as /entuse skips the first ones. The entity_used event does not fire for a use made by a script (rpLuaCurrent).
 A chain may reach a target_reward or a target_dialog: it pays or opens for the player, as for a button --
 how much and how often is the server host's design. Every use takes room in the player's allowance
 (RP_LUA_SENDS_PER_SEC, shared with Msg.*), and what the chain sends that player, or writes to the database,
@@ -699,8 +699,10 @@ static int RP_LuaWorld_Use( lua_State *L )
 		e = &g_entities[found[i]];
 		if ( !e->inuse || !e->targetname || Q_stricmp( e->targetname, name ) )
 			continue;	// gone, or another entity now, since the search
-		if ( RP_EntityIsCharacter( e ) || e->rpHeldBy || !e->use || ( e->classname && !Q_stricmp( e->classname, "target_lua" ) ) )
-		{ // a target_lua loads plugins: people choose those (rp_lua_plugins, /scripts, the entity itself), never a script
+		if ( RP_EntityIsCharacter( e ) || e->rpHeldBy || !e->use ||
+			( e->classname && ( !Q_stricmp( e->classname, "target_lua" ) || !Q_stricmp( e->classname, "target_scriptrunner" ) ) ) )
+		{ // a target_lua loads plugins: people choose those (rp_lua_plugins, /scripts, the entity itself), never a script;
+		  // GLX_U fix: [Lua] a target_scriptrunner runs ICARUS, the map's and the admins' choice in the same way
 			skipped++;
 			continue;
 		}
@@ -731,6 +733,10 @@ static const char *const rpLuaRefusedKeys[] = {
 	"targetname", "script_targetname", "npc_targetname", "team",	// the name is opts.name; ICARUS and the mover teams are the map's
 	"rpLock", "lock", "npccredits", "npcxp",	// "lock" is the spawn key of rpLock (g_spawn.c): a server lock is the map's
 	"targetshadername", "targetshadernewname",	// a shader remap for everyone, a configstring on every firing: the map's business
+	// GLX_U fix: [Lua] the ICARUS keys every class understands (g_spawn.c's field table) that are not caught by the
+	// rule in RP_LuaWorld_KeyRefused (a key ending in "script", one starting with "parm"): the delay before the
+	// delayed script, and a ROFF move played on the entity
+	"delayscripttime", "roffname", "rofftarget",
 	NULL
 };
 // a link key: its value is a plain name of one of this plugin's own entities, stored as lua.<plugin>.<name>, so a
@@ -765,8 +771,19 @@ static qboolean RP_LuaWorld_KeyOk( const char *key )
 
 static qboolean RP_LuaWorld_KeyRefused( const char *key )
 {
+	size_t len = strlen( key );
 	int i;
 
+	// GLX_U fix: [Lua] no ICARUS from a script's entity. Every class takes the behaviour-set keys (spawnscript,
+	// usescript, painscript, deathscript, ... -- each ends in "script") and parm1-parm16, and the spawn starts a
+	// spawnscript at once (zyk_main_spawn_entity): any .IBI on the server ran on a plugin's prop -- the default
+	// assets' vjun3/outro and t2_wedge/beacon1 slow the whole server (timescale 0.1, 0.3) -- outside World.use's
+	// guards, removing map entities by name. ICARUS is the mapper's and the admins' tool. A rule, not a list, so
+	// a behaviour set added later is refused too; no other key ends in "script" or starts with "parm".
+	if ( len >= 6 && !Q_stricmp( key + len - 6, "script" ) )
+		return qtrue;
+	if ( !Q_stricmpn( key, "parm", 4 ) )
+		return qtrue;
 	for ( i = 0; rpLuaRefusedKeys[i]; i++ )
 	{
 		if ( !Q_stricmp( key, rpLuaRefusedKeys[i] ) )
