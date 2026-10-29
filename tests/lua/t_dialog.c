@@ -73,7 +73,10 @@ int main( void )
 	GlobalUse( &g_entities[d], &g_entities[0], &g_entities[0] ); g_entities[0].client->ps.legsAnim = 999; frames( 500 ); CHECK( level.rpDialog[0].id == 0, "knockdown closes" ); g_entities[0].client->ps.legsAnim = 0;
 	GlobalUse( &g_entities[d], &g_entities[0], &g_entities[0] ); g_entities[0].client->sess.sessionTeam = TEAM_SPECTATOR; frames( 500 ); CHECK( level.rpDialog[0].id == 0, "spectator closes" ); g_entities[0].client->sess.sessionTeam = TEAM_FREE;
 	GlobalUse( &g_entities[d], &g_entities[0], &g_entities[0] ); RP_DialogPlayerGone( 0, qtrue ); CHECK( level.rpDialog[0].id == 0 && t_log_has( ": left" ), "disconnect closes" );
-	GlobalUse( &g_entities[d], &g_entities[0], &g_entities[0] ); { int first = level.rpDialog[0].id; GlobalUse( &g_entities[d], &g_entities[0], &g_entities[0] ); CHECK( level.rpDialog[0].id == first + 1 && t_log_has( ": replaced" ), "another opens: replaced" ); }
+	t_key( "message", "Other?" ); t_key( "option1", "x" ); { int d2 = spawn_dialog( "other", NULL, 0 ); GlobalUse( &g_entities[d], &g_entities[0], &g_entities[0] ); { int first = level.rpDialog[0].id; GlobalUse( &g_entities[d2], &g_entities[0], &g_entities[0] ); CHECK( level.rpDialog[0].id == first + 1 && t_log_has( ": replaced" ), "another opens: replaced" ); } dialog_cmd( 0, "dialog 0" ); }
+	// AUDIT H2: the same dialogue used again while open (a USE_BUTTON trigger held down) goes on: same id, nothing sent, the clock refreshed
+	GlobalUse( &g_entities[d], &g_entities[0], &g_entities[0] ); { int first = level.rpDialog[0].id, dl = level.rpDialog[0].deadline; frames( 2000 ); clear_sent(); GlobalUse( &g_entities[d], &g_entities[0], &g_entities[0] );
+	  CHECK( level.rpDialog[0].id == first && t_nsent[0] == 0 && level.rpDialog[0].deadline == dl + 2000, "used again while open: refreshed, not replaced (id %d/%d, sent %d)", level.rpDialog[0].id, first, t_nsent[0] ); }	// left open for the next check
 	{ rpDialogDef_t *def = g_entities[d].rpDialogDef; g_entities[d].rpDialogDef = NULL; frames( 500 ); CHECK( level.rpDialog[0].id == 0 && t_log_has( ": gone" ), "the entity respawned: gone" ); g_entities[d].rpDialogDef = def; }
 	CHECK( t_usedCount[door] == 1, "none of these fired an option" );
 
@@ -104,7 +107,7 @@ int main( void )
 	// --- the Lua notification: dialog_answer for an answer (after the option fired) and for every other end
 	t_init( 8 ); t_player( 0, "Alice", qtrue, 7 ); t_player( 1, "Bob", qtrue, 8 ); g_entities[0].client->pers.enterTime = 100;
 	t_write_plugin( "dl", "L = {} Events.on('dialog_answer', function(e) L[#L+1] = e.dialog .. ' ' .. e.entity.number .. ' ' .. tostring(e.choice) .. ' ' .. tostring(e.option) .. ' ' .. e.reason .. ' ' .. (e.player.name or '?') end)\n" );
-	t_start( "dl" ); { rpLuaPlugin_t *pl = RP_Lua_Find( "dl" ); CHECK( pl && pl->L, "plugin loaded" );
+	t_start( "dl" ); { rpLuaPlugin_t *pl = RP_Lua_Find( "dl" ); int D2 = -1; CHECK( pl && pl->L, "plugin loaded" );
 	  door = t_mapEntity( "func_door", "door2", NULL ); t_key( "message", "Open?" ); t_key( "option1", "Yes please" ); t_key( "go1", "door2" ); t_key( "option2", "No" ); t_key( "timeout", "5" ); t_key( "range", "100" );
 	  d = spawn_dialog( "gate", "bye2", 0 ); { int bye2 = t_mapEntity( "target_print", "bye2", NULL ); (void)bye2; }
 	  // an answer: the event comes after the door was used
@@ -114,10 +117,11 @@ int main( void )
 	  GlobalUse( &g_entities[d], &g_entities[0], &g_entities[0] ); dialog_cmd( 0, "dialog 0" );
 	  GlobalUse( &g_entities[d], &g_entities[0], &g_entities[0] ); frames( 5500 );
 	  GlobalUse( &g_entities[d], &g_entities[0], &g_entities[0] ); g_entities[0].client->ps.origin[0] = 500; frames( 500 ); g_entities[0].client->ps.origin[0] = 0;
-	  GlobalUse( &g_entities[d], &g_entities[0], &g_entities[0] ); GlobalUse( &g_entities[d], &g_entities[0], &g_entities[0] ); dialog_cmd( 0, "dialog 2" );
+	  { int d2; t_key( "message", "Open?" ); t_key( "option1", "Yes please" ); t_key( "go1", "door2" ); t_key( "option2", "No" ); t_key( "timeout", "5" ); t_key( "range", "100" ); d2 = spawn_dialog( "gate2", NULL, 0 );
+	    GlobalUse( &g_entities[d], &g_entities[0], &g_entities[0] ); GlobalUse( &g_entities[d2], &g_entities[0], &g_entities[0] ); dialog_cmd( 0, "dialog 2" ); D2 = d2; }
 	  GlobalUse( &g_entities[d], &g_entities[0], &g_entities[0] ); RP_DialogPlayerGone( 0, qtrue );
 	  { lua_State *L = pl->L; const char *tails[] = { "nil nil cancelled Alice", "nil nil timeout Alice", "nil nil away Alice", "nil nil replaced Alice", "2 No answered Alice", "nil nil left Alice" }; char exp[6][64]; int k;
-	    for ( k = 0; k < 6; k++ ) Com_sprintf( exp[k], sizeof( exp[k] ), "gate %d %s", d, tails[k] );
+	    for ( k = 0; k < 6; k++ ) Com_sprintf( exp[k], sizeof( exp[k] ), k == 4 ? "gate2 %d %s" : "gate %d %s", k == 4 ? D2 : d, tails[k] );
 	    lua_getglobal( L, "L" ); CHECK( (int)lua_rawlen( L, -1 ) == 7, "7 events: %d", (int)lua_rawlen( L, -1 ) );
 	    for ( k = 0; k < 6; k++ ) { lua_rawgeti( L, -1, k + 2 ); CHECK( lua_tostring( L, -1 ) && !strcmp( lua_tostring( L, -1 ), exp[k] ), "event %d: %s (wanted %s)", k + 2, lua_tostring( L, -1 ) ? lua_tostring( L, -1 ) : "nil", exp[k] ); lua_pop( L, 1 ); } lua_pop( L, 1 ); }
 	  CHECK( t_usedCount[door] == 1 && pl->errorsTotal == 0, "the door opened once, no script errors (%d)", pl->errorsTotal );
@@ -145,7 +149,7 @@ int main( void )
 	  t_args( "talk quest" ); RP_LUA_COMMAND( &g_entities[0], "talk" ); CHECK( level.rpDialog[0].id == 0, "no room for two commands: not opened" );
 	  GlobalUse( &g_entities[dq], &g_entities[0], &g_entities[0] ); id = level.rpDialog[0].id; CHECK( id > 0, "Alice's own use opens it" );
 	  t_args( "talk quest" ); RP_LUA_COMMAND( &g_entities[0], "talk" ); CHECK( level.rpDialog[0].id == id, "a script's use without room leaves the open one untouched" );
-	  frames( 1000 ); t_args( "talk quest" ); RP_LUA_COMMAND( &g_entities[0], "talk" ); CHECK( level.rpDialog[0].id > id, "a second later it opens (replacing): %d", level.rpDialog[0].id );
+	  frames( 1000 ); t_args( "talk quest" ); RP_LUA_COMMAND( &g_entities[0], "talk" ); CHECK( level.rpDialog[0].id == id && level.rpDialog[0].deadline > level.time + 29000, "a second later the same dialogue is refreshed, not replaced: %d", level.rpDialog[0].id );
 	  RP_LUA_SHUTDOWN(); }
 
 	// --- a plugin's own quest: its dialogue (real g_dialog.c), reward and flag, spawned by World.prop; opened by its own
@@ -216,6 +220,21 @@ int main( void )
 	  t_logLen = 0; t_log[0] = 0; pl->tokens = RP_LUA_TOKENS; t_args( "talk pa" ); RP_LUA_COMMAND( &g_entities[0], "talk" );
 	  CHECK( level.rpDialog[0].entNum == da && t_log_has( "dialog_answer event raised inside a script call: not delivered" ) && !t_log_has( "nested script call refused" ), "a script's replacement: no event, logged as not delivered, not as a C bug" );
 	  RP_LUA_SHUTDOWN(); }
+
+	// --- AUDIT M1: a need-gated option is refused at answer time when the flag went away while the dialogue was open
+	t_init( 8 ); t_player( 0, "Alice", qtrue, 7 ); g_entities[0].client->pers.enterTime = 100;
+	{ int dg, fset, fclr, gated = t_mapEntity( "func_door", "gdoor", NULL ), plain = t_mapEntity( "func_door", "pdoor", NULL );
+	  fset = spawn_flag( "fset", "key", 0 ); fclr = spawn_flag( "fclr", "key", 1 );
+	  t_key( "message", "G?" ); t_key( "option1", "Use the key" ); t_key( "need1", "key" ); t_key( "go1", "gdoor" ); t_key( "option2", "Chat" ); t_key( "go2", "pdoor" ); dg = spawn_dialog( "gd", NULL, 0 );
+	  GlobalUse( &g_entities[fset], &g_entities[0], &g_entities[0] ); GlobalUse( &g_entities[dg], &g_entities[0], &g_entities[0] ); CHECK( level.rpDialog[0].numShown == 2, "with the flag both options are offered" );
+	  GlobalUse( &g_entities[fclr], &g_entities[0], &g_entities[0] ); CHECK( !RP_FlagHas( &g_entities[0], "key" ), "the flag cleared while open" );
+	  { int id = level.rpDialog[0].id; clear_sent(); dialog_cmd( 0, "dialog 1" );
+	    CHECK( t_usedCount[gated] == 0 && strstr( sent_with( 0, "no longer" ), "no longer open" ) && level.rpDialog[0].id > id && level.rpDialog[0].numShown == 1 && level.rpDialog[0].shown[0] == 1, "'1' refused, the dialogue reopened with the options held now (%d shown)", level.rpDialog[0].numShown ); }
+	  dialog_cmd( 0, "dialog 1" ); CHECK( t_usedCount[plain] == 1 && t_usedCount[gated] == 0, "'1' is now Chat" );
+	  // every option gated and gone: it closes
+	  t_key( "message", "V?" ); t_key( "option1", "VIP" ); t_key( "need1", "key" ); { int dv = spawn_dialog( "vd", NULL, 0 );
+	    GlobalUse( &g_entities[fset], &g_entities[0], &g_entities[0] ); GlobalUse( &g_entities[dv], &g_entities[0], &g_entities[0] ); GlobalUse( &g_entities[fclr], &g_entities[0], &g_entities[0] );
+	    dialog_cmd( 0, "dialog 1" ); CHECK( level.rpDialog[0].id == 0 && t_log_has( ": gone" ), "nothing left to say: closed" ); } }
 
 	t_init( 8 );	// TEST ONLY: frees what the stubs still hold (spawned strings, NPC clients): valgrind ends with nothing reachable
 	printf( fails ? "%d FAILED\n" : "t_dialog: ALL OK\n", fails );

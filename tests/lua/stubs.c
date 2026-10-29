@@ -171,6 +171,7 @@ void GlobalUse( gentity_t *self, gentity_t *other, gentity_t *activator )
 	if ( !self || ( self->flags & FL_INACTIVE ) || !self->use ) return;
 	if ( other != self && t_locked[self->s.number] && activator && activator->client ) return;
 	if ( t_useDepth == 0 ) t_useChain = 0;
+	if ( !RP_LUA_CHAIN_ROOM( t_useChain ) ) return;	// as the real one: a chain a script started stops at RP_LUA_USE_CHAIN
 	if ( t_useDepth >= 128 || t_useChain >= 2048 ) { t_useRefused++; return; }
 	t_useDepth++; t_useChain++;
 	s_Use( self, other, activator );

@@ -6,6 +6,7 @@
 #define RP_LUA_LIMIT_MS 60
 
 typedef struct { const char *name; const char *code; } shape_t;
+static const char *get_str( rpLuaPlugin_t *p, const char *name ) { static char b[512]; lua_getglobal( p->L, name ); Q_strncpyz( b, lua_tostring( p->L, -1 ) ? lua_tostring( p->L, -1 ) : "(nil)", sizeof( b ) ); lua_pop( p->L, 1 ); return b; }
 static const shape_t shapes[] = {
 	{ "strbomb",	"local s = 'x' for i = 1, 40 do s = s .. s end" },
 	{ "patbomb",	"local s = ('a'):rep(200000) s:find('.-.-.-.-x')" },
@@ -72,6 +73,21 @@ static const shape_t shapes[] = {
 	{ "vehopts",	"local t = {'player', 'enemy', 'x', 5, true, {}} for i = 1, 100000 do pcall(World.vehicle, 'swoop', {x=0,y=0,z=0}, nil, {team=t[i%6+1], scale=i%600, health=(i%3==0) and 5 or nil}) end" },
 	{ "questloop",	"for i = 1, 100000 do World.prop('target_dialog', {x=0,y=0,z=0}, nil, {message='x', option1='y', go1='pay'}) World.prop('target_reward', {x=0,y=0,z=0}, nil, {credits=100000}, {name='pay'}) World.prop('target_flag', {x=0,y=0,z=0}, nil, {flag='f'}) end" },
 	{ "musicloop",	"local h = World.prop('target_play_music', {x=0,y=0,z=0}, nil, {music='music/x.mp3'}, {name='song'}) local p = Players.get(0) for i = 1, 100000 do World.use('lua.h.song', p) end" },
+	// AUDIT 2 C4 / M-cost: the library's own loops, a lying __len, and the shapes that ran far past the budget at one step each
+	{ "lenremove",	"local t = setmetatable({}, {__len = function() return math.maxinteger - 1 end}) local ok, e = pcall(table.remove, t, 1) WHY = tostring(e)" },
+	{ "leninsert",	"local t = setmetatable({}, {__len = function() return math.maxinteger - 1 end}) local ok, e = pcall(table.insert, t, 1, 0) WHY = tostring(e)" },
+	{ "lensort",	"local ok, e = pcall(table.sort, setmetatable({}, {__len = function() return 2147483000 end}), rawequal) WHY = tostring(e)" },
+	{ "lenconcat",	"local ok, e = pcall(table.concat, setmetatable({}, {__len = function() return 1 << 30 end, __index = function() return 'x' end})) WHY = tostring(e)" },
+	{ "bigremove",	"local t = {} for i = 1, 10000 do t[i] = i end for i = 1, 100000 do table.remove(t, 1) t[#t+1] = i end" },
+	{ "biginsert",	"local t = {} for i = 1, 10000 do t[i] = i end for i = 1, 100000 do table.insert(t, 1, 0) t[#t] = nil end" },
+	{ "bigsort",	"local t = {} for i = 1, 10000 do t[i] = (i * 7919) % 100003 end for k = 1, 1000 do table.sort(t) table.sort(t, function(a, b) return a > b end) end" },
+	{ "bigconcat",	"local t = {} for i = 1, 20 do t[i] = ('x'):rep(5000) end for k = 1, 100000 do local x = table.concat(t, ('-'):rep(1000)) end" },
+	{ "gsubrep",	"local s = ('a'):rep(5000) for k = 1, 100 do s:gsub('', ('%0'):rep(100000)) end" },
+	{ "gsubbig",	"local s = ('a'):rep(1000) local r = ('r'):rep(200) for k = 1, 100000 do local x = s:gsub('a', r) end" },
+	{ "bigclass",	"local s = ('a'):rep(5000) local c = '[' .. ('b'):rep(200000) .. 'a]+x' for k = 1, 100 do s:find(c) end" },
+	{ "frontier",	"local s = ('a'):rep(5000) local c = '%f[' .. ('b'):rep(200000) .. 'a]x' for k = 1, 100 do s:find(c) end" },
+	{ "bigfind",	"local s = ('a'):rep(100000) local n = ('a'):rep(50000) .. 'b' for k = 1, 100000 do s:find(n, 1, true) end" },
+	{ "bigrep",		"for k = 1, 100000 do local x = ('x'):rep(100, ('-'):rep(1000)) end" },
 	{ "musictimer",	"World.prop('target_play_music', {x=0,y=0,z=0}, nil, {music='music/x.mp3'}, {name='song'}) Timer.every(50, function() for i = 0, 23 do World.use('lua.h.song', Players.get(i)) end end)" },
 	{ "linkbomb",	"for i = 1, 100000 do pcall(World.prop, 'misc_model_breakable', {x=0,y=0,z=0}, nil, {paintarget=('a'):rep(i % 80), target='door.1', go1='x'}) end" },
 	{ "npcreward",	"for i = 1, 100000 do World.npc('jedi', {x=0,y=0,z=0}, nil, {credits=100000, xp=100}) end" },
@@ -122,6 +138,9 @@ int main( void )
 		if ( !strcmp( shapes[i].name, "print200" ) ) CHECK( maxq == RP_LUA_CMDS_PER_SEC, "print200: %d reached the player", maxq );
 		if ( !strcmp( shapes[i].name, "bcastloop" ) ) CHECK( maxq == RP_LUA_CMDS_PER_SEC, "bcastloop: %d reached each player", maxq );
 		if ( !strcmp( shapes[i].name, "musicloop" ) ) CHECK( t_musicChanges <= RP_LUA_CMDS_PER_SEC && t_musicChanges >= 1, "musicloop: %d music changes in one call", t_musicChanges );
+		if ( ( !strncmp( shapes[i].name, "big", 3 ) && strcmp( shapes[i].name, "bigvalue" ) ) || !strcmp( shapes[i].name, "gsubrep" ) || !strcmp( shapes[i].name, "gsubbig" ) || !strcmp( shapes[i].name, "frontier" ) ) CHECK( t_log_has( "ran too long" ), "%s: the budget, not the end of the loop, stopped it", shapes[i].name );
+		if ( !strncmp( shapes[i].name, "len", 3 ) ) CHECK( p && p->L && strstr( get_str( p, "WHY" ), "table too big" ), "%s: refused before any loop (%s)", shapes[i].name, p && p->L ? get_str( p, "WHY" ) : "-" );
+		if ( !strcmp( shapes[i].name, "usechain" ) ) CHECK( p && p->chainsCut >= 1 && t_useRefused == 0, "usechain: the script chain cap stopped the loop %d times, the 2048 cap never reached", p ? p->chainsCut : -1 );	// AUDIT 2 C5
 		if ( !strcmp( shapes[i].name, "questloop" ) ) CHECK( p && p->dialogSpawns <= RP_LUA_DIALOG_SPAWNS_MAP && p->propSpawns <= RP_LUA_TOKENS, "questloop: %d dialogues, %d props (the bucket paces it)", p ? p->dialogSpawns : -1, p ? p->propSpawns : -1 );
 		CHECK( p && p->inUse, "%s: plugin slot", shapes[i].name );
 		if ( p ) CHECK( p->memUsed <= 512 * 1024, "%s: memory %d", shapes[i].name, (int)p->memUsed );
@@ -170,6 +189,32 @@ int main( void )
 	  RP_LUA_SHUTDOWN(); t_frame( 100 ); t_runThinks();
 	  CHECK( t_vehiclesAlive == 0 && t_freedRidden == 0, "all vehicles gone: %d", t_vehiclesAlive );
 	  printf( "%-14s ok\n", "vehreload" ); }
+	// AUDIT 2 C4, deterministic: with the clock frozen every read is a millisecond, so ONE library call whose own checks read
+	// the clock 11+ times is killed "in a library loop" whatever the machine's speed; without the check (or the weight)
+	// the call ends on its own and nothing is logged
+	{ static const char *lib[][2] = {
+	    { "rm",     "T = {} for i = 1, 12000 do T[i] = i end Commands.add('golib', function() table.remove(T, 1) end)" },
+	    { "ins",    "T = {} for i = 1, 12000 do T[i] = i end Commands.add('golib', function() table.insert(T, 1, 0) end)" },
+	    { "sort",   "T = {} for i = 1, 12000 do T[i] = (i * 7919) % 100003 end Commands.add('golib', function() table.sort(T) end)" },
+	    { "concat", "local piece = ('p'):rep(500) T = {} for i = 1, 500 do T[i] = piece end Commands.add('golib', function() local x = table.concat(T) end)" },	// 500 pieces of 500 bytes: the piece weight, not the separator's
+	    { "concsep","T = {} for i = 1, 200 do T[i] = 'abcdefghij' end SEP = ('-'):rep(1000) Commands.add('golib', function() local x = table.concat(T, SEP) end)" },
+	    { "find",   "local a = ('a'):rep(4000) S = ('x' .. a):rep(60) N = 'x' .. a .. 'b' Commands.add('golib', function() S:find(N, 1, true) end)" },	// 59 candidates, 4 KB compared each
+	    { "rep",    "SEP = ('-'):rep(8000) Commands.add('golib', function() local x = ('x'):rep(30, SEP) end)" },
+	    { NULL, NULL } };
+	  int i;
+	  for ( i = 0; lib[i][0]; i++ )
+	  {
+		rpLuaPlugin_t *p;
+		t_init( 8 ); t_player( 0, "Alice", qtrue, 7 ); t_write_plugin( "lib", lib[i][1] ); t_start( "lib" ); p = RP_Lua_Find( "lib" );
+		CHECK( p && p->L && p->numCommands == 1, "%s: set up (%s)", lib[i][0], p && p->L ? "state" : strstr( t_log, "error" ) ? strstr( t_log, "error" ) : t_log );
+		t_frame( 100 );	// a fresh frame budget: the call gets the full RP_LUA_CALL_MS, not the short deadline
+		t_logLen = 0; t_log[0] = 0; t_clockFrozen = qtrue; t_tick = 1;
+		t_args( "golib" ); RP_LUA_COMMAND( &g_entities[0], t_argv[0] );
+		t_clockFrozen = qfalse; t_tick = 0;
+		CHECK( t_log_has( "in a library loop" ), "%s: one call, killed by the library's own checks (%s) deadline %d ms", lib[i][0], strstr( t_log, "error" ) ? strstr( t_log, "error" ) : "no error", p->deadlineMs );
+		CHECK( p->deadlineMs == RP_LUA_CALL_MS, "%s: the full deadline (%d)", lib[i][0], p->deadlineMs );
+		RP_LUA_SHUTDOWN();
+	  } }
 	t_init( 8 );	// TEST ONLY: frees what the stubs still hold (spawned strings, NPC clients): valgrind ends with nothing reachable
 	printf( fails ? "%d FAILED\n" : "t_hostile: ALL OK\n", fails );
 	return fails != 0;

@@ -74,9 +74,10 @@ int main( void )
 	  CHECK( t_payouts == 3 && t_log_has( "used: Carol" ) && !t_log_has( "[lua:" ), "a player's button: paid, no plugin named" );
 	  run( p, "use plain_btn" ); CHECK( get_int( p, "U" ) == 1 && t_usedCount[plain] == 1 && t_usedInCall[plain] == 1, "inside a script call the flag is set (%d)", t_usedInCall[plain] );
 	  GlobalUse( &g_entities[plain], &g_entities[1], &g_entities[1] ); CHECK( t_usedInCall[plain] == 0 && rp_luaInCall == 0, "a player's use: flag clear" );
-	  // a loop through relays ends at the stock chain limit
+	  // a loop through relays ends at the script chain cap (AUDIT 2 C5: 64, long before the stock 2048)
 	  { int a1 = t_mapEntity( "target_relay", "loopa", "loopb" ), a2 = t_mapEntity( "target_relay", "loopb", "loopa" ); (void)a1; (void)a2;
-	    t_frame( 1000 ); refill( p ); run( p, "use loopa" ); CHECK( t_useRefused > 0 && t_useDepth == 0, "a loop ends at the chain limit" ); } }
+	    t_frame( 1000 ); refill( p ); run( p, "use loopa" ); CHECK( p->chainsCut == 1 && t_useRefused == 0 && t_useDepth == 0 && t_log_has( "a use chain stopped at 64 uses" ), "a loop ends at the script chain cap (%d)", p->chainsCut );
+	    refill( p ); run( p, "use loopa" ); CHECK( p->chainsCut == 2 && t_useRefused == 0, "again: counted, the log once a minute" ); } }
 	// G3: database writes from inside script calls, four a frame, all plugins together; a payout past it gives nothing, fires
 	// nothing and keeps no ONCE_EACH record; the next frame pays again; a player's own use is not counted
 	{ int k, after = t_mapEntity( "target_relay", "many_after", NULL ); for ( k = 0; k < 6; k++ ) t_rewardEntity( "many", "many_after", 10, 0 );
@@ -164,6 +165,9 @@ int main( void )
 	  for ( k = 0; keys[k]; k++ ) { refill( p ); run( p, va( "lnk %s vault_door", keys[k] ) ); { int n = get_int( p, "LN" ); const char *v = n >= 0 ? t_recordValue( n, keys[k] ) : NULL;
 	    CHECK( n >= 0 && v && !strcmp( v, "lua.pr.vault_door" ), "%s prefixed: %s", keys[k], v ? v : "(none)" ); } }
 	  refill( p ); run( p, "bad fx_runner npc_target2 door.1" ); CHECK( strstr( get_str( p, "E" ), "'npc_target2' is a name" ), "a dotted npc_target2 refused" ); }
+	// AUDIT 2 H1: the shader remap keys are refused
+	run( p, "bad misc_model_ghoul targetshadername textures/x" ); CHECK( strstr( get_str( p, "E" ), "not allowed" ), "targetshadername refused" );
+	run( p, "bad misc_model_ghoul targetShaderNewName textures/y" ); CHECK( strstr( get_str( p, "E" ), "not allowed" ), "targetshadernewname refused" );
 	// AUDIT M9: the option tables are read raw: an __index metamethod never runs inside a spawn
 	refill( p ); run( p, "raw" ); CHECK( get_int( p, "RN" ) >= 0 && get_int( p, "RX" ) == 1 && get_int( p, "META" ) == 0, "raw reads: spawned at the raw x (%d), __index ran %d times", get_int( p, "RX" ), get_int( p, "META" ) );
 	CHECK( p->errorsTotal == 0, "no errors so far: %s", strstr( t_log, "error" ) ? strstr( t_log, "error" ) : "-" );
@@ -185,6 +189,17 @@ int main( void )
 	RP_LuaWorld_PluginClose( p ); t_frame( 50 ); CHECK( RP_LuaWorld_CountLive( p, qfalse ) == 0, "all removed by the plugin close" );
 	{ int i; for ( i = 0; i < 200; i++ ) { refill( p ); run( p, "loop" ); if ( !strcmp( get_str( p, "WHY" ), "spawn limit for this map" ) ) break; if ( RP_LuaWorld_CountLive( p, qfalse ) >= 30 ) { RP_LuaWorld_PluginClose( p ); } } }
 	CHECK( p->propSpawns == RP_LUA_PROP_SPAWNS_MAP && !strcmp( get_str( p, "WHY" ), "spawn limit for this map" ), "128 spawns a map: %d, %s", p->propSpawns, get_str( p, "WHY" ) );
+	// AUDIT 2 H3: the per-map counters are kept by plugin name: a reload cannot start the 128 over; the pool budget refuses
+	CHECK( p->propSpawns == RP_LUA_PROP_SPAWNS_MAP, "at the map cap before the reload" );
+	RP_Lua_QueueOp( "pr", RPLOP_RELOAD ); t_frame( 50 ); p = RP_Lua_Find( "pr" ); CHECK( p && p->L && p->propSpawns == RP_LUA_PROP_SPAWNS_MAP, "reloaded: still at the map cap (%d)", p ? p->propSpawns : -1 );
+	refill( p ); run( p, "loop" ); CHECK( !strcmp( get_str( p, "WHY" ), "spawn limit for this map" ) && RP_LuaWorld_CountLive( p, qfalse ) == 0, "a reloaded plugin spawns nothing more this map" );
+	RP_Lua_QueueOp( "pr", RPLOP_UNLOAD ); t_frame( 50 ); RP_Lua_QueueLoad( "pr" ); t_frame( 50 ); p = RP_Lua_Find( "pr" ); CHECK( p && p->L && p->propSpawns == RP_LUA_PROP_SPAWNS_MAP, "unloaded and loaded again: the same (%d)", p ? p->propSpawns : -1 );
+	t_write_plugin( "pool", "N = 0 Commands.add('fat', function(p) for i = 1, 4 do local h, why = World.prop('misc_model_breakable', {x=0,y=0,z=0}, nil, {k1=('v'):rep(250), k2=('v'):rep(250), k3=('v'):rep(250), k4=('v'):rep(250), k5=('v'):rep(250), k6=('v'):rep(250), k7=('v'):rep(250), k8=('v'):rep(250), k9=('v'):rep(250), k10=('v'):rep(250), k11=('v'):rep(250), k12=('v'):rep(250), k13=('v'):rep(250), k14=('v'):rep(250), k15=('v'):rep(250), k16=('v'):rep(250), k17=('v'):rep(250), k18=('v'):rep(250), k19=('v'):rep(250), k20=('v'):rep(250)}) if h then N = N + 1 World.remove(h) else WHY = why return end end end)\n" );
+	RP_Lua_QueueLoad( "pool" ); t_frame( 10 ); p = RP_Lua_Find( "pool" ); CHECK( p && p->L, "pool plugin loaded" );
+	{ int i; for ( i = 0; i < 128 && strcmp( get_str( p, "WHY" ), "spawn limit for this map" ); i++ ) { refill( p ); run( p, "fat" ); t_frame( 50 ); } }
+	CHECK( !strcmp( get_str( p, "WHY" ), "spawn limit for this map" ) && p->poolBytes > ( RP_LUA_POOL_KB_MAP - 8 ) * 1024 && p->poolBytes <= RP_LUA_POOL_KB_MAP * 1024 && p->propSpawns < RP_LUA_PROP_SPAWNS_MAP, "the pool budget refuses first: %d bytes after %d spawns (%s)", p->poolBytes, p->propSpawns, get_str( p, "WHY" ) );
+	RP_LUA_SHUTDOWN(); t_init( 8 ); t_player( 0, "Alice", qtrue, 7 ); t_start( "pool" ); p = RP_Lua_Find( "pool" ); CHECK( p && p->poolBytes == 0 && p->propSpawns == 0, "a new map starts the counters over" ); RP_LUA_SHUTDOWN();
+	t_init( 8 ); t_player( 0, "Alice", qtrue, 7 ); t_start( "pr" ); p = RP_Lua_Find( "pr" );
 	// AUDIT: the name room leaves space for lua.<plugin>. with the longest plugin name
 	t_write_plugin( "abcdefghijklmnopqrstuvwxyz012345", "Commands.add('nmx', function(p, a) OKN, EN = pcall(World.prop, 'misc_model_breakable', {x=0,y=0,z=0}, nil, nil, {name=('n'):rep(tonumber(a[1]))}) EN = tostring(EN) end)\n" );
 	RP_Lua_QueueLoad( "abcdefghijklmnopqrstuvwxyz012345" ); t_frame( 10 ); p = RP_Lua_Find( "abcdefghijklmnopqrstuvwxyz012345" );

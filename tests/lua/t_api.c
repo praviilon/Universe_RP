@@ -92,6 +92,13 @@ int main( void )
 	CHECK( !RP_Lua_ScriptCmdRoom( 5, RP_LUA_CMDS_PER_SEC + 1 ), "more than the ring holds never fits" );
 	{ int k, ok = 1; for ( k = 0; k < RP_LUA_CMDS_PER_SEC; k++ ) if ( !RP_Lua_ScriptBroadcastRoom( 1 ) ) ok = 0;
 	  CHECK( ok && !RP_Lua_ScriptBroadcastRoom( 1 ), "a broadcast that passes is counted: %d pass, then none", RP_LUA_CMDS_PER_SEC ); }
+	// AUDIT 2 H6: 32 a second, and 96 in any 5 s
+	{ int k, s, ok = 1; rp_luaInCall--; for ( k = 0; k < 6; k++ ) t_frame( 1000 ); rp_luaInCall++; CHECK( RP_Lua_ScriptCmdRoom( 5, RP_LUA_CMDS_PER_SEC ), "six seconds on: the window is empty" );
+	  for ( s = 0; s < 3; s++ ) { for ( k = 0; k < RP_LUA_CMDS_PER_SEC; k++ ) if ( !RP_Lua_ScriptBroadcastRoom( 1 ) ) ok = 0; if ( RP_Lua_ScriptCmdRoom( 5, 1 ) ) ok = 0; rp_luaInCall--; t_frame( 1000 ); rp_luaInCall++; }
+	  CHECK( ok && !RP_Lua_ScriptCmdRoom( 5, 1 ), "96 in three seconds: the fourth second has no room" );
+	  rp_luaInCall--; t_frame( 1000 ); rp_luaInCall++; CHECK( !RP_Lua_ScriptCmdRoom( 5, 1 ), "nor the fifth" );
+	  rp_luaInCall--; t_frame( 1000 ); rp_luaInCall++; ok = RP_Lua_ScriptCmdRoom( 5, RP_LUA_CMDS_PER_SEC ) && !RP_Lua_ScriptCmdRoom( 5, RP_LUA_CMDS_PER_SEC + 1 ); for ( k = 0; k < RP_LUA_CMDS_PER_SEC; k++ ) if ( !RP_Lua_ScriptBroadcastRoom( 1 ) ) ok = 0;
+	  CHECK( ok && !RP_Lua_ScriptCmdRoom( 5, 1 ), "the sixth: the first second's 32 are out of the window, 32 fit again, no more" ); }
 	rp_luaInCall--;
 	RP_LUA_SHUTDOWN();
 
@@ -130,7 +137,8 @@ int main( void )
 	  GlobalUse( &g_entities[tlOnce], &g_entities[0], &g_entities[0] ); CHECK( RP_Lua_Find( "qst" )->pendingOp == RPLOP_NONE, "qu is ONCE: the second use does nothing" );
 	  // reload
 	  t_keysClear(); t_key( "plugin", "qst" ); t_key( "action", "reload" ); k = t_mapEntity( "target_lua", "qr", NULL ); e = &g_entities[k]; e->use = NULL; SP_target_lua( e );
-	  { lua_State *L0 = RP_Lua_Find( "qst" )->L; GlobalUse( e, &g_entities[0], &g_entities[0] ); CHECK( RP_Lua_Find( "qst" )->pendingOp == RPLOP_RELOAD, "qr: reload queued" ); t_frame( 50 ); CHECK( RP_Lua_Find( "qst" )->L && RP_Lua_Find( "qst" )->L != L0, "reloaded: a fresh state" ); }
+	  { lua_State *L0 = RP_Lua_Find( "qst" )->L; lua_pushinteger( L0, 1 ); lua_setglobal( L0, "OLD" ); GlobalUse( e, &g_entities[0], &g_entities[0] ); CHECK( RP_Lua_Find( "qst" )->pendingOp == RPLOP_RELOAD, "qr: reload queued" ); t_frame( 50 );
+	    L0 = RP_Lua_Find( "qst" )->L; if ( L0 ) lua_getglobal( L0, "OLD" ); CHECK( L0 && lua_isnil( L0, -1 ), "reloaded: a fresh state (the old global is gone)" ); if ( L0 ) lua_pop( L0, 1 ); }	// (a pointer compare was flaky: the allocator reuses the address)
 	  // the map's own with a missing file: the load fails at the frame end, logged, nothing else
 	  t_logLen = 0; t_log[0] = 0;
 	  { gentity_t *m = NULL; while ( ( m = G_Find( m, FOFS( targetname ), "mapnofile" ) ) ) GlobalUse( m, &g_entities[0], &g_entities[0] ); } t_frame( 50 ); CHECK( t_log_has( "nosuch not loaded" ) && !RP_Lua_Find( "nosuch" ), "missing file: logged at the frame end" );
