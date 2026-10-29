@@ -95,7 +95,7 @@ qboolean t_npcRefuse = qfalse;	// NPC_Spawn_Do returns NULL
 int t_removedSilently;
 
 static const char *s_exempt[] = { "misc_model_breakable", "misc_model_ghoul", "fx_runner", "target_speaker", "weapon_blaster", "ammo_blaster", "item_medpac", "misc_exploding_crate",
-	"target_dialog", "target_reward", "target_flag", "target_play_music", NULL };
+	"target_dialog", "target_reward", "target_flag", "target_play_music", "target_teleporter", "target_position", "target_level_change", NULL };
 qboolean RP_MapExemptClass( const char *classname ) { int i; for ( i = 0; s_exempt[i]; i++ ) if ( !Q_stricmp( classname, s_exempt[i] ) ) return qtrue; return qfalse; }
 static const char *s_vector[] = { "origin", "angles", "angles2", "mins", "maxs", "trdelta", "color", "offcolor", "modelscale_vec", "spinangles", "tint", NULL };
 qboolean RP_EntityVectorKey( const char *key ) { int i; for ( i = 0; s_vector[i]; i++ ) if ( !Q_stricmp( key, s_vector[i] ) ) return qtrue; return qfalse; }
@@ -124,9 +124,13 @@ static const char *s_RecordValue( int n, const char *key ) { int i; for ( i = 0;
 int t_freedRidden;	// G_FreeEntity on a vehicle someone rides: what must never happen (EjectAll)
 void G_FreeEntity( gentity_t *ed ) { int n = ed->s.number; if ( n >= MAX_CLIENTS ) t_freed++; if ( ed->m_pVehicle ) { if ( ed->m_pVehicle->m_pPilot || ed->m_pVehicle->m_iNumPassengers ) t_freedRidden++; free( ed->m_pVehicle ); t_vehiclesAlive--; } if ( ed->NPC ) free( ed->NPC ); if ( ed->client && n >= MAX_CLIENTS && ( ed->client < g_clients_store || ed->client >= g_clients_store + MAX_CLIENTS ) ) { free( ed->client ); t_npcsAlive--; } memset( ed, 0, sizeof( *ed ) ); ed->s.number = n; ed->classname = "freed"; t_recordCount[n] = 0; t_freeSlots++; }
 static void s_RewardUse( gentity_t *self, gentity_t *other, gentity_t *activator ); static void s_MusicUse( gentity_t *self, gentity_t *other, gentity_t *activator ); void t_spawnReal( gentity_t *ent );
+// a stand-in target_teleporter: the real one is G_PickTarget( target ) then TeleportPlayer; here the activator's origin becomes the destination's
+int t_teleports, t_teleportedTo; static void s_TeleporterUse( gentity_t *self, gentity_t *other, gentity_t *activator ) { gentity_t *dest = NULL; (void)other; if ( !activator->client || !self->target ) return; while ( ( dest = G_Find( dest, FOFS( targetname ), self->target ) ) ) { VectorCopy( dest->r.currentOrigin, activator->client->ps.origin ); t_teleports++; t_teleportedTo = dest->s.number; return; } }
 void zyk_main_spawn_entity( gentity_t *ent ) { int n = ent->s.number; const char *v; if ( !ent->inuse ) return; level.rp_spawn_refusal[0] = 0; ent->classname = G_NewString( s_RecordValue( n, "classname" ) ); if ( ( v = s_RecordValue( n, "targetname" ) ) ) ent->targetname = G_NewString( v ); if ( ( v = s_RecordValue( n, "origin" ) ) ) sscanf( v, "%f %f %f", &ent->r.currentOrigin[0], &ent->r.currentOrigin[1], &ent->r.currentOrigin[2] ); if ( ( v = s_RecordValue( n, "health" ) ) ) ent->health = atoi( v ); if ( ( v = s_RecordValue( n, "target" ) ) ) ent->target = G_NewString( v ); if ( ( v = s_RecordValue( n, "spawnflags" ) ) ) ent->spawnflags = atoi( v ); ent->use = (void *)1;
 	if ( !strcmp( ent->classname, "target_reward" ) ) { ent->use = s_RewardUse; ent->rpRewardCredits = ( v = s_RecordValue( n, "credits" ) ) ? atoi( v ) : 0; ent->rpRewardXP = ( v = s_RecordValue( n, "xp" ) ) ? atoi( v ) : 0; }
 	else if ( !strcmp( ent->classname, "target_play_music" ) ) { ent->use = s_MusicUse; ent->message = ( v = s_RecordValue( n, "music" ) ) ? G_NewString( v ) : NULL; }
+	else if ( !strcmp( ent->classname, "target_teleporter" ) ) { ent->use = s_TeleporterUse; }
+	else if ( !strcmp( ent->classname, "target_position" ) ) { ent->use = NULL; }
 	else if ( !strcmp( ent->classname, "target_dialog" ) || !strcmp( ent->classname, "target_flag" ) ) { t_spawnReal( ent ); }
 	if ( t_spawnRefuse ) { Q_strncpyz( level.rp_spawn_refusal, "the server does not have that model", sizeof( level.rp_spawn_refusal ) ); G_FreeEntity( ent ); } }
 int RP_FreeEntityChildren( gentity_t *maker ) { (void)maker; return 0; }
@@ -206,5 +210,5 @@ void t_worldReset( void )
 	s_numStrings = 0;
 	t_freeSlots = 1000; t_poolFree = 1 << 20; t_spawnRefuse = qfalse; t_npcRefuse = qfalse;
 	memset( t_locked, 0, sizeof( t_locked ) ); memset( t_usedCount, 0, sizeof( t_usedCount ) ); memset( t_usedInCall, 0, sizeof( t_usedInCall ) ); memset( t_recordCount, 0, sizeof( t_recordCount ) );
-	t_useDepth = t_useChain = t_useRefused = 0; t_freedRidden = 0; t_vehiclesAlive = 0; t_effects = t_sounds = 0; t_ncs[0] = t_ncs[1] = 0; t_freed = 0; t_npcsAlive = 0; t_removedSilently = 0;
+	t_useDepth = t_useChain = t_useRefused = 0; t_teleports = 0; t_teleportedTo = -1; t_freedRidden = 0; t_vehiclesAlive = 0; t_effects = t_sounds = 0; t_ncs[0] = t_ncs[1] = 0; t_freed = 0; t_npcsAlive = 0; t_removedSilently = 0;
 }

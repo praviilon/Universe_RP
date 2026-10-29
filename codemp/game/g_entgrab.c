@@ -248,8 +248,9 @@ static const char *rp_map_exempt_classes[] = {
 	"misc_model_breakable", "misc_model_cargo_small", "misc_model_ghoul", "fx_runner", "target_speaker", "misc_exploding_crate",
 	"misc_gas_tank",
 	// GLX_U: [Lua] the quest entities, so a plugin may spawn its own (World.prop, rp_lua_world.c). None of them does
-	// anything without a targetname, so a map's own is always linked, and stays protected as before
-	"target_dialog", "target_reward", "target_flag", "target_play_music",
+	// anything without a targetname (a position without one cannot be aimed at), so a map's own is always linked,
+	// and stays protected as before
+	"target_dialog", "target_reward", "target_flag", "target_play_music", "target_teleporter", "target_position", "target_level_change",
 	NULL
 };
 

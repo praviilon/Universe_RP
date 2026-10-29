@@ -11,7 +11,7 @@ extern int t_floodProtect; extern qboolean t_builtin;
 extern int t_freeSlots, t_poolFree, t_useDepth, t_useChain, t_useRefused, t_effects, t_sounds, t_lastEffect, t_lastSound, t_freed, t_npcsAlive, t_removedSilently; extern qboolean t_spawnRefuse, t_npcRefuse, t_locked[]; extern int t_usedCount[], t_usedInCall[]; extern gentity_t *t_usedActivator[], *t_usedOther[]; extern const char *t_cs[2][64]; extern int t_ncs[2]; extern char t_record[MAX_ENTITIESTOTAL][64][2][260]; extern int t_recordCount[];
 extern gclient_t g_clients_store[]; extern int t_freedRidden, t_vehiclesAlive; extern char t_lastSpawnerClass[]; void t_ride( gentity_t *veh, gentity_t *pilot, int passengers ); extern vec3_t t_lastEffectOrigin;
 int t_mapEntity( const char *classname, const char *targetname, const char *target ); void t_runThinks( void );
-int t_rewardEntity( const char *targetname, const char *target, int credits, int spawnflags ); extern int t_paidCredits[MAX_CLIENTS], t_payouts, t_musicChanges;
+int t_rewardEntity( const char *targetname, const char *target, int credits, int spawnflags ); extern int t_paidCredits[MAX_CLIENTS], t_payouts, t_musicChanges, t_teleports, t_teleportedTo;
 const char *t_recordValue( int n, const char *key ); void t_spawnReal( gentity_t *ent );
 void t_init( int maxclients ); void t_player( int i, const char *name, qboolean loggedin, int charId ); void t_frame( int ms );
 

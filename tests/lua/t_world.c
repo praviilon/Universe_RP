@@ -124,6 +124,8 @@ int main( void )
 		"Commands.add('valid', function(p, a) V = H[tonumber(a[1])]:valid() N2 = tostring(H[tonumber(a[1])].number) end)\n"
 		"Commands.add('loop', function(p) for i = 1, 100 do local h, why = World.prop('misc_model_breakable', {x=0,y=0,z=0}) if not h then WHY = why return end end end)\n"
 		"Commands.add('lnk', function(p, a) local h = World.prop('fx_runner', {x=0,y=0,z=0}, nil, {[a[1]] = a[2]}) LN = h and h.number or -1 end)\n"
+		"Commands.add('tpset', function(p) local a, b, c, w1, w2, w3 a, w1 = World.prop('target_position', {x=500,y=0,z=0}, nil, nil, {name='there'}) b, w2 = World.prop('target_teleporter', {x=0,y=0,z=0}, nil, {target='there'}, {name='beam'}) c, w3 = World.prop('target_level_change', {x=0,y=0,z=0}, nil, {mapname='mp/ffa3'}, {name='leave'}) PN = a and a.number or -1 TN = b and b.number or -1 LN = c and c.number or -1 TWHY = tostring(w1) .. ' ' .. tostring(w2) .. ' ' .. tostring(w3) end)\n"
+		"Commands.add('use', function(p, a) U, S = World.use(a[1], p) end)\n"
 		"META = 0 Commands.add('raw', function(p) local o = setmetatable({x=1,y=2,z=3}, {__index = function(t, k) META = META + 1 return 0 end}) local h = World.prop('fx_runner', o, o, o, o) RN = h and h.number or -1 RX = h and h.origin.x or -1 end)\n" );
 	t_start( "pr" ); p = RP_Lua_Find( "pr" );
 	run( p, "prop misc_model_breakable crate" ); CHECK( get_int( p, "OK" ) == 1, "spawned: %s / %s", get_str( p, "WHY" ), strstr( t_log, "error" ) ? strstr( t_log, "error" ) : "-" );
@@ -165,6 +167,18 @@ int main( void )
 	// AUDIT M9: the option tables are read raw: an __index metamethod never runs inside a spawn
 	refill( p ); run( p, "raw" ); CHECK( get_int( p, "RN" ) >= 0 && get_int( p, "RX" ) == 1 && get_int( p, "META" ) == 0, "raw reads: spawned at the raw x (%d), __index ran %d times", get_int( p, "RX" ), get_int( p, "META" ) );
 	CHECK( p->errorsTotal == 0, "no errors so far: %s", strstr( t_log, "error" ) ? strstr( t_log, "error" ) : "-" );
+	// the quest helpers: a teleporter to the plugin's own position moves the player passed to World.use; a position has no use;
+	// a level change spawns (its mapname is checked by the real spawn function), and a mapname with a separator is refused by the key filter
+	{ int pos, tp, lc; g_entities[0].client->ps.origin[0] = 0;
+	  refill( p ); run( p, "tpset" ); pos = get_int( p, "PN" ); tp = get_int( p, "TN" ); lc = get_int( p, "LN" );
+	  CHECK( pos >= 0 && tp >= 0 && lc >= 0, "position, teleporter and level change spawned (%d %d %d): %s", pos, tp, lc, get_str( p, "TWHY" ) );
+	  CHECK( pos >= 0 && !strcmp( g_entities[pos].targetname, "lua.pr.there" ) && g_entities[pos].r.currentOrigin[0] == 500 && !g_entities[pos].use, "the position: named, placed, no use" );
+	  CHECK( tp >= 0 && t_recordValue( tp, "target" ) && !strcmp( t_recordValue( tp, "target" ), "lua.pr.there" ), "the teleporter's target is prefixed: %s", tp >= 0 && t_recordValue( tp, "target" ) ? t_recordValue( tp, "target" ) : "(none)" );
+	  CHECK( lc >= 0 && t_recordValue( lc, "mapname" ) && !strcmp( t_recordValue( lc, "mapname" ), "mp/ffa3" ), "the level change carries its mapname" );
+	  refill( p ); run( p, "use lua.pr.there" ); CHECK( get_int( p, "U" ) == 0 && get_int( p, "S" ) == 1, "a position is skipped by World.use (no use)" );
+	  refill( p ); run( p, "use lua.pr.beam" ); CHECK( get_int( p, "U" ) == 1 && t_teleports == 1 && t_teleportedTo == pos && g_entities[0].client->ps.origin[0] == 500, "the teleporter moved Alice to the position (%d teleports, to %d, x %.0f)", t_teleports, t_teleportedTo, g_entities[0].client->ps.origin[0] );
+	  refill( p ); run( p, "bad target_level_change mapname mp/ffa3;quit" ); CHECK( strstr( get_str( p, "E" ), "semicolon" ), "a mapname with a separator refused: %s", get_str( p, "E" ) );
+	  g_entities[0].client->ps.origin[0] = 0; }
 	// caps: 32 live, then 128 per map; the bucket paces the loop
 	{ int i; for ( i = 0; i < 40; i++ ) { refill( p ); run( p, "loop" ); if ( !strcmp( get_str( p, "WHY" ), "too many props" ) ) break; } }
 	CHECK( RP_LuaWorld_CountLive( p, qfalse ) == RP_LUA_MAX_PROPS && !strcmp( get_str( p, "WHY" ), "too many props" ), "32 live then refused: %d, %s", RP_LuaWorld_CountLive( p, qfalse ), get_str( p, "WHY" ) );

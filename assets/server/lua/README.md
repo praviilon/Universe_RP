@@ -196,8 +196,9 @@ Each `World.use` takes one of the player's four a second (`"player busy"`).
 weapons, ammo, items, dispensers and racks, `misc_model_breakable`,
 `misc_model_ghoul`, `misc_model_cargo_small`, `misc_exploding_crate`,
 `misc_gas_tank`, `fx_runner`, `target_speaker`, and the quest entities
-`target_dialog`, `target_reward`, `target_flag` and `target_play_music`
-(see `/enthelp` for their keys). The keys are the class's own, as for
+`target_dialog`, `target_reward`, `target_flag`, `target_play_music`,
+`target_teleporter`, `target_position` and `target_level_change` (see
+`/enthelp` for their keys). The keys are the class's own, as for
 `/entadd`, except `targetname`, `script_targetname`, `team`, `lock` and
 the spawner reward keys, which are refused. A script's entity is named
 `lua.<plugin>.<name>` when `{name=...}` is given, so it can never take a map
