@@ -198,6 +198,12 @@ int main( void )
 	    { "sort",   "T = {} for i = 1, 12000 do T[i] = (i * 7919) % 100003 end Commands.add('golib', function() table.sort(T) end)" },
 	    { "concat", "local piece = ('p'):rep(500) T = {} for i = 1, 500 do T[i] = piece end Commands.add('golib', function() local x = table.concat(T) end)" },	// 500 pieces of 500 bytes: the piece weight, not the separator's
 	    { "concsep","T = {} for i = 1, 200 do T[i] = 'abcdefghij' end SEP = ('-'):rep(1000) Commands.add('golib', function() local x = table.concat(T, SEP) end)" },
+	    // AUDIT 3 C1: equal keys compare false both ways (the partition's own loops never ran), and a string
+	    // comparison is strcoll over the whole string; each level of the recursion had its own counter
+	    { "sortstr","local s = ('s'):rep(20000) T = {} for i = 1, 2000 do T[i] = s end Commands.add('golib', function() table.sort(T) end)" },
+	    { "sorteq", "T = {} for i = 1, 16384 do T[i] = 7 end Commands.add('golib', function() table.sort(T) end)" },
+	    // few comparisons (40 entries: about 200), each strcoll over 6 KB: only the weight makes them checks
+	    { "sortlong","local s = ('s'):rep(6000) T = {} for i = 1, 40 do T[i] = s .. string.char(65 + (i * 7) % 40) end Commands.add('golib', function() table.sort(T) end)" },
 	    { "find",   "local a = ('a'):rep(4000) S = ('x' .. a):rep(60) N = 'x' .. a .. 'b' Commands.add('golib', function() S:find(N, 1, true) end)" },	// 59 candidates, 4 KB compared each
 	    { "rep",    "SEP = ('-'):rep(8000) Commands.add('golib', function() local x = ('x'):rep(30, SEP) end)" },
 	    { NULL, NULL } };
@@ -215,6 +221,18 @@ int main( void )
 		CHECK( p->deadlineMs == RP_LUA_CALL_MS, "%s: the full deadline (%d)", lib[i][0], p->deadlineMs );
 		RP_LUA_SHUTDOWN();
 	  } }
+	// AUDIT 3 C1: the counted sort still sorts, with and without a function, numbers and strings, on the real clock
+	{ rpLuaPlugin_t *p;
+	  t_init( 8 ); t_player( 0, "Alice", qtrue, 7 );
+	  t_write_plugin( "srt", "OK = true\n"
+		"Commands.add('srtn', function() local n = {} for i = 1, 600 do n[i] = (i * 7919) % 601 end table.sort(n) for i = 2, #n do if n[i - 1] > n[i] then OK = false end end end)\n"
+		"Commands.add('srts', function() local s = {} for i = 1, 300 do s[i] = 'k' .. ((i * 61) % 301) end table.sort(s) for i = 2, #s do if s[i - 1] > s[i] then OK = false end end end)\n"
+		"Commands.add('srtd', function() local d = {} for i = 1, 300 do d[i] = (i * 31) % 299 end table.sort(d, function(a, b) return a > b end) for i = 2, #d do if d[i - 1] < d[i] then OK = false end end end)\n"
+		"Commands.add('srte', function() local e = {} for i = 1, 300 do e[i] = 3 end table.sort(e) for i = 1, #e do if e[i] ~= 3 then OK = false end end end)\n" );
+	  t_start( "srt" ); p = RP_Lua_Find( "srt" ); t_logLen = 0; t_log[0] = 0;
+	  { static const char *c[] = { "srtn", "srts", "srtd", "srte" }; int k; for ( k = 0; k < 4; k++ ) { t_args( c[k] ); RP_LUA_COMMAND( &g_entities[0], c[k] ); t_frame( 50 ); } }
+	  lua_getglobal( p->L, "OK" ); CHECK( lua_toboolean( p->L, -1 ) && !t_log_has( "error" ), "ordinary sorts are sorted and within the budget (%s)", strstr( t_log, "error" ) ? strstr( t_log, "error" ) : "-" ); lua_pop( p->L, 1 );
+	  RP_LUA_SHUTDOWN(); }
 	t_init( 8 );	// TEST ONLY: frees what the stubs still hold (spawned strings, NPC clients): valgrind ends with nothing reachable
 	printf( fails ? "%d FAILED\n" : "t_hostile: ALL OK\n", fails );
 	return fails != 0;

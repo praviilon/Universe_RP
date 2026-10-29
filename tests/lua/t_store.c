@@ -72,6 +72,29 @@ int main( void )
 	RP_LUA_CHAR_REMOVED( 13 ); CHECK( count_rows( "SELECT COUNT(*) FROM char_kv WHERE char_id = 13" ) == 0, "character 13 rows deleted with no plugin loaded" );
 	RP_LUA_SHUTDOWN();
 
+	// --- AUDIT 3 C4: values keep their bytes through the flush and a fresh read from the database; keys with a zero byte are refused
+	t_init( 8 ); t_player( 0, "Alice", qtrue, 11 );
+	t_write_plugin( "bin", "Commands.add('binset', function(p) Storage.set('v', string.pack('<i4i4', 5, 1000)) Storage.char.set(p, 'w', 'gold\\0silver') end)\n"
+		"Commands.add('binget', function(p) local v = Storage.get('v') local w = Storage.char.get(p, 'w') LV = v and #v or -1 LW = w and #w or -1 if v and #v == 8 then A, B = string.unpack('<i4i4', v) end W = w end)\n"
+		"Commands.add('zkey', function(p) OKG, EG = pcall(Storage.get, 'a\\0b') OKS, ES = pcall(Storage.set, 'a\\0b', 1) OKC, EC = pcall(Storage.char.set, p, 'x\\0', 'y') EG, ES, EC = tostring(EG), tostring(ES), tostring(EC) end)\n" );
+	t_start( "bin" ); p = RP_Lua_Find( "bin" ); CHECK( p && p->L, "bin loaded" );
+	t_args( "binset" ); RP_LUA_COMMAND( &g_entities[0], "binset" ); t_args( "binget" ); RP_LUA_COMMAND( &g_entities[0], "binget" );
+	{ lua_getglobal( p->L, "LV" ); lua_getglobal( p->L, "LW" ); CHECK( lua_tointeger( p->L, -2 ) == 8 && lua_tointeger( p->L, -1 ) == 11, "pending: %d and %d bytes", (int)lua_tointeger( p->L, -2 ), (int)lua_tointeger( p->L, -1 ) ); lua_pop( p->L, 2 ); }
+	for ( i = 0; i < 31; i++ ) t_frame( 1000 );
+	CHECK( p->numPending == 0 && count_rows( "SELECT COUNT(*) FROM plugin_kv WHERE plugin = 'bin' AND LENGTH(CAST(value AS BLOB)) = 8" ) == 1, "flushed with its 8 bytes" );
+	t_args( "binget" ); RP_LUA_COMMAND( &g_entities[0], "binget" );
+	{ lua_getglobal( p->L, "LV" ); lua_getglobal( p->L, "LW" ); lua_getglobal( p->L, "A" ); lua_getglobal( p->L, "B" );
+	  CHECK( lua_tointeger( p->L, -4 ) == 8 && lua_tointeger( p->L, -3 ) == 11 && lua_tointeger( p->L, -2 ) == 5 && lua_tointeger( p->L, -1 ) == 1000, "after the flush: %d and %d bytes, unpacked %d %d", (int)lua_tointeger( p->L, -4 ), (int)lua_tointeger( p->L, -3 ), (int)lua_tointeger( p->L, -2 ), (int)lua_tointeger( p->L, -1 ) );
+	  lua_pop( p->L, 4 ); }
+	{ size_t n; const char *w; lua_getglobal( p->L, "W" ); w = lua_tolstring( p->L, -1, &n ); CHECK( w && n == 11 && !memcmp( w, "gold\0silver", 11 ), "the char value byte for byte" ); lua_pop( p->L, 1 ); }
+	RP_LUA_SHUTDOWN(); t_init( 8 ); t_player( 0, "Alice", qtrue, 11 ); t_start( "bin" ); p = RP_Lua_Find( "bin" );
+	t_args( "binget" ); RP_LUA_COMMAND( &g_entities[0], "binget" );
+	{ lua_getglobal( p->L, "A" ); lua_getglobal( p->L, "B" ); lua_getglobal( p->L, "LW" ); CHECK( lua_tointeger( p->L, -3 ) == 5 && lua_tointeger( p->L, -2 ) == 1000 && lua_tointeger( p->L, -1 ) == 11, "a new map, read from the database: %d %d, %d bytes", (int)lua_tointeger( p->L, -3 ), (int)lua_tointeger( p->L, -2 ), (int)lua_tointeger( p->L, -1 ) ); lua_pop( p->L, 3 ); }
+	t_args( "zkey" ); RP_LUA_COMMAND( &g_entities[0], "zkey" );
+	CHECK( strstr( get_str( p, "EG" ), "a key has no zero byte" ) && strstr( get_str( p, "ES" ), "a key has no zero byte" ) && strstr( get_str( p, "EC" ), "a key has no zero byte" ), "zero-byte keys refused: %s / %s / %s", get_str( p, "EG" ), get_str( p, "ES" ), get_str( p, "EC" ) );
+	CHECK( p->numPending == 0, "nothing written for them" );
+	RP_LUA_SHUTDOWN();
+
 	printf( fails ? "%d FAILED\n" : "t_store: ALL OK\n", fails );
 	return fails != 0;
 }
