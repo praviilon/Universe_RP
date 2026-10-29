@@ -9438,6 +9438,7 @@ void G_RunFrame( int levelTime ) {
 #endif
 
 	RP_DialogFrame();	// GLX_U: [Dialogues] open dialogues: timeout, range, the player's state (after the thinks)
+	RP_MusicFrame();	// GLX_U fix: [Music] a music change that waited for the gap (G_SetMusic)
 	RP_LUA_FRAME();	// GLX_U: [Lua] timers, flushes and the queued loads and unloads, last
 
 	g_LastFrameTime = level.time;

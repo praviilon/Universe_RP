@@ -184,8 +184,17 @@ static int RP_LuaStore_DbGet( rpLuaPlugin_t *p, int charId, const char *key, cha
 		const char *v = (const char *)sqlite3_column_text( stmt, 0 );
 
 		len = sqlite3_column_bytes( stmt, 0 );
-		if ( out )
-			Q_strncpyz( out, v ? v : "", outSize );
+		if ( out && outSize > 0 )
+		{ // GLX_U fix: [Lua] the bytes, not a C string: a value may hold a zero byte (string.pack output), and
+		  // Q_strncpyz() cut it there once it had been written to the database
+			int n = ( v && len > 0 ) ? ( len < outSize - 1 ? len : outSize - 1 ) : 0;
+
+			if ( n )
+				memcpy( out, v, n );
+			out[n] = '\0';
+			if ( len > n )
+				len = n;
+		}
 	}
 	sqlite3_finalize( stmt );
 	return len;
@@ -363,6 +372,8 @@ static const char *RP_LuaStore_KeyArg( lua_State *L, int idx )
 
 	if ( !len || len > RP_LUA_KEY_MAX )
 		luaL_error( L, "a key is 1 to %d bytes", RP_LUA_KEY_MAX );
+	if ( memchr( key, '\0', len ) )
+		luaL_error( L, "a key has no zero byte" );	// GLX_U fix: [Lua] the database stores keys as text: "a\0b" and "a" were one row
 	return key;
 }
 
@@ -381,10 +392,10 @@ static int RP_LuaStore_Get( lua_State *L, int charId, int keyIdx )
 			lua_pushnil( L );
 		return 1;
 	}
-	if ( RP_LuaStore_DbGet( p, charId, key, value, sizeof( value ) ) < 0 )
+	if ( ( i = RP_LuaStore_DbGet( p, charId, key, value, sizeof( value ) ) ) < 0 )
 		lua_pushnil( L );
 	else
-		lua_pushstring( L, value );
+		lua_pushlstring( L, value, i );	// GLX_U fix: [Lua] with its length (a zero byte inside is kept)
 	return 1;
 }
 

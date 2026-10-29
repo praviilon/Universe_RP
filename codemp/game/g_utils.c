@@ -1981,7 +1981,7 @@ void G_CleanAllFakeClients(void)
 	{
 		ent = &g_entities[i];
 
-		if (ent->inuse && ent->s.eType == ET_NPC && ent->client)
+		if (ent->inuse && ( ent->s.eType == ET_NPC || ent->NPC ) && ent->client)	// GLX_U fix: [NPCs] a hidden one too (G_FreeEntity)
 		{
 			G_FreeFakeClient(&ent->client);
 		}
@@ -2918,12 +2918,23 @@ void G_FreeEntity( gentity_t *ed ) {
 		trap->G2API_CleanGhoul2Models(&(ed->ghoul2));
 	}
 
-	if (ed->s.eType == ET_NPC && ed->m_pVehicle)
+	// GLX_U fix: [NPCs] an NPC or vehicle hidden before its free -- RP_SpawnedRemove() (World.remove, a plugin's
+	// unload, /entundo of a spawner) and the stock NPC_RemoveIfOutOfPlayersPVS() set ET_INVISIBLE a frame
+	// before G_FreeEntity() -- is still one: it has its NPC record and a number above the players. Testing the
+	// type alone skipped the cleanup below for them: the vehicle-pool slot stayed taken, the saber entity
+	// (neverFree, and already let go by RP_SpawnedRemove(), whose own free of it bails on neverFree) stayed in
+	// use for the rest of the map, and the sabers' ghoul2 instances were never cleaned -- their handles lost
+	// when the next NPC in the slot wiped the client, in the engine's 1024-slot table that lives as long as
+	// the process ("Out of ghoul2 info slots", a fatal error, once it fills).
+	const qboolean hiddenNpc = ( ed->s.eType != ET_NPC && ed->s.number >= MAX_CLIENTS && ed->NPC != NULL ) ? qtrue : qfalse;
+	const qboolean npc = ( ed->s.eType == ET_NPC || hiddenNpc ) ? qtrue : qfalse;
+
+	if (npc && ed->m_pVehicle)
 	{ //tell the "vehicle pool" that this one is now free
 		G_FreeVehicleObject(ed->m_pVehicle);
 	}
 
-	if (ed->s.eType == ET_NPC && ed->client)
+	if (npc && ed->client)
 	{ //this "client" structure is one of our dynamically allocated ones, so free the memory
 		int saberEntNum = -1;
 		int i = 0;
@@ -2936,7 +2947,9 @@ void G_FreeEntity( gentity_t *ed ) {
 			saberEntNum = ed->client->saberStoredIndex;
 		}
 
-		if (saberEntNum > 0 && g_entities[saberEntNum].inuse)
+		// (a hidden one's saber is freed only while it is still its own: its number was let go a frame ago)
+		if (saberEntNum > 0 && saberEntNum < ENTITYNUM_WORLD && g_entities[saberEntNum].inuse &&
+			( !hiddenNpc || g_entities[saberEntNum].r.ownerNum == ed->s.number ))
 		{
 			g_entities[saberEntNum].neverFree = qfalse;
 			G_FreeEntity(&g_entities[saberEntNum]);
@@ -3097,28 +3110,72 @@ qboolean G_MusicStringValid( const char *music, char *normalized, int size, cons
 	return qtrue;
 }
 
-qboolean G_SetMusic( const char *music, const char **reason )
+// the gamestate counts what replaces what is there now: each string that is there at all costs its length
+// plus one (zyk_gamestate_bytes_used), an empty slot nothing
+static qboolean G_MusicFits( const char *normalized, const char *current, const char **reason )
 {
-	char normalized[MAX_QPATH * 2];
-	char current[MAX_STRING_CHARS];
-	int delta;
+	int delta = ( (int)strlen( normalized ) + 1 ) - ( current[0] ? (int)strlen( current ) + 1 : 0 );
 
-	if ( !G_MusicStringValid( music, normalized, sizeof( normalized ), reason ) )
-		return qfalse;
-
-	// the gamestate counts what replaces what is there now: each string that is there at all costs
-	// its length plus one (zyk_gamestate_bytes_used), an empty slot nothing
-	trap->GetConfigstring( CS_MUSIC, current, sizeof( current ) );
-	delta = ( (int)strlen( normalized ) + 1 ) - ( current[0] ? (int)strlen( current ) + 1 : 0 );
 	if ( delta > 0 && !G_ConfigstringBytesAvailable( delta ) )
 	{
 		if ( reason ) *reason = "the gamestate is full";
 		G_LogPrintf( "music \"%s\" refused: the gamestate is at %d of %d bytes\n", normalized, G_GamestateBytesUsed(), ZYK_GAMESTATE_BUDGET );
 		return qfalse;
 	}
-
-	trap->SetConfigstring( CS_MUSIC, normalized );
 	return qtrue;
+}
+
+// GLX_U fix: [Music] CS_MUSIC is written at most once every RP_MUSIC_GAP_MS for the whole level, the last
+// request winning. Every change of it sends a reliable "cs" to every client, and nothing paced the changes
+// outside a script call: a script's fx_runner firing its target2 at a group of music props (or a script
+// breakable's paintarget) flipped it a dozen times a frame, every 100 ms, past the engine's 128 commands, and
+// every player was dropped ("Server command overflow"). A change that comes sooner is kept and written by
+// RP_MusicFrame() once the gap has passed, so a quick pair (an intro trigger, then a loop trigger) still ends
+// on the second, up to a second late; the caller is told the music is set.
+qboolean G_SetMusic( const char *music, const char **reason )
+{
+	char normalized[MAX_QPATH * 2];
+	char current[MAX_STRING_CHARS];
+
+	if ( !G_MusicStringValid( music, normalized, sizeof( normalized ), reason ) )
+		return qfalse;
+
+	trap->GetConfigstring( CS_MUSIC, current, sizeof( current ) );
+	if ( !G_MusicFits( normalized, current, reason ) )
+		return qfalse;
+
+	if ( !strcmp( normalized, current ) )
+	{ // already playing: nothing to send, and an earlier change still waiting is superseded
+		level.rpMusicPending[0] = '\0';
+		return qtrue;
+	}
+	if ( level.rpMusicLastSet && level.time - level.rpMusicLastSet < RP_MUSIC_GAP_MS )
+	{
+		Q_strncpyz( level.rpMusicPending, normalized, sizeof( level.rpMusicPending ) );
+		return qtrue;
+	}
+
+	level.rpMusicPending[0] = '\0';
+	trap->SetConfigstring( CS_MUSIC, normalized );
+	level.rpMusicLastSet = level.time ? level.time : 1;
+	return qtrue;
+}
+
+// G_RunFrame: a change G_SetMusic() kept, once the gap has passed (the gamestate looked at again: it may have
+// filled since)
+void RP_MusicFrame( void )
+{
+	char current[MAX_STRING_CHARS];
+
+	if ( !level.rpMusicPending[0] || ( level.rpMusicLastSet && level.time - level.rpMusicLastSet < RP_MUSIC_GAP_MS ) )
+		return;
+	trap->GetConfigstring( CS_MUSIC, current, sizeof( current ) );
+	if ( strcmp( level.rpMusicPending, current ) && G_MusicFits( level.rpMusicPending, current, NULL ) )
+	{
+		trap->SetConfigstring( CS_MUSIC, level.rpMusicPending );
+		level.rpMusicLastSet = level.time ? level.time : 1;
+	}
+	level.rpMusicPending[0] = '\0';
 }
 
 /*

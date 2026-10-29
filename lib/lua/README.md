@@ -60,7 +60,14 @@ ends, with no VM instruction for the hook to count. The library's own
 loops call `RP_Lua_LoopCheck()` every 1024 steps: the shifts in
 `tinsert()` and `tremove()`, `tmove()` (a huge range over an empty table),
 `tconcat()` (each piece and separator weighted by its length, as in
-`lstrlib.c`), and the `partition()` and `auxsort()` loops of `table.sort`.
+`lstrlib.c`), and `table.sort`. The sort keeps one counter for the whole
+call, passed down every level of its recursion (`sort()` → `auxsort()` →
+`partition()` → `sort_comp()`), and counts every comparison whatever it
+returns, a comparison of two strings without a function as `1 + the
+shorter length / 16` (it is `strcoll` over them), and every swap round of
+the partition. Before, each level kept its own counter and only a
+comparison that returned true was counted, so equal keys - 8192 copies of
+one 200 KB string - sorted for most of a second, uncounted, every frame.
 
 Every other `.c` file is byte-identical to the release. When upgrading,
 replace every file, then re-apply the `luaconf.h` blocks and the `lstrlib.c`

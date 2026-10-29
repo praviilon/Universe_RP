@@ -297,7 +297,8 @@ Storage.char.get(p, key)  Storage.char.set(p, key, value)  Storage.char.del(p, k
 ```
 
 Stored values are strings (numbers are stored as their text; use
-`tonumber`). Writes are kept in memory and written every 30 s and at map
+`tonumber`), kept byte for byte: any string, `string.pack` output
+included. Keys are text, 1 to 64 bytes, without a zero byte. Writes are kept in memory and written every 30 s and at map
 end. Rows of a deleted character are removed with it.
 
 ### What is not there

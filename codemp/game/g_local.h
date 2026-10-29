@@ -2237,6 +2237,8 @@ typedef struct level_locals_s {
 	// for the command that asked for it to say -- see RP_EntitySystemSpawnRefused() in g_spawn.c
 	char rp_spawn_refusal[256];
 	qboolean rpMapChangeQueued;		// GLX_U: [Entity System] a target_level_change queued its "map": every later one this map is ignored
+	int rpMusicLastSet;				// GLX_U fix: [Music] level time of the last CS_MUSIC write by G_SetMusic() (0: none this map)
+	char rpMusicPending[MAX_QPATH * 2];	// GLX_U fix: [Music] a change waiting for RP_MUSIC_GAP_MS to pass ("" none)
 	// GalaxyRP: [Entity System] the ambient sound set names this server knows, read from sound/sound.txt once
 	// per map: 0 not read yet, 1 read, -1 the file could not be read -- see RP_SoundSetKnown() in g_spawn.c
 	int rp_soundsets_state;
@@ -2820,6 +2822,10 @@ void		RP_TeamDetach( gentity_t *ed );
 // alone, for a spawn function; G_SetMusic() checks and sets. A refusal gives its reason.
 qboolean	G_MusicStringValid( const char *music, char *normalized, int size, const char **reason );
 qboolean	G_SetMusic( const char *music, const char **reason );
+// GLX_U fix: [Music] G_SetMusic() writes CS_MUSIC at most once every RP_MUSIC_GAP_MS for the whole level; a
+// change that comes sooner waits in level.rpMusicPending (the last one wins) and RP_MusicFrame() writes it
+#define RP_MUSIC_GAP_MS		1000
+void		RP_MusicFrame( void );
 void		RP_TeamLinkEntity( gentity_t *e );
 void		Cmd_EntCopy_f( gentity_t *ent );
 void		Cmd_EntCut_f( gentity_t *ent );
