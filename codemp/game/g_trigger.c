@@ -1381,7 +1381,7 @@ void SP_trigger_push( gentity_t *self ) {
 }
 
 void Use_target_push( gentity_t *self, gentity_t *other, gentity_t *activator ) {
-	if ( !activator->client ) {
+	if ( !activator || !activator->client ) {	// GLX_U fix: [Entity System] fired with no activator (a breakable's paintarget)
 		return;
 	}
 

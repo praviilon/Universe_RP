@@ -30,7 +30,22 @@
 #define TAB_RW	(TAB_R | TAB_W)		/* read/write */
 
 
-#define aux_getn(L,n,w)	(checktab(L, n, (w) | TAB_L), luaL_len(L, n))
+/* GLX_U: [Lua] the library's C loops (insert, remove, concat, move, sort) run as long as the length says, and
+** the mod's count hook never sees them: every 1024 steps the mod checks its deadline (RP_Lua_LoopCheck,
+** rp_lua_core.c), and a length past 2^24 - a __len metamethod can say anything - is refused before any loop */
+extern void RP_Lua_LoopCheck (lua_State *L);
+#define GLXU_STEP(L, counter)  { if (l_unlikely((++(counter) & 1023u) == 0)) RP_Lua_LoopCheck(L); }
+#define GLXU_STEPS(L, counter, n)  { unsigned glxu_before_ = (counter); (counter) += (unsigned)(n); \
+  if (l_unlikely(((counter) >> 10) != (glxu_before_ >> 10))) RP_Lua_LoopCheck(L); }
+#define GLXU_MAX_LEN  (1 << 24)
+
+static lua_Integer glxu_getn (lua_State *L, int n) {
+  lua_Integer len = luaL_len(L, n);
+  if (l_unlikely(len > GLXU_MAX_LEN || len < 0))
+    luaL_error(L, "table too big");
+  return len;
+}
+#define aux_getn(L,n,w)	(checktab(L, n, (w) | TAB_L), glxu_getn(L, n))
 
 
 static int checkfield (lua_State *L, const char *key, int n) {
@@ -69,11 +84,13 @@ static int tinsert (lua_State *L) {
     }
     case 3: {
       lua_Integer i;
+      unsigned steps = 0;  /* GLX_U */
       pos = luaL_checkinteger(L, 2);  /* 2nd argument is the position */
       /* check whether 'pos' is in [1, e] */
       luaL_argcheck(L, (lua_Unsigned)pos - 1u < (lua_Unsigned)e, 2,
                        "position out of bounds");
       for (i = e; i > pos; i--) {  /* move up elements */
+        GLXU_STEP(L, steps);
         lua_geti(L, 1, i - 1);
         lua_seti(L, 1, i);  /* t[i] = t[i - 1] */
       }
@@ -91,12 +108,14 @@ static int tinsert (lua_State *L) {
 static int tremove (lua_State *L) {
   lua_Integer size = aux_getn(L, 1, TAB_RW);
   lua_Integer pos = luaL_optinteger(L, 2, size);
+  unsigned steps = 0;  /* GLX_U */
   if (pos != size)  /* validate 'pos' if given */
     /* check whether 'pos' is in [1, size + 1] */
     luaL_argcheck(L, (lua_Unsigned)pos - 1u <= (lua_Unsigned)size, 2,
                      "position out of bounds");
   lua_geti(L, 1, pos);  /* result = t[pos] */
   for ( ; pos < size; pos++) {
+    GLXU_STEP(L, steps);
     lua_geti(L, 1, pos + 1);
     lua_seti(L, 1, pos);  /* t[pos] = t[pos + 1] */
   }
@@ -112,10 +131,6 @@ static int tremove (lua_State *L) {
 ** "possible" means destination after original range, or smaller
 ** than origin, or copying to another table.
 */
-/* GLX_U: [Lua] table.move over a huge range is a C loop the mod's count hook never sees: every 1024
-** elements the mod checks its deadline (rp_lua_core.c), as lstrlib.c does for pattern matching */
-extern void RP_Lua_LoopCheck (lua_State *L);
-
 static int tmove (lua_State *L) {
   lua_Integer f = luaL_checkinteger(L, 2);
   lua_Integer e = luaL_checkinteger(L, 3);
@@ -150,11 +165,14 @@ static int tmove (lua_State *L) {
 }
 
 
-static void addfield (lua_State *L, luaL_Buffer *b, lua_Integer i) {
+static void addfield (lua_State *L, luaL_Buffer *b, lua_Integer i, unsigned *steps) {
+  size_t len;
   lua_geti(L, 1, i);
   if (l_unlikely(!lua_isstring(L, -1)))
     luaL_error(L, "invalid value (%s) at index %I in table for 'concat'",
                   luaL_typename(L, -1), (LUAI_UACINT)i);
+  lua_tolstring(L, -1, &len);
+  GLXU_STEPS(L, *steps, 1 + len / 16);  /* GLX_U: a long piece costs its copy */
   luaL_addvalue(b);
 }
 
@@ -165,14 +183,16 @@ static int tconcat (lua_State *L) {
   size_t lsep;
   const char *sep = luaL_optlstring(L, 2, "", &lsep);
   lua_Integer i = luaL_optinteger(L, 3, 1);
+  unsigned steps = 0;  /* GLX_U */
   last = luaL_optinteger(L, 4, last);
   luaL_buffinit(L, &b);
   for (; i < last; i++) {
-    addfield(L, &b, i);
+    addfield(L, &b, i, &steps);
+    GLXU_STEPS(L, steps, lsep / 16);
     luaL_addlstring(&b, sep, lsep);
   }
   if (i == last)  /* add last value (if interval was not empty) */
-    addfield(L, &b, i);
+    addfield(L, &b, i, &steps);
   luaL_pushresult(&b);
   return 1;
 }
@@ -304,10 +324,12 @@ static int sort_comp (lua_State *L, int a, int b) {
 static IdxT partition (lua_State *L, IdxT lo, IdxT up) {
   IdxT i = lo;  /* will be incremented before first use */
   IdxT j = up - 1;  /* will be decremented before first use */
+  unsigned steps = 0;  /* GLX_U */
   /* loop invariant: a[lo .. i] <= P <= a[j .. up] */
   for (;;) {
     /* next loop: repeat ++i while a[i] < P */
     while ((void)lua_geti(L, 1, ++i), sort_comp(L, -1, -2)) {
+      GLXU_STEP(L, steps);
       if (l_unlikely(i == up - 1))  /* a[i] < P  but a[up - 1] == P  ?? */
         luaL_error(L, "invalid order function for sorting");
       lua_pop(L, 1);  /* remove a[i] */
@@ -315,6 +337,7 @@ static IdxT partition (lua_State *L, IdxT lo, IdxT up) {
     /* after the loop, a[i] >= P and a[lo .. i - 1] < P */
     /* next loop: repeat --j while P < a[j] */
     while ((void)lua_geti(L, 1, --j), sort_comp(L, -3, -1)) {
+      GLXU_STEP(L, steps);
       if (l_unlikely(j < i))  /* j < i  but  a[j] > P ?? */
         luaL_error(L, "invalid order function for sorting");
       lua_pop(L, 1);  /* remove a[j] */
@@ -350,9 +373,11 @@ static IdxT choosePivot (IdxT lo, IdxT up, unsigned int rnd) {
 */
 static void auxsort (lua_State *L, IdxT lo, IdxT up,
                                    unsigned int rnd) {
+  unsigned steps = 0;  /* GLX_U */
   while (lo < up) {  /* loop for tail recursion */
     IdxT p;  /* Pivot index */
     IdxT n;  /* to be used later */
+    GLXU_STEP(L, steps);
     /* sort elements 'lo', 'p', and 'up' */
     lua_geti(L, 1, lo);
     lua_geti(L, 1, up);

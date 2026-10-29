@@ -1089,6 +1089,12 @@ void NPC_Use( gentity_t *self, gentity_t *other, gentity_t *activator )
 				{
 					pVeh->m_pVehicleInfo->EjectAll( pVeh );
 				}
+				// GLX_U fix: [Vehicles] a use from something that is not a character -- a target_flag, a relay, a
+				// breakable, a reward firing its target at the vehicle -- boarded "other" with no client: Board()
+				// read its playerState and the server crashed. Only a character boards or is ejected.
+				else if ( !other || !other->client )
+				{
+				}
 				// If other is already riding this vehicle (self), eject him.
 				else if ( other->s.owner == self->s.number )
 				{

@@ -32,6 +32,11 @@
 ** steps the mod checks its deadline and raises an error when it is past (rp_lua_core.c). */
 extern void RP_Lua_LoopCheck (lua_State *L);
 #define GLXU_STEP(L, counter)  { if (l_unlikely((++(counter) & 1023u) == 0)) RP_Lua_LoopCheck(L); }
+/* GLX_U: a step that copies or scans n bytes counts 1 + n/16, so a long replacement, a long bracket class, a long
+** needle or a long repeated piece cost what they take (the audit's gsub and bracket shapes ran 10-30x the budget
+** at one step each) */
+#define GLXU_STEPS(L, counter, n)  { unsigned int glxu_before_ = (counter); (counter) += (unsigned int)(n); \
+  if (l_unlikely(((counter) >> 10) != (glxu_before_ >> 10))) RP_Lua_LoopCheck(L); }
 
 
 /*
@@ -172,7 +177,7 @@ static int str_rep (lua_State *L) {
     unsigned int steps = 0;  /* GLX_U */
     char *p = luaL_buffinitsize(L, &b, totallen);
     while (n-- > 1) {  /* first n-1 copies (followed by separator) */
-      GLXU_STEP(L, steps);
+      GLXU_STEPS(L, steps, 1 + (l + lsep) / 16);
       memcpy(p, s, l * sizeof(char)); p += l;
       if (lsep > 0) {  /* empty 'memcpy' is not that cheap */
         memcpy(p, sep, lsep * sizeof(char));
@@ -490,7 +495,8 @@ static int singlematch (MatchState *ms, const char *s, const char *p,
     switch (*p) {
       case '.': return 1;  /* matches any char */
       case L_ESC: return match_class(c, uchar(*(p+1)));
-      case '[': return matchbracketclass(c, p, ep-1);
+      case '[': GLXU_STEPS(ms->L, ms->steps, (ep - p) / 16);  /* GLX_U: the class is scanned */
+                return matchbracketclass(c, p, ep-1);
       default:  return (uchar(*p) == c);
     }
   }
@@ -624,6 +630,7 @@ static const char *match (MatchState *ms, const char *s, const char *p) {
               luaL_error(ms->L, "missing '[' after '%%f' in pattern");
             ep = classend(ms, p);  /* points to what is next */
             previous = (s == ms->src_init) ? '\0' : *(s - 1);
+            GLXU_STEPS(ms->L, ms->steps, (ep - p) / 8);  /* GLX_U: two scans of the class */
             if (!matchbracketclass(uchar(previous), p, ep - 1) &&
                matchbracketclass(uchar(*s), p, ep - 1)) {
               p = ep; goto init;  /* return match(ms, s, ep); */
@@ -698,7 +705,7 @@ static const char *lmemfind (lua_State *L, const char *s1, size_t l1,
     l2--;  /* 1st char will be checked by 'memchr' */
     l1 = l1-l2;  /* 's2' cannot be found after that */
     while (l1 > 0 && (init = (const char *)memchr(s1, *s2, l1)) != NULL) {
-      GLXU_STEP(L, steps);
+      GLXU_STEPS(L, steps, 1 + l2 / 16);
       init++;   /* 1st char is already checked */
       if (memcmp(init, s2+1, l2) == 0)
         return init-1;
@@ -894,13 +901,16 @@ static void add_s (MatchState *ms, luaL_Buffer *b, const char *s,
   lua_State *L = ms->L;
   const char *news = lua_tolstring(L, 3, &l);
   const char *p;
+  GLXU_STEPS(L, ms->steps, 1 + l / 16);  /* GLX_U: the replacement is copied for every match */
   while ((p = (char *)memchr(news, L_ESC, l)) != NULL) {
     luaL_addlstring(b, news, p - news);
     p++;  /* skip ESC */
     if (*p == L_ESC)  /* '%%' */
       luaL_addchar(b, *p);
-    else if (*p == '0')  /* '%0' */
+    else if (*p == '0') {  /* '%0' */
+        GLXU_STEPS(L, ms->steps, (e - s) / 16);  /* GLX_U */
         luaL_addlstring(b, s, e - s);
+    }
     else if (isdigit(uchar(*p))) {  /* '%n' */
       const char *cap;
       ptrdiff_t resl = get_onecapture(ms, *p - '1', s, e, &cap);

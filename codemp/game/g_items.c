@@ -3133,7 +3133,7 @@ void RespawnItem( gentity_t *ent ) {
 	ent->r.svFlags &= ~SVF_BROADCAST;
 	trap->LinkEntity ((sharedEntity_t *)ent);
 
-	if ( ent->item->giType == IT_POWERUP ) {
+	if ( ent->item->giType == IT_POWERUP && G_EntitySlotsAvailable( 1 ) ) {	// GLX_U fix: [Entity System] no slot for the sound: silent, not an exit
 		// play powerup spawn sound to all clients
 		gentity_t	*te;
 

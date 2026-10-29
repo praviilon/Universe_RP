@@ -30,6 +30,54 @@ static int rpLuaNumLoadQueued = 0;
 static qboolean rpLuaStoreReady = qfalse;
 static qboolean rpLuaPanicked = qfalse;	// a Lua panic ended the map: the states are not touched again
 
+// the per-map spawn counters by plugin name: a reload or an unload and load must not start them over, or a
+// plugin could take another 128 props' worth of the level pool (never freed within a map) each time
+typedef struct {
+	char	name[RP_LUA_NAME_LEN + 1];
+	int		props, npcs, vehicles, dialogs, poolBytes;
+} rpLuaMapSpawns_t;
+static rpLuaMapSpawns_t rpLuaMapSpawns[RP_LUA_MAP_NAMES];
+static int rpLuaNumMapNames = 0;
+
+// the entry for a name, made when there is none; past RP_LUA_MAP_NAMES names the last entry is shared
+static rpLuaMapSpawns_t *RP_Lua_MapSpawnsFor( const char *name )
+{
+	int i;
+
+	for ( i = 0; i < rpLuaNumMapNames; i++ )
+	{
+		if ( !Q_stricmp( rpLuaMapSpawns[i].name, name ) )
+			return &rpLuaMapSpawns[i];
+	}
+	if ( rpLuaNumMapNames >= RP_LUA_MAP_NAMES )
+		return &rpLuaMapSpawns[RP_LUA_MAP_NAMES - 1];
+	memset( &rpLuaMapSpawns[rpLuaNumMapNames], 0, sizeof( rpLuaMapSpawns[0] ) );
+	Q_strncpyz( rpLuaMapSpawns[rpLuaNumMapNames].name, name, sizeof( rpLuaMapSpawns[0].name ) );
+	return &rpLuaMapSpawns[rpLuaNumMapNames++];
+}
+
+static void RP_Lua_MapSpawnsSave( const rpLuaPlugin_t *p )
+{
+	rpLuaMapSpawns_t *m = RP_Lua_MapSpawnsFor( p->name );
+
+	m->props = p->propSpawns; m->npcs = p->npcSpawns; m->vehicles = p->vehicleSpawns; m->dialogs = p->dialogSpawns; m->poolBytes = p->poolBytes;
+}
+
+static void RP_Lua_MapSpawnsRestore( rpLuaPlugin_t *p )
+{
+	const rpLuaMapSpawns_t *m = RP_Lua_MapSpawnsFor( p->name );
+
+	p->propSpawns = m->props; p->npcSpawns = m->npcs; p->vehicleSpawns = m->vehicles; p->dialogSpawns = m->dialogs; p->poolBytes = m->poolBytes;
+}
+
+qboolean RP_Lua_PoolRoom( rpLuaPlugin_t *p, int bytes )
+{
+	if ( bytes < 0 || p->poolBytes + bytes > RP_LUA_POOL_KB_MAP * 1024 )
+		return qfalse;
+	p->poolBytes += bytes;
+	return qtrue;
+}
+
 const char *rpLuaEventNames[RPLE_COUNT] = {
 	"init", "shutdown", "frame", "client_begin", "client_disconnect", "chat",
 	"player_death", "login", "logout", "character_select", "level_up", "entity_used",
@@ -565,6 +613,8 @@ static void RP_Lua_ClosePlugin( rpLuaPlugin_t *p, qboolean keepSlot )
 	int errorsTotal = p->errorsTotal;
 
 	Q_strncpyz( name, p->name, sizeof( name ) );
+	if ( p->name[0] )
+		RP_Lua_MapSpawnsSave( p );	// the map's counters outlive the state
 	RP_LuaWorld_PluginClose( p );	// its props and NPCs go with it (runs at a frame end or map end only)
 	if ( p->L && rpLuaPanicked )
 		p->L = NULL;	// left as it is: a half-built state is not closed (its memory goes with the process)
@@ -639,6 +689,7 @@ static qboolean RP_Lua_LoadPlugin( const char *name, const char **why )
 
 	RP_Lua_ResetPlugin( p );
 	Q_strncpyz( p->name, name, sizeof( p->name ) );
+	RP_Lua_MapSpawnsRestore( p );
 	p->inUse = qtrue;
 	p->memCap = RP_Lua_MemCap();
 	p->L = lua_newstate( RP_Lua_Alloc, p );
@@ -696,6 +747,7 @@ qboolean RP_Lua_OpenScratch( rpLuaPlugin_t *p, const char *name )
 {
 	RP_Lua_ResetPlugin( p );
 	Q_strncpyz( p->name, name, sizeof( p->name ) );
+	RP_Lua_MapSpawnsRestore( p );
 	p->inUse = qtrue;
 	p->memCap = RP_Lua_MemCap();
 	p->L = lua_newstate( RP_Lua_Alloc, p );
@@ -889,6 +941,7 @@ void RP_Lua_Init( void )
 	rp_luaInCall = 0;
 	rpLuaCurrent = NULL;
 	rpLuaPanicked = qfalse;
+	rpLuaNumMapNames = 0;	// a new map: the per-name spawn counters start over
 	RP_LuaApi_Reset();
 	RP_LuaWorld_Reset();
 

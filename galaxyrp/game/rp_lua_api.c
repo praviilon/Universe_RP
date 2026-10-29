@@ -27,8 +27,9 @@ static int rpLuaSends[MAX_CLIENTS][RP_LUA_SENDS_PER_SEC];	// level.time of the l
 // the stability guards
 static gameImport_t rpLuaTrap;		// the engine's import table, SendServerCommand guarded
 static void ( *rpLuaEngineSend )( int clientNum, const char *text );
-static int rpLuaCmdRing[MAX_CLIENTS][RP_LUA_CMDS_PER_SEC];	// level.time + 1 of the last guarded commands (0: none)
+static int rpLuaCmdRing[MAX_CLIENTS][RP_LUA_CMDS_PER_5S];	// level.time + 1 of the last guarded commands (0: none)
 static int rpLuaCmdHead[MAX_CLIENTS];	// the oldest of them
+static int rpLuaChainLogged;		// level.time + 1 of the last "chain stopped" log line
 static int rpLuaCmdLogged[MAX_CLIENTS];	// level.time + 1 of the last "held back" log line
 static int rpLuaDbFrame, rpLuaDbWrites, rpLuaDbLogged;	// level.time + 1 of the frame counted, writes in it, logged in it
 
@@ -259,25 +260,48 @@ const char *RP_Lua_CurrentName( void )
 	return rpLuaCurrent ? rpLuaCurrent->name : NULL;
 }
 
-// n more guarded commands to clientNum fit in the last second: the n oldest in its ring are a second old or none
+// n more guarded commands to clientNum fit: with them, at most RP_LUA_CMDS_PER_SEC in the last second and
+// RP_LUA_CMDS_PER_5S in the last five (the engine drops a client 128 unacknowledged commands behind; the second
+// window keeps a client that stops acknowledging for a few seconds under that from script traffic alone)
 static qboolean RP_Lua_CmdFits( int clientNum, int n )
 {
-	int k;
+	int k, inSecond = 0, inFive = 0;
 
-	for ( k = 0; k < n && k < RP_LUA_CMDS_PER_SEC; k++ )
+	if ( n > RP_LUA_CMDS_PER_SEC )
+		return qfalse;
+	for ( k = 0; k < RP_LUA_CMDS_PER_5S; k++ )
 	{
-		const int t = rpLuaCmdRing[clientNum][( rpLuaCmdHead[clientNum] + k ) % RP_LUA_CMDS_PER_SEC];
+		const int t = rpLuaCmdRing[clientNum][k], age = level.time + 1 - t;
 
-		if ( t && level.time + 1 - t >= 0 && level.time + 1 - t < 1000 )
-			return qfalse;
+		if ( !t || age < 0 )
+			continue;
+		if ( age < 1000 )
+			inSecond++;
+		if ( age < 5000 )
+			inFive++;
 	}
-	return ( n <= RP_LUA_CMDS_PER_SEC ) ? qtrue : qfalse;
+	return ( inSecond + n <= RP_LUA_CMDS_PER_SEC && inFive + n <= RP_LUA_CMDS_PER_5S ) ? qtrue : qfalse;
 }
 
 static void RP_Lua_CmdCount( int clientNum )
 {
 	rpLuaCmdRing[clientNum][rpLuaCmdHead[clientNum]] = level.time + 1;
-	rpLuaCmdHead[clientNum] = ( rpLuaCmdHead[clientNum] + 1 ) % RP_LUA_CMDS_PER_SEC;
+	rpLuaCmdHead[clientNum] = ( rpLuaCmdHead[clientNum] + 1 ) % RP_LUA_CMDS_PER_5S;
+}
+
+// GlobalUse: a chain a script call started stops at RP_LUA_USE_CHAIN uses (counted, logged once a minute)
+qboolean RP_Lua_ScriptChainRoom( int chain )
+{
+	if ( !rp_luaInCall || chain < RP_LUA_USE_CHAIN )
+		return qtrue;
+	if ( rpLuaCurrent )
+		rpLuaCurrent->chainsCut++;
+	if ( !rpLuaChainLogged || level.time + 1 - rpLuaChainLogged >= 60000 || level.time + 1 < rpLuaChainLogged )
+	{
+		rpLuaChainLogged = level.time + 1;
+		G_LogPrintf( "[lua:%s] a use chain stopped at %d uses: script budget\n", rpLuaCurrent ? rpLuaCurrent->name : "?", RP_LUA_USE_CHAIN );
+	}
+	return qfalse;
 }
 
 // a client the budget looks after: connected and not a bot (a bot has no command queue to overflow)
@@ -917,6 +941,7 @@ void RP_LuaApi_Reset( void )
 	memset( rpLuaSends, 0, sizeof( rpLuaSends ) );
 	memset( rpLuaCmdRing, 0, sizeof( rpLuaCmdRing ) );
 	memset( rpLuaCmdHead, 0, sizeof( rpLuaCmdHead ) );
+	rpLuaChainLogged = 0;
 	memset( rpLuaCmdLogged, 0, sizeof( rpLuaCmdLogged ) );
 	rpLuaDbFrame = rpLuaDbWrites = rpLuaDbLogged = 0;
 }

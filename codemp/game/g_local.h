@@ -2236,6 +2236,7 @@ typedef struct level_locals_s {
 	// GalaxyRP: [Entity System] why the last Entity System spawn was refused ("" if it was not),
 	// for the command that asked for it to say -- see RP_EntitySystemSpawnRefused() in g_spawn.c
 	char rp_spawn_refusal[256];
+	qboolean rpMapChangeQueued;		// GLX_U: [Entity System] a target_level_change queued its "map": every later one this map is ignored
 	// GalaxyRP: [Entity System] the ambient sound set names this server knows, read from sound/sound.txt once
 	// per map: 0 not read yet, 1 read, -1 the file could not be read -- see RP_SoundSetKnown() in g_spawn.c
 	int rp_soundsets_state;

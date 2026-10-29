@@ -385,6 +385,17 @@ static void RP_DialogOpen( gentity_t *self, gentity_t *player )
 	}
 	if ( !n )
 		return;	// nothing this player may say: as if not used
+	if ( o->id && o->entNum == self->s.number && o->def == d && o->numShown == n && !memcmp( o->shown, shown, n * sizeof( shown[0] ) ) )
+	{ // GLX_U fix: this dialogue is already open for the player with the same options (a USE_BUTTON trigger held
+	  // down fires every frame): the open one goes on, its time and place refreshed, nothing sent again --
+	  // each reopen resent the menu and the text, and a held key piled up enough to drop the player
+		o->deadline = level.time + d->timeoutMs;
+		o->nextCheck = level.time + RP_DLG_CHECK_MS;
+		if ( d->speaker[0] )
+			speaker = G_Find( NULL, FOFS( targetname ), d->speaker );
+		VectorCopy( speaker ? speaker->r.currentOrigin : self->r.currentOrigin, o->origin );
+		return;
+	}
 	if ( self->rpRewardSlots )
 	{ // ONCE_EACH: once per connection
 		int *slot = &self->rpRewardSlots[player->s.number * 2];
@@ -474,6 +485,21 @@ void Cmd_Dialog_f( gentity_t *ent )
 	if ( n < 1 || n > o->numShown )
 	{
 		trap->SendServerCommand( ent->s.number, va( "print \"There is no option %d. Type /dialog to see the dialogue again.\n\"", n ) );
+		return;
+	}
+	if ( !RP_FlagNeedMet( ent, o->def->need[o->shown[n - 1]] ) )
+	{ // GLX_U fix: need<n> was checked when the dialogue opened; a flag cleared since (a turn-in nearby) left the
+	  // option on the list, so a gated reward could be taken twice. Refused, and the dialogue reopened with the
+	  // options the player holds now (the same entity, a different set: RP_DialogOpen replaces it).
+		int k, met = 0;
+
+		trap->SendServerCommand( ent->s.number, "print \"That answer is no longer open to you.\n\"" );
+		for ( k = 0; k < o->def->numOptions; k++ )
+			met += RP_FlagNeedMet( ent, o->def->need[k] ) ? 1 : 0;
+		if ( met && !e->rpRewardSlots )	// (a ONCE_EACH dialogue cannot reopen: it closes instead)
+			RP_DialogOpen( e, ent );
+		else
+			RP_DialogClose( ent->s.number, RPDLG_GONE );
 		return;
 	}
 	trap->SendServerCommand( ent->s.number, va( "print \"^3> ^7%s\n\"", o->def->option[o->shown[n - 1]] ) );

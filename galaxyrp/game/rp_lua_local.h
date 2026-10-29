@@ -29,7 +29,9 @@ three cvars (rp_lua, rp_lua_plugins, rp_lua_memkb) are in g_xcvar.h.
 #define RP_LUA_SENDS_PER_SEC	4		// script commands to one player per second, all plugins together
 										// (Msg.*, and every World.use: its activator's room)
 #define RP_LUA_CMDS_PER_SEC		32		// any command to one client from inside script calls, a second, all plugins
-										// together (the engine drops a client 128 behind)
+										// together (the engine drops a client 128 behind), and
+#define RP_LUA_CMDS_PER_5S		96		// this many in five seconds: a client that stops acknowledging for a while
+										// (a lag spike) must not be dropped by script traffic alone
 #define RP_LUA_DB_WRITES_FRAME	4		// database writes from inside script calls, a server frame (a payout)
 #define RP_LUA_BROADCAST_PER_TOKEN 8	// recipients one token buys in Msg.broadcast
 #define RP_LUA_MAX_TIMERS		32		// live timers per plugin
@@ -60,6 +62,9 @@ three cvars (rp_lua, rp_lua_plugins, rp_lua_memkb) are in g_xcvar.h.
 #define RP_LUA_PROP_SPAWNS_MAP	128		// spawns per plugin per map: the key/value pool (G_Alloc) and the
 #define RP_LUA_NPC_SPAWNS_MAP	32		// spawner strings are never freed within a map
 #define RP_LUA_DIALOG_SPAWNS_MAP 16		// target_dialogs per plugin per map, within the 128: each keeps ~1.5 KB of pool
+#define RP_LUA_POOL_KB_MAP		512		// level pool (G_Alloc, never freed within a map) a plugin's spawns may take per map
+#define RP_LUA_NPC_POOL_BYTES	512		// what an NPC or vehicle spawn is charged (above its real spawner strings)
+#define RP_LUA_MAP_NAMES		64		// plugin names the per-map counters are kept for (a reload does not reset them)
 #define RP_LUA_NPC_HEALTH_MAX	100000	// World.npc's health option: 1..this
 #define RP_LUA_MAX_KEYS			24		// key/value pairs a World.prop may carry (ZYK_MAX_SPAWN_STRING_SLOTS/2 is 64)
 #define RP_LUA_KEY_NAME_MAX		32
@@ -153,7 +158,8 @@ typedef struct rpLuaPlugin_s {
 	// P2: the world
 	rpLuaEntity_t	ents[RP_LUA_MAX_ENTS];
 	int				numEnts;
-	int				propSpawns, npcSpawns, vehicleSpawns, dialogSpawns;	// this map (this load)
+	int				propSpawns, npcSpawns, vehicleSpawns, dialogSpawns;	// this map, by plugin name: saved at a close and
+	int				poolBytes;											// restored at a load (rpLuaMapSpawns), so a reload starts nowhere
 	qboolean		removesQueued;
 
 	// stats
@@ -162,6 +168,7 @@ typedef struct rpLuaPlugin_s {
 	int				usesBusy, cmdsHeld, dbRefused;	// the stability guards (rp_lua_api.c)
 	int				eventsShort, eventsSkipped;		// event calls past the frame budget: with the 1 ms deadline, and not made
 	int				luaUsesHeld;					// target_lua uses made from inside this plugin's calls, refused
+	int				chainsCut;						// use chains stopped at RP_LUA_USE_CHAIN
 } rpLuaPlugin_t;
 
 extern rpLuaPlugin_t rpLuaPlugins[RP_LUA_MAX_PLUGINS];
@@ -183,6 +190,7 @@ void RP_Lua_Error( rpLuaPlugin_t *p, const char *msg );
 qboolean RP_Lua_QueueOp( const char *name, rpLuaOp_t op );
 qboolean RP_Lua_QueueLoad( const char *name );
 qboolean RP_Lua_PluginFileExists( const char *name );	// lua/plugins/<name>/plugin.lua in the mod folder
+qboolean RP_Lua_PoolRoom( rpLuaPlugin_t *p, int bytes );	// the plugin's per-map pool budget takes bytes more (and charges them)
 void RP_Lua_FireEvent( rpLuaEvent_t ev, void (*fill)( lua_State *L, void *ctx ), void *ctx );
 void RP_Lua_RefillTokens( rpLuaPlugin_t *p );
 void RP_Lua_FirePlugin( rpLuaPlugin_t *p, rpLuaEvent_t ev, void (*fill)( lua_State *L, void *ctx ), void *ctx );	// one plugin's handler

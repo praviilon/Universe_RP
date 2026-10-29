@@ -63,4 +63,7 @@ const char *RP_Lua_CurrentName( void );	// the plugin whose call runs, or NULL
 #define RP_LUA_IN_CALL()				( rp_luaInCall != 0 )
 #define RP_LUA_CMD_ROOM( c, n )			( !rp_luaInCall || RP_Lua_ScriptCmdRoom( c, n ) )
 #define RP_LUA_BROADCAST_ROOM( n )		( !rp_luaInCall || RP_Lua_ScriptBroadcastRoom( n ) )
+#define RP_LUA_USE_CHAIN				64		// uses one chain started inside a script call may make (the map's own is RP_MAX_USE_CHAIN)
+#define RP_LUA_CHAIN_ROOM( chain )		( !rp_luaInCall || RP_Lua_ScriptChainRoom( chain ) )
+qboolean RP_Lua_ScriptChainRoom( int chain );	// the chain is under RP_LUA_USE_CHAIN (else counted and logged)
 #define RP_LUA_DB_WRITE_OK()			( !rp_luaInCall || RP_Lua_ScriptDbWrite() )

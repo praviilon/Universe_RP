@@ -79,12 +79,12 @@ static void RP_LuaAdmin_Stats( gentity_t *ent, const char *name )
 		RP_LuaAdmin_Out( ent, va( "^3%s^7: %d calls, %d ms in all, %d errors; sent %d, refused %d (bucket) + %d (player busy); timers deferred %d; tokens now %d; stored %d KB\n",
 			p->name, p->calls, p->callMs, p->errorsTotal, p->sent, p->refusedTokens, p->refusedRecipients, p->deferredTimers, p->tokens, (int)( p->storeBytes / 1024 ) ) );
 		if ( p->L )
-			RP_LuaAdmin_Out( ent, va( "   world: %d props, %d NPCs and %d vehicles alive (%d, %d and %d spawned this map, %d of the props dialogues, %d refused); %d uses, %d effects, %d sounds\n",
+			RP_LuaAdmin_Out( ent, va( "   world: %d props, %d NPCs and %d vehicles alive (%d, %d and %d spawned this map by this name, %d of the props dialogues, %d KB of pool, %d refused); %d uses, %d effects, %d sounds\n",
 				RP_LuaWorld_CountLive( p, qfalse ), RP_LuaWorld_CountLive( p, qtrue ), RP_LuaWorld_CountVehicles( p ), p->propSpawns, p->npcSpawns, p->vehicleSpawns,
-				p->dialogSpawns, p->spawnsRefused, p->uses, p->effects, p->sounds ) );
-		if ( p->L && ( p->usesBusy || p->cmdsHeld || p->dbRefused || p->eventsShort || p->eventsSkipped || p->luaUsesHeld ) )
-			RP_LuaAdmin_Out( ent, va( "   guards: %d uses refused (player busy), %d commands held back, %d payouts skipped (database writes), %d target_lua uses refused; past the frame budget: %d event calls shortened, %d not run\n",
-				p->usesBusy, p->cmdsHeld, p->dbRefused, p->luaUsesHeld, p->eventsShort, p->eventsSkipped ) );
+				p->dialogSpawns, p->poolBytes / 1024, p->spawnsRefused, p->uses, p->effects, p->sounds ) );
+		if ( p->L && ( p->usesBusy || p->cmdsHeld || p->dbRefused || p->eventsShort || p->eventsSkipped || p->luaUsesHeld || p->chainsCut ) )
+			RP_LuaAdmin_Out( ent, va( "   guards: %d uses refused (player busy), %d commands held back, %d payouts skipped (database writes), %d target_lua uses refused, %d use chains stopped; past the frame budget: %d event calls shortened, %d not run\n",
+				p->usesBusy, p->cmdsHeld, p->dbRefused, p->luaUsesHeld, p->chainsCut, p->eventsShort, p->eventsSkipped ) );
 	}
 }
 

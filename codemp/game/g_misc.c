@@ -414,7 +414,10 @@ void TeleportPlayer( gentity_t *player, vec3_t origin, vec3_t angles ) {
 
 	// use temp events at source and destination to prevent the effect
 	// from getting dropped by a second player event
-	if ( player->client->sess.sessionTeam != TEAM_SPECTATOR ) {
+	// GLX_U fix: [Entity System] not when the entity table is nearly full: a chain of teleporters (a script's
+	// fan-out, a map loop) made hundreds of these in one frame, and G_Spawn() with no slot left ends the server.
+	// The teleport itself still happens; only its flash is left out.
+	if ( player->client->sess.sessionTeam != TEAM_SPECTATOR && G_EntitySlotsAvailable( 2 ) ) {
 		tent = G_TempEntity( player->client->ps.origin, EV_PLAYER_TELEPORT_OUT );
 		tent->s.clientNum = player->s.clientNum;
 
@@ -1042,7 +1045,7 @@ void misc_model_breakable_pain ( gentity_t *self, gentity_t *other, int damage )
 		// still alive, react to the pain
 		if ( self->paintarget )
 		{
-			G_UseTargets2 (self, self->activator, self->paintarget);
+			G_UseTargets2 (self, self->activator ? self->activator : other, self->paintarget);	// GLX_U fix: the attacker when nothing used it yet, never NULL
 		}
 
 		// Don't do script if dead
@@ -4318,6 +4321,11 @@ void fx_runner_think( gentity_t *ent )
 
 	if ( ent->target2 && ent->target2[0] )
 	{
+		// GLX_U fix: [Entity System] with a "delay" of 0 this fired target2 every frame, with no pacing at all
+		// (a powerup respawn, a teleporter, another fx_runner, each use a G_Find scan and often a temp
+		// entity). The effect keeps its delay; the firing is paced as the damage tick is.
+		if ((ent->nextthink - level.time) < RP_FX_RUNNER_MIN_DAMAGE_DELAY)
+			ent->nextthink = level.time + RP_FX_RUNNER_MIN_DAMAGE_DELAY;
 		// let our target know that we have spawned an effect
 		G_UseTargets2( ent, ent, ent->target2 );
 	}

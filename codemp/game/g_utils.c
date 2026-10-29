@@ -2121,6 +2121,11 @@ void GlobalUse(gentity_t *self, gentity_t *other, gentity_t *activator)
 		level.rp_use_chain = 0;
 	}
 
+	if ( !RP_LUA_CHAIN_ROOM( level.rp_use_chain ) )
+	{ // GLX_U: [Lua] a chain a script started stops at RP_LUA_USE_CHAIN: a fan-out of flags into teleporters turned one
+	  // World.use into hundreds of uses in a frame (and their temp entities); a quest never needs that many
+		return;
+	}
 	if (level.rp_use_depth >= RP_MAX_USE_DEPTH || level.rp_use_chain >= RP_MAX_USE_CHAIN)
 	{
 		if (!level.rp_use_limit_warned)
@@ -2150,7 +2155,7 @@ void G_UseTargets2( gentity_t *ent, gentity_t *activator, const char *string ) {
 		return;
 	}
 
-	if (ent->targetShaderName && ent->targetShaderNewName) {
+	if (ent->targetShaderName && ent->targetShaderNewName && RP_LUA_BROADCAST_ROOM( 1 )) {	// GLX_U: [Lua] a configstring to everyone, counted inside a script call
 		float f = level.time * 0.001;
 		AddRemap(ent->targetShaderName, ent->targetShaderNewName, f);
 		trap->SetConfigstring(CS_SHADERSTATE, BuildShaderStateConfig());

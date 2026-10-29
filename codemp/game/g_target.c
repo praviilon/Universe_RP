@@ -146,7 +146,7 @@ Used to drop flight powerups into death puts.
 */
 extern void Jedi_Decloak( gentity_t *self );
 void Use_target_remove_powerups( gentity_t *ent, gentity_t *other, gentity_t *activator ) {
-	if( !activator->client ) {
+	if( !activator || !activator->client ) {	// GLX_U fix: [Entity System] fired with no activator (a breakable's paintarget)
 		return;
 	}
 
@@ -417,7 +417,8 @@ void Use_Target_Speaker (gentity_t *ent, gentity_t *other, gentity_t *activator)
 		}
 	}else {	// normal sound
 		if ( ent->spawnflags & 8 ) {
-			G_AddEvent( activator, EV_GENERAL_SOUND, ent->noise_index );
+			if ( activator )	// GLX_U fix: [Entity System] fired with no activator (a breakable's paintarget): nobody to play it to
+				G_AddEvent( activator, EV_GENERAL_SOUND, ent->noise_index );
 		} else if (ent->spawnflags & 4) {
 			G_AddEvent( ent, EV_GLOBAL_SOUND, ent->noise_index );
 		} else {
@@ -642,7 +643,7 @@ void SP_target_laser (gentity_t *self)
 void target_teleporter_use( gentity_t *self, gentity_t *other, gentity_t *activator ) {
 	gentity_t	*dest;
 
-	if (!activator->client)
+	if (!activator || !activator->client)	// GLX_U fix: [Entity System] a breakable's paintarget fires with no activator until it was used
 		return;
 
 	G_ActivateBehavior(self,BSET_USE);
@@ -735,6 +736,8 @@ Kills the activator.
 */
 void target_kill_use( gentity_t *self, gentity_t *other, gentity_t *activator ) {
 	G_ActivateBehavior(self,BSET_USE);
+	if ( !activator )	// GLX_U fix: [Entity System] fired with no activator (a breakable's paintarget): nobody to kill
+		return;
 	G_Damage ( activator, NULL, NULL, NULL, NULL, 100000, DAMAGE_NO_PROTECTION, MOD_TELEFRAG);
 }
 
@@ -848,9 +851,19 @@ void SP_target_reward( gentity_t *self )
 		G_FreeEntity( self );
 		return;
 	}
-	if ( self->wait < 0 )
-		self->wait = 0;
+	if ( !( self->wait >= 0 ) || self->wait > 86400 )
+	{ // GLX_U fix: as /entadd caps them; past 24.8 days the millisecond value overflowed to INT_MIN and the wait was gone (NaN too)
+		G_LogPrintf( "target_reward %d: wait %g brought to %d\n", self->s.number, self->wait, self->wait > 86400 ? 86400 : 0 );
+		self->wait = self->wait > 86400 ? 86400 : 0;
+	}
 	G_SpawnFloat( "playerwait", "0", &f );
+	if ( !( f >= 0 ) )
+		f = 0;
+	if ( f > 86400 )
+	{
+		G_LogPrintf( "target_reward %d: playerwait %g brought to 86400\n", self->s.number, f );
+		f = 86400;
+	}
 	self->rpRewardPlayerWait = ( f > 0 ) ? (int)( f * 1000 ) : 0;
 	if ( self->rpRewardPlayerWait > 0 || ( self->spawnflags & RP_REWARD_ONCE_EACH ) )
 	{ // G_Alloc() ends the server when the pool is out: ask first, as the entity commands do
@@ -1304,6 +1317,17 @@ void target_level_change_use(gentity_t *self, gentity_t *other, gentity_t *activ
 
 		return;
 	}
+
+	// GLX_U fix: [Entity System] one map change per map. Each use appended its own "map" command and the engine
+	// ran every one of them in turn: several level changes fired by one chain (a script's fan-out, a relay into a
+	// few of them) meant that many full map loads back to back, with the server unresponsive for minutes.
+	if ( level.rpMapChangeQueued )
+	{
+		G_LogPrintf( "target_level_change at %s used by %s: a map change is already queued, ignored\n", vtos( self->s.origin ),
+			( activator && activator->client ) ? activator->client->pers.netname : "the map" );
+		return;
+	}
+	level.rpMapChangeQueued = qtrue;
 
 	// GalaxyRP: [Entity System] who tripped it goes to the log before the map goes
 	G_LogPrintf( "target_level_change at %s used by %s: changing map to %s\n", vtos( self->s.origin ),

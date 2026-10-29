@@ -730,6 +730,7 @@ static const char *const rpLuaRefusedKeys[] = {
 	"classname", "origin", "angles", "aimoffset",	// arguments of the call, not keys
 	"targetname", "script_targetname", "npc_targetname", "team",	// the name is opts.name; ICARUS and the mover teams are the map's
 	"rpLock", "lock", "npccredits", "npcxp",	// "lock" is the spawn key of rpLock (g_spawn.c): a server lock is the map's
+	"targetshadername", "targetshadernewname",	// a shader remap for everyone, a configstring on every firing: the map's business
 	NULL
 };
 // a link key: its value is a plain name of one of this plugin's own entities, stored as lua.<plugin>.<name>, so a
@@ -890,8 +891,11 @@ static int RP_LuaWorld_Prop( lua_State *L )
 		p->spawnsRefused++;
 		return RP_LuaWorld_Refuse( L, "no room" );
 	}
+	if ( p->poolBytes + RP_PairsBytes( ptrs, n * 2 ) > RP_LUA_POOL_KB_MAP * 1024 )
+		return RP_LuaWorld_Refuse( L, "spawn limit for this map" );	// the plugin's pool budget (RP_Lua_PoolRoom), by name: a reload keeps it
 	if ( !RP_LuaApi_TakeToken( p, 1 ) )
 		return RP_LuaWorld_Refuse( L, "too fast" );
+	RP_Lua_PoolRoom( p, RP_PairsBytes( ptrs, n * 2 ) );
 	p->propSpawns++;
 	if ( !Q_stricmp( classname, "target_dialog" ) )
 		p->dialogSpawns++;
@@ -957,15 +961,16 @@ static int RP_LuaWorld_Npc( lua_State *L )
 		return RP_LuaWorld_Refuse( L, "a vehicle type: use World.vehicle" );
 	if ( RP_LuaWorld_CountLive( p, qtrue ) >= RP_LUA_MAX_NPCS )
 		return RP_LuaWorld_Refuse( L, "too many npcs" );
-	if ( p->npcSpawns >= RP_LUA_NPC_SPAWNS_MAP )
+	if ( p->npcSpawns >= RP_LUA_NPC_SPAWNS_MAP || p->poolBytes + RP_LUA_NPC_POOL_BYTES > RP_LUA_POOL_KB_MAP * 1024 )
 		return RP_LuaWorld_Refuse( L, "spawn limit for this map" );
-	if ( !G_EntitySlotsAvailable( 3 ) )
-	{
+	if ( !G_EntitySlotsAvailable( 3 ) || !G_AllocRoomFor( RP_LUA_NPC_POOL_BYTES ) )
+	{ // the spawner's strings and the NPC's own (NPC_type, the name) are level pool, never freed within a map
 		p->spawnsRefused++;
 		return RP_LuaWorld_Refuse( L, "no room" );
 	}
 	if ( !RP_LuaApi_TakeToken( p, 1 ) )
 		return RP_LuaWorld_Refuse( L, "too fast" );
+	RP_Lua_PoolRoom( p, RP_LUA_NPC_POOL_BYTES );
 	p->npcSpawns++;
 
 	spawner = RP_SpawnForClassname( "npc_spawner", qfalse, qfalse );
@@ -1039,17 +1044,18 @@ static int RP_LuaWorld_Vehicle( lua_State *L )
 		return RP_LuaWorld_Refuse( L, "not a vehicle type" );
 	if ( RP_LuaWorld_CountVehicles( p ) >= RP_LUA_MAX_VEHICLES )
 		return RP_LuaWorld_Refuse( L, "too many vehicles" );
-	if ( p->vehicleSpawns >= RP_LUA_VEHICLE_SPAWNS_MAP )
+	if ( p->vehicleSpawns >= RP_LUA_VEHICLE_SPAWNS_MAP || p->poolBytes + RP_LUA_NPC_POOL_BYTES > RP_LUA_POOL_KB_MAP * 1024 )
 		return RP_LuaWorld_Refuse( L, "spawn limit for this map" );
 	if ( RP_LuaWorld_VehiclesOnServer() >= RP_LUA_VEHICLES_SERVER )
 		return RP_LuaWorld_Refuse( L, "too many vehicles on the server" );
-	if ( !G_EntitySlotsAvailable( 3 ) )
+	if ( !G_EntitySlotsAvailable( 3 ) || !G_AllocRoomFor( RP_LUA_NPC_POOL_BYTES ) )
 	{
 		p->spawnsRefused++;
 		return RP_LuaWorld_Refuse( L, "no room" );
 	}
 	if ( !RP_LuaApi_TakeToken( p, 1 ) )
 		return RP_LuaWorld_Refuse( L, "too fast" );
+	RP_Lua_PoolRoom( p, RP_LUA_NPC_POOL_BYTES );
 	p->vehicleSpawns++;
 
 	spawner = RP_SpawnForClassname( "npc_spawner", qfalse, qfalse );

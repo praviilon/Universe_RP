@@ -39,15 +39,28 @@ steps across a whole call (`prepstate`), and every 1024 of them, in
 `matchbalance()`, in `max_expand()`, in the plain-find `lmemfind()` and in
 `str_rep()`'s copy loop, the library calls `RP_Lua_LoopCheck()`
 (`rp_lua_core.c`), which raises "ran too long" once the call's deadline is
-past. `str_rep()` also returns `""` at once when there is nothing to repeat
-(`("")`:rep(n) looped n times for nothing). These loops run no VM
-instruction, so the count hook alone cannot stop them: a backtracking
-pattern (`('a'):rep(200000):find('.-.-.-.-x')`), `%b()` over a long
-unbalanced string, a long linear pattern, a long plain find.
+past. A step that copies or scans `n` bytes counts `1 + n/16` steps
+(`GLXU_STEPS`): the replacement string `add_s()` copies for every match
+(and a `%0` capture), a bracket class scanned per character (`[...]` in
+`singlematch()`, twice in `%f[...]`), the needle `lmemfind()` compares, the
+piece `str_rep()` repeats. At one step each, a 5000-match `gsub` with a
+100 KB replacement and a 200 KB bracket class ran 10-30 times past the
+budget before the check saw them. `str_rep()` also returns `""` at once
+when there is nothing to repeat (`("")`:rep(n) looped n times for nothing).
+These loops run no VM instruction, so the count hook alone cannot stop
+them: a backtracking pattern (`('a'):rep(200000):find('.-.-.-.-x')`),
+`%b()` over a long unbalanced string, a long linear pattern, a long plain
+find.
 
-**`ltablib.c`**, two lines marked `GLX_U`: `tmove()` (`table.move`) calls
-`RP_Lua_LoopCheck()` every 1024 elements, for the same reason (a huge range
-over an empty table is a pure C loop).
+**`ltablib.c`**, the lines marked `GLX_U`: `aux_getn()` refuses a length
+past 2^24 ("table too big") before any loop runs - a `__len` metamethod
+may return anything, and `table.remove(t, 1)` or `table.insert(t, 1, v)`
+on a table whose `__len` says `math.maxinteger` is a C loop that never
+ends, with no VM instruction for the hook to count. The library's own
+loops call `RP_Lua_LoopCheck()` every 1024 steps: the shifts in
+`tinsert()` and `tremove()`, `tmove()` (a huge range over an empty table),
+`tconcat()` (each piece and separator weighted by its length, as in
+`lstrlib.c`), and the `partition()` and `auxsort()` loops of `table.sort`.
 
 Every other `.c` file is byte-identical to the release. When upgrading,
 replace every file, then re-apply the `luaconf.h` blocks and the `lstrlib.c`
