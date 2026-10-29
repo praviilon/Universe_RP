@@ -118,12 +118,9 @@ void RP_Lua_EventDeath( gentity_t *victim, gentity_t *attacker, int mod )
 	{ // NPCs die through player_die too: only one a script spawned is reported, to that script
 		rpLuaPlugin_t *p = RP_LuaWorld_OwnerOf( victim );
 
-		if ( !p || !p->L || rpLuaCurrent || p->handlers[RPLE_NPC_DEATH] == LUA_NOREF )
-			return;
-		lua_rawgeti( p->L, LUA_REGISTRYINDEX, p->handlers[RPLE_NPC_DEATH] );
-		lua_newtable( p->L );
-		RP_Lua_FillNpcDeath( p->L, &c );
-		RP_Lua_Call( p, 1, 0 );
+		if ( !p || rpLuaCurrent )
+			return;	// inside a script call (its own World.use killed it): not delivered, as every event then
+		RP_Lua_FirePlugin( p, RPLE_NPC_DEATH, RP_Lua_FillNpcDeath, &c );
 		return;
 	}
 	RP_Lua_FireEvent( RPLE_PLAYER_DEATH, RP_Lua_FillDeath, &c );
@@ -154,7 +151,7 @@ void RP_Lua_EventUsed( gentity_t *self, gentity_t *activator )
 	int i;
 
 	if ( rpLuaCurrent )
-		return;	// P1 scripts cannot use anything, so this cannot happen; kept as the rule
+		return;	// a use made by a script (World.use, g_utils.c skips the hook) or inside one: not delivered
 	for ( i = 0; i < RP_LUA_MAX_PLUGINS; i++ )
 	{
 		rpLuaPlugin_t *p = &rpLuaPlugins[i];
@@ -169,10 +166,7 @@ void RP_Lua_EventUsed( gentity_t *self, gentity_t *activator )
 		}
 		if ( w == p->numWatches )
 			continue;
-		lua_rawgeti( p->L, LUA_REGISTRYINDEX, p->handlers[RPLE_ENTITY_USED] );
-		lua_newtable( p->L );
-		RP_Lua_FillUsed( p->L, &c );
-		RP_Lua_Call( p, 1, 0 );
+		RP_Lua_FirePlugin( p, RPLE_ENTITY_USED, RP_Lua_FillUsed, &c );
 	}
 }
 
@@ -269,9 +263,29 @@ RP_Lua_Command
 ClientCommand's "Unknown command" line asks here first. qtrue when a plugin owns the name.
 ==================
 */
+// the command's arguments: the player and the args table, inside the protected call
+static int RP_Lua_PushCommand( lua_State *L, void *ctx )
+{
+	int clientNum = *(int *)ctx, argc = trap->Argc(), k;
+
+	RP_LuaApi_PushPlayer( L, clientNum );
+	lua_newtable( L );
+	if ( argc > RP_LUA_MAX_ARGS + 1 )
+		argc = RP_LUA_MAX_ARGS + 1;
+	for ( k = 1; k < argc; k++ )
+	{
+		char arg[MAX_TOKEN_CHARS];
+
+		trap->Argv( k, arg, sizeof( arg ) );
+		lua_pushstring( L, arg );
+		lua_rawseti( L, -2, k );
+	}
+	return 2;
+}
+
 qboolean RP_Lua_Command( gentity_t *ent, const char *cmd )
 {
-	int i, k, argc;
+	int i, k, clientNum = ent - g_entities;
 
 	if ( rpLuaCurrent || !ent->client )
 		return qfalse;
@@ -285,21 +299,7 @@ qboolean RP_Lua_Command( gentity_t *ent, const char *cmd )
 		{
 			if ( Q_stricmp( p->cmdNames[k], cmd ) )
 				continue;
-			lua_rawgeti( p->L, LUA_REGISTRYINDEX, p->cmdRefs[k] );
-			RP_LuaApi_PushPlayer( p->L, ent - g_entities );
-			lua_newtable( p->L );
-			argc = trap->Argc();
-			if ( argc > RP_LUA_MAX_ARGS + 1 )
-				argc = RP_LUA_MAX_ARGS + 1;
-			for ( k = 1; k < argc; k++ )
-			{
-				char arg[MAX_TOKEN_CHARS];
-
-				trap->Argv( k, arg, sizeof( arg ) );
-				lua_pushstring( p->L, arg );
-				lua_rawseti( p->L, -2, k );
-			}
-			RP_Lua_Call( p, 2, 0 );
+			RP_Lua_CallRef( p, p->cmdRefs[k], RP_Lua_CallMs( p ), RP_Lua_PushCommand, &clientNum );
 			return qtrue;
 		}
 	}

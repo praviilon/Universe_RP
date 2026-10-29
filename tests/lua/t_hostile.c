@@ -35,6 +35,22 @@ static const shape_t shapes[] = {
 	{ "deep",		"local t = {} local c = t for i = 1, 100000 do c.n = {} c = c.n end" },
 	{ "utf8",		"local s = ('\\xF0\\x9F\\x98\\x80'):rep(50000) for i = 1, 100 do utf8.len(s) end" },
 	{ "tostringloop","local t = {} for i = 1, 100000 do t[i] = tostring(i) .. tostring({}) end" },
+	// the audit's C-side loops (lstrlib, ltablib) and the escapes from the budget
+	{ "tmove",		"table.move({}, 1, math.maxinteger - 1, 2)" },
+	{ "tmovefwd",	"table.move({}, 1, math.maxinteger - 1, 1, {})" },
+	{ "balance",	"local s = ('('):rep(250000) s:find('%b()')" },
+	{ "linearpat",	"local s = ('a'):rep(200000) local p = ('a'):rep(100000) .. '%d' s:find(p)" },
+	{ "plainfind",	"local s = ('a'):rep(200000) local p = ('a'):rep(100000) .. 'b' s:find(p, 1, true)" },
+	{ "maxexpand",	"local s = ('a'):rep(200000) s:find('a*b')" },
+	{ "emptyrep",	"local s = (''):rep(math.maxinteger) local t = (''):rep(math.maxinteger, '')" },
+	{ "gmatchlong",	"local s = ('a'):rep(200000) local p = ('a'):rep(80000) .. 'b' for w in s:gmatch(p) do end" },
+	{ "pcallloop",	"while true do pcall(function() while true do end end) end" },
+	{ "pcallpat",	"local s = ('a'):rep(200000) while true do pcall(string.find, s, '.-.-.-.-x') end" },
+	{ "gcloop",		"setmetatable({}, {__gc = function() while true do end end})" },
+	{ "gcstore",	"setmetatable({}, {__gc = function() Storage.set('k', 'v') end})" },
+	{ "gcworld",	"setmetatable({}, {__gc = function() World.use('x', Players.get(0)) end})" },
+	{ "metaprop",	"local o o = setmetatable({}, {__index = function() return World.prop('fx_runner', o) end}) World.prop('fx_runner', o)" },
+	{ "metanpc",	"local o = setmetatable({}, {__index = function() return 'enemy' end}) for i = 1, 100 do World.npc('jedi', {x=0,y=0,z=0}, nil, o) end" },
 	// P2: the world
 	{ "proploop",	"for i = 1, 100000 do World.prop('misc_model_breakable', {x=0,y=0,z=0}) end" },
 	{ "npcloop",	"for i = 1, 100000 do World.npc('jedi', {x=0,y=0,z=0}) end" },
@@ -154,6 +170,7 @@ int main( void )
 	  RP_LUA_SHUTDOWN(); t_frame( 100 ); t_runThinks();
 	  CHECK( t_vehiclesAlive == 0 && t_freedRidden == 0, "all vehicles gone: %d", t_vehiclesAlive );
 	  printf( "%-14s ok\n", "vehreload" ); }
+	t_init( 8 );	// TEST ONLY: frees what the stubs still hold (spawned strings, NPC clients): valgrind ends with nothing reachable
 	printf( fails ? "%d FAILED\n" : "t_hostile: ALL OK\n", fails );
 	return fails != 0;
 }

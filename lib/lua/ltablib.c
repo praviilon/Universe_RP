@@ -112,6 +112,10 @@ static int tremove (lua_State *L) {
 ** "possible" means destination after original range, or smaller
 ** than origin, or copying to another table.
 */
+/* GLX_U: [Lua] table.move over a huge range is a C loop the mod's count hook never sees: every 1024
+** elements the mod checks its deadline (rp_lua_core.c), as lstrlib.c does for pattern matching */
+extern void RP_Lua_LoopCheck (lua_State *L);
+
 static int tmove (lua_State *L) {
   lua_Integer f = luaL_checkinteger(L, 2);
   lua_Integer e = luaL_checkinteger(L, 3);
@@ -128,12 +132,14 @@ static int tmove (lua_State *L) {
                   "destination wrap around");
     if (t > e || t <= f || (tt != 1 && !lua_compare(L, 1, tt, LUA_OPEQ))) {
       for (i = 0; i < n; i++) {
+        if (l_unlikely((i & 1023) == 1023)) RP_Lua_LoopCheck(L);  /* GLX_U */
         lua_geti(L, 1, f + i);
         lua_seti(L, tt, t + i);
       }
     }
     else {
       for (i = n - 1; i >= 0; i--) {
+        if (l_unlikely((i & 1023) == 1023)) RP_Lua_LoopCheck(L);  /* GLX_U */
         lua_geti(L, 1, f + i);
         lua_seti(L, tt, t + i);
       }

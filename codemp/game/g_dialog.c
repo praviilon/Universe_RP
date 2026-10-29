@@ -372,15 +372,16 @@ static void RP_DialogOpen( gentity_t *self, gentity_t *player )
 {
 	rpDialogOpen_t *o = RP_DialogOf( player->s.number );
 	rpDialogDef_t *d = self->rpDialogDef;
-	int i, n = 0;
+	int i, n = 0, shown[RP_DIALOG_OPTIONS];
 	gentity_t *speaker = NULL;
 
 	if ( !o || !d )
 		return;
 	for ( i = 0; i < d->numOptions; i++ )
-	{
+	{ // GLX_U: built here, written into the record only once this dialogue really opens: a use that returns
+	  // below (nothing to say, ONCE_EACH) must leave an open dialogue's option map as it is
 		if ( RP_FlagNeedMet( player, d->need[i] ) )
-			o->shown[n++] = i;
+			shown[n++] = i;
 	}
 	if ( !n )
 		return;	// nothing this player may say: as if not used
@@ -398,7 +399,7 @@ static void RP_DialogOpen( gentity_t *self, gentity_t *player )
 		slot[1] = level.time ? level.time : 1;
 	}
 	if ( o->id )
-		RP_DialogClose( player->s.number, RPDLG_REPLACED );
+		RP_DialogClose( player->s.number, RPDLG_REPLACED );	// raises dialog_answer: a handler's own open is overwritten below, whole
 
 	o->id = rpDialogNextId++;
 	if ( rpDialogNextId <= 0 )
@@ -406,6 +407,7 @@ static void RP_DialogOpen( gentity_t *self, gentity_t *player )
 	o->entNum = self->s.number;
 	o->def = d;
 	o->numShown = n;
+	memcpy( o->shown, shown, sizeof( o->shown ) );
 	o->deadline = level.time + d->timeoutMs;
 	o->nextCheck = level.time + RP_DLG_CHECK_MS;
 	o->range = d->range;

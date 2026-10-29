@@ -460,7 +460,7 @@ static int RP_LuaApi_Refuse( lua_State *L, const char *why )
 
 static int RP_LuaApi_SendOne( lua_State *L, const char *cmd )
 {
-	rpLuaPlugin_t *p = rpLuaCurrent;
+	rpLuaPlugin_t *p = RP_LUA_PLUGIN( L );
 	int clientNum;
 	char text[RP_LUA_TEXT_MAX + 1];
 
@@ -485,7 +485,7 @@ static int RP_LuaApi_MsgCenter( lua_State *L )	{ return RP_LuaApi_SendOne( L, "c
 
 static int RP_LuaApi_MsgBroadcast( lua_State *L )
 {
-	rpLuaPlugin_t *p = rpLuaCurrent;
+	rpLuaPlugin_t *p = RP_LUA_PLUGIN( L );
 	char text[RP_LUA_TEXT_MAX + 1];
 	int i, recipients = 0, tokens;
 
@@ -522,7 +522,7 @@ Events
 */
 static int RP_LuaApi_EventsOn( lua_State *L )
 {
-	rpLuaPlugin_t *p = rpLuaCurrent;
+	rpLuaPlugin_t *p = RP_LUA_PLUGIN( L );
 	const char *name = luaL_checkstring( L, 1 );
 	int ev;
 
@@ -550,7 +550,7 @@ Commands
 */
 static int RP_LuaApi_CommandsAdd( lua_State *L )
 {
-	rpLuaPlugin_t *p = rpLuaCurrent;
+	rpLuaPlugin_t *p = RP_LUA_PLUGIN( L );
 	const char *name = luaL_checkstring( L, 1 );
 	const char *help = luaL_optstring( L, 3, "" );
 	int i;
@@ -609,7 +609,7 @@ Timers
 */
 static int RP_LuaApi_TimerAdd( lua_State *L, qboolean repeat )
 {
-	rpLuaPlugin_t *p = rpLuaCurrent;
+	rpLuaPlugin_t *p = RP_LUA_PLUGIN( L );
 	int ms = (int)luaL_checkinteger( L, 1 );
 	rpLuaTimer_t *t;
 
@@ -633,7 +633,7 @@ static int RP_LuaApi_TimerEvery( lua_State *L )	{ return RP_LuaApi_TimerAdd( L, 
 
 static int RP_LuaApi_TimerCancel( lua_State *L )
 {
-	rpLuaPlugin_t *p = rpLuaCurrent;
+	rpLuaPlugin_t *p = RP_LUA_PLUGIN( L );
 	int id = (int)luaL_checkinteger( L, 1 ), i;
 
 	for ( i = 0; i < p->numTimers; i++ )
@@ -661,9 +661,7 @@ void RP_LuaApi_RunTimers( rpLuaPlugin_t *p )
 		if ( p->frameMsLeft > 0 && rpLuaFrameMsLeft > 0 )
 		{
 			p->frameDue = level.time + RP_LUA_EVENT_FRAME_MS;
-			lua_rawgeti( L, LUA_REGISTRYINDEX, p->handlers[RPLE_FRAME] );
-			lua_newtable( L );
-			RP_Lua_Call( p, 1, 0 );
+			RP_Lua_CallRef( p, p->handlers[RPLE_FRAME], RP_LUA_CALL_MS, RP_Lua_PushEmptyEvent, NULL );
 		}
 		else
 			p->deferredTimers++;
@@ -686,14 +684,16 @@ void RP_LuaApi_RunTimers( rpLuaPlugin_t *p )
 			if ( t->due < level.time )
 				t->due = level.time + t->interval;	// fell behind: no catching up
 		}
-		lua_rawgeti( L, LUA_REGISTRYINDEX, t->ref );
-		if ( !t->interval )
-		{
-			luaL_unref( L, LUA_REGISTRYINDEX, t->ref );
+		if ( t->interval )
+			RP_Lua_CallRef( p, t->ref, RP_LUA_CALL_MS, RP_Lua_PushEmptyEvent, NULL );
+		else
+		{ // once: the ref is dropped first, so a Timer.cancel from inside finds it gone
+			int ref = t->ref;
+
 			t->ref = LUA_NOREF;
+			RP_Lua_CallRef( p, ref, RP_LUA_CALL_MS, RP_Lua_PushEmptyEvent, NULL );
+			luaL_unref( L, LUA_REGISTRYINDEX, ref );
 		}
-		lua_newtable( L );
-		RP_Lua_Call( p, 1, 0 );
 		if ( !p->L )
 			return;	// cannot happen in P1 (closes are queued), kept as the rule
 	}
@@ -781,7 +781,7 @@ static int RP_LuaApi_WorldEntity( lua_State *L )
 
 static int RP_LuaApi_WorldWatch( lua_State *L )
 {
-	rpLuaPlugin_t *p = rpLuaCurrent;
+	rpLuaPlugin_t *p = RP_LUA_PLUGIN( L );
 	size_t len;
 	const char *name = luaL_checklstring( L, 1, &len );
 	int i;
@@ -808,7 +808,7 @@ static int RP_LuaApi_WorldWatch( lua_State *L )
 
 static int RP_LuaApi_WorldUnwatch( lua_State *L )
 {
-	rpLuaPlugin_t *p = rpLuaCurrent;
+	rpLuaPlugin_t *p = RP_LUA_PLUGIN( L );
 	const char *name = luaL_checkstring( L, 1 );
 	int i;
 
@@ -850,7 +850,7 @@ static int RP_LuaApi_LogInfo( lua_State *L )
 	char text[RP_LUA_TEXT_MAX + 1];
 
 	RP_LuaApi_Text( L, 1, text, sizeof( text ) );
-	G_LogPrintf( "[lua:%s] %s\n", rpLuaCurrent->name, text );
+	G_LogPrintf( "[lua:%s] %s\n", RP_LUA_PLUGIN( L )->name, text );
 	return 0;
 }
 

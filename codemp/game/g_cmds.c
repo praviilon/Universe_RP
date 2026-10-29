@@ -21733,10 +21733,11 @@ RP_LUA_DB_WRITES_FRAME (RP_LUA_DB_WRITE_OK, rp_lua_api.c), or nothing is paid an
 qboolean RP_PayReward( gentity_t *player, int credits, int xp, const char *label, const char *logTag, qboolean silent )
 {
 	int credits_given = 0, xp_given = 0;
-	char line[512];
+	char line[512], tag[MAX_QPATH * 2];
 
 	if ( credits <= 0 && xp <= 0 )
 		return qfalse;
+	Q_strncpyz( tag, logTag ? logTag : "Reward", sizeof( tag ) );	// GLX_U: a va() result from the caller: copied before the va() calls below reuse its buffer
 	if ( !player || !player->inuse || !player->client || player->s.number < 0 || player->s.number >= MAX_CLIENTS ||
 		player->client->pers.connected != CON_CONNECTED || player->client->sess.amrpgmode != 2 || player->client->pers.CharID <= 0 )
 		return qfalse;
@@ -21789,7 +21790,7 @@ qboolean RP_PayReward( gentity_t *player, int credits, int xp, const char *label
 	if ( credits_given > 0 || xp_given > 0 )
 	{
 		update_chars_table_row_with_current_values( player );
-		G_LogPrintf( "%s: %s^7: %d credits, %d XP\n", logTag, player->client->pers.netname, credits_given, xp_given );
+		G_LogPrintf( "%s: %s^7: %d credits, %d XP\n", tag, player->client->pers.netname, credits_given, xp_given );
 		return qtrue;
 	}
 	return qfalse;

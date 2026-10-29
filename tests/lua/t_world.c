@@ -122,7 +122,9 @@ int main( void )
 		"Commands.add('bad', function(p, a) OK2, E = pcall(World.prop, a[1], {x=0,y=0,z=0}, nil, {[a[2]] = a[3]}) E = tostring(E) end)\n"
 		"Commands.add('rmv', function(p, a) R = World.remove(H[tonumber(a[1])]) INUSE = H[tonumber(a[1])]:valid() end)\n"
 		"Commands.add('valid', function(p, a) V = H[tonumber(a[1])]:valid() N2 = tostring(H[tonumber(a[1])].number) end)\n"
-		"Commands.add('loop', function(p) for i = 1, 100 do local h, why = World.prop('misc_model_breakable', {x=0,y=0,z=0}) if not h then WHY = why return end end end)\n" );
+		"Commands.add('loop', function(p) for i = 1, 100 do local h, why = World.prop('misc_model_breakable', {x=0,y=0,z=0}) if not h then WHY = why return end end end)\n"
+		"Commands.add('lnk', function(p, a) local h = World.prop('fx_runner', {x=0,y=0,z=0}, nil, {[a[1]] = a[2]}) LN = h and h.number or -1 end)\n"
+		"META = 0 Commands.add('raw', function(p) local o = setmetatable({x=1,y=2,z=3}, {__index = function(t, k) META = META + 1 return 0 end}) local h = World.prop('fx_runner', o, o, o, o) RN = h and h.number or -1 RX = h and h.origin.x or -1 end)\n" );
 	t_start( "pr" ); p = RP_Lua_Find( "pr" );
 	run( p, "prop misc_model_breakable crate" ); CHECK( get_int( p, "OK" ) == 1, "spawned: %s / %s", get_str( p, "WHY" ), strstr( t_log, "error" ) ? strstr( t_log, "error" ) : "-" );
 	CHECK( !strcmp( get_str( p, "CLS" ), "misc_model_breakable" ) && !strcmp( get_str( p, "TN" ), "lua.pr.crate" ) && get_int( p, "OX" ) == 10 && get_int( p, "HP" ) == 50, "handle fields: %s %s %d", get_str( p, "CLS" ), get_str( p, "TN" ), get_int( p, "HP" ) );
@@ -136,6 +138,7 @@ int main( void )
 	run( p, "bad misc_model_ghoul npc_targetname x" ); CHECK( strstr( get_str( p, "E" ), "not allowed" ), "npc_targetname refused" );
 	run( p, "bad misc_model_ghoul team x" ); CHECK( strstr( get_str( p, "E" ), "not allowed" ), "team refused" );
 	run( p, "bad misc_model_ghoul rpLock x" ); CHECK( strstr( get_str( p, "E" ), "not allowed" ), "rpLock refused" );
+	run( p, "bad misc_model_ghoul lock x" ); CHECK( strstr( get_str( p, "E" ), "not allowed" ), "lock (the spawn key of rpLock) refused" );
 	run( p, "bad misc_model_ghoul npcxp 5" ); CHECK( strstr( get_str( p, "E" ), "not allowed" ), "npcxp refused" );
 	run( p, "bad misc_model_ghoul targetname x" ); CHECK( strstr( get_str( p, "E" ), "not allowed" ), "targetname key refused" );
 	run( p, "bad misc_model_ghoul mins 1_2" ); CHECK( strstr( get_str( p, "E" ), "three numbers" ), "vector key checked: %s", get_str( p, "E" ) );
@@ -151,12 +154,29 @@ int main( void )
 	t_frame( 50 ); CHECK( !g_entities[get_int( p, "NUM" )].inuse && t_freed == 2, "freed at the frame end (freed %d)", t_freed );
 	run( p, "valid 1" ); CHECK( get_int( p, "V" ) == 0 && !strcmp( get_str( p, "N2" ), "nil" ), "stale handle: valid false, fields nil" );
 	run( p, "rmv 1" ); CHECK( get_int( p, "R" ) == 0, "removing a stale handle refused" );
+	// AUDIT: the slot taken again by a new prop: the old handle stays stale
+	refill( p ); run( p, "prop misc_model_breakable crate2" ); CHECK( get_int( p, "NUM" ) == get_int( p, "NUM" ) && g_entities[get_int( p, "NUM" )].inuse, "a new prop" );
+	{ int n2 = get_int( p, "NUM" ); refill( p ); run( p, "valid 1" ); CHECK( get_int( p, "V" ) == 0, "old handle stale after slot reuse" ); run( p, "rmv 1" ); t_frame( 50 ); CHECK( get_int( p, "R" ) == 0 && g_entities[n2].inuse, "the old handle cannot remove the new prop" ); }
+	// AUDIT H3: every key that writes a target field is a link key, stored with the plugin's prefix
+	{ const char *keys[] = { "npc_target2", "npc_target4", "throwtarget", "goaltarget", "target2", "NPC_TARGET2", NULL }; int k;
+	  for ( k = 0; keys[k]; k++ ) { refill( p ); run( p, va( "lnk %s vault_door", keys[k] ) ); { int n = get_int( p, "LN" ); const char *v = n >= 0 ? t_recordValue( n, keys[k] ) : NULL;
+	    CHECK( n >= 0 && v && !strcmp( v, "lua.pr.vault_door" ), "%s prefixed: %s", keys[k], v ? v : "(none)" ); } }
+	  refill( p ); run( p, "bad fx_runner npc_target2 door.1" ); CHECK( strstr( get_str( p, "E" ), "'npc_target2' is a name" ), "a dotted npc_target2 refused" ); }
+	// AUDIT M9: the option tables are read raw: an __index metamethod never runs inside a spawn
+	refill( p ); run( p, "raw" ); CHECK( get_int( p, "RN" ) >= 0 && get_int( p, "RX" ) == 1 && get_int( p, "META" ) == 0, "raw reads: spawned at the raw x (%d), __index ran %d times", get_int( p, "RX" ), get_int( p, "META" ) );
+	CHECK( p->errorsTotal == 0, "no errors so far: %s", strstr( t_log, "error" ) ? strstr( t_log, "error" ) : "-" );
 	// caps: 32 live, then 128 per map; the bucket paces the loop
 	{ int i; for ( i = 0; i < 40; i++ ) { refill( p ); run( p, "loop" ); if ( !strcmp( get_str( p, "WHY" ), "too many props" ) ) break; } }
 	CHECK( RP_LuaWorld_CountLive( p, qfalse ) == RP_LUA_MAX_PROPS && !strcmp( get_str( p, "WHY" ), "too many props" ), "32 live then refused: %d, %s", RP_LuaWorld_CountLive( p, qfalse ), get_str( p, "WHY" ) );
 	RP_LuaWorld_PluginClose( p ); t_frame( 50 ); CHECK( RP_LuaWorld_CountLive( p, qfalse ) == 0, "all removed by the plugin close" );
 	{ int i; for ( i = 0; i < 200; i++ ) { refill( p ); run( p, "loop" ); if ( !strcmp( get_str( p, "WHY" ), "spawn limit for this map" ) ) break; if ( RP_LuaWorld_CountLive( p, qfalse ) >= 30 ) { RP_LuaWorld_PluginClose( p ); } } }
 	CHECK( p->propSpawns == RP_LUA_PROP_SPAWNS_MAP && !strcmp( get_str( p, "WHY" ), "spawn limit for this map" ), "128 spawns a map: %d, %s", p->propSpawns, get_str( p, "WHY" ) );
+	// AUDIT: the name room leaves space for lua.<plugin>. with the longest plugin name
+	t_write_plugin( "abcdefghijklmnopqrstuvwxyz012345", "Commands.add('nmx', function(p, a) OKN, EN = pcall(World.prop, 'misc_model_breakable', {x=0,y=0,z=0}, nil, nil, {name=('n'):rep(tonumber(a[1]))}) EN = tostring(EN) end)\n" );
+	RP_Lua_QueueLoad( "abcdefghijklmnopqrstuvwxyz012345" ); t_frame( 10 ); p = RP_Lua_Find( "abcdefghijklmnopqrstuvwxyz012345" );
+	if ( p && p->L ) { refill( p ); run( p, "nmx 27" ); CHECK( get_int( p, "OKN" ) == 0 && strstr( get_str( p, "EN" ), "name is" ), "a name past the room refused: %s", get_str( p, "EN" ) );
+	  refill( p ); run( p, "nmx 26" ); CHECK( get_int( p, "OKN" ) == 1, "26 fits a 32-character plugin name" ); }
+	else CHECK( 0, "long-named plugin loaded" );
 	RP_LUA_SHUTDOWN(); CHECK( t_npcsAlive == 0, "nothing left" );
 
 	// --- World.npc: types, caps, the spawner, removal via RP_SpawnedRemove, npc_death to the owner only

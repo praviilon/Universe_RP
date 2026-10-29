@@ -33,14 +33,22 @@ limits, each in a block marked `GLX_U`:
 | `LUAI_MAXCCALLS` | 200 | 100 | C recursion depth (nested pcalls, metamethods, pattern matching) |
 | `LUA_MAXCAPTURES` | 32 | 16 | captures per pattern |
 
-**`lstrlib.c`**, four lines marked `GLX_U`: `MatchState` counts its match
-steps, and every 1024 of them `match()` calls `RP_Lua_MatchCheck()`
+**`lstrlib.c`**, the lines marked `GLX_U`: `MatchState` counts its match
+steps across a whole call (`prepstate`), and every 1024 of them, in
+`match()` at its `init:` label (so the tail loop counts too), in
+`matchbalance()`, in `max_expand()`, in the plain-find `lmemfind()` and in
+`str_rep()`'s copy loop, the library calls `RP_Lua_LoopCheck()`
 (`rp_lua_core.c`), which raises "ran too long" once the call's deadline is
-past. A backtracking pattern over a long subject (`('a'):rep(200000):find('.-.-.-.-x')`)
-runs for hours without a single VM instruction, so the count hook alone
-cannot stop it; this is the one C-side loop in the kept libraries that is
-unbounded by the input's size.
+past. `str_rep()` also returns `""` at once when there is nothing to repeat
+(`("")`:rep(n) looped n times for nothing). These loops run no VM
+instruction, so the count hook alone cannot stop them: a backtracking
+pattern (`('a'):rep(200000):find('.-.-.-.-x')`), `%b()` over a long
+unbalanced string, a long linear pattern, a long plain find.
+
+**`ltablib.c`**, two lines marked `GLX_U`: `tmove()` (`table.move`) calls
+`RP_Lua_LoopCheck()` every 1024 elements, for the same reason (a huge range
+over an empty table is a pure C loop).
 
 Every other `.c` file is byte-identical to the release. When upgrading,
 replace every file, then re-apply the `luaconf.h` blocks and the `lstrlib.c`
-lines (`grep GLX_U`).
+and `ltablib.c` lines (`grep GLX_U`).

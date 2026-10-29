@@ -44,6 +44,34 @@ int main( void )
 	CHECK( count_rows( "SELECT COUNT(*) FROM char_kv WHERE char_id = 99" ) == 0 && count_rows( "SELECT COUNT(*) FROM char_kv WHERE char_id = 12" ) == 1, "orphan 99 swept, 12 kept" );
 	CHECK( p->storeBytes > 900 * 1024, "bytes read back: %d", (int)p->storeBytes );
 	RP_LUA_SHUTDOWN();
+	// --- AUDIT M5: bytes are counted as bytes after a reload too (LENGTH of a TEXT counts characters, and stops at a NUL)
+	t_init( 8 ); t_player( 0, "Alice", qtrue, 11 );
+	t_write_plugin( "mb", "Commands.add('mbset', function(p) Storage.set('u', '\\208\\159\\209\\128\\208\\184') Storage.set('z', 'a\\0bc') end) Commands.add('mbd', function(p) OKD = Storage.del('u') OKZ = Storage.del('z') OKS, WHYS = Storage.set('u', 'x') WHYS = tostring(WHYS) end)\n" );
+	t_start( "mb" ); p = RP_Lua_Find( "mb" ); t_args( "mbset" ); RP_LUA_COMMAND( &g_entities[0], "mbset" );
+	CHECK( p->storeBytes == ( 1 + 6 + 32 ) + ( 1 + 4 + 32 ), "pending: %d bytes", (int)p->storeBytes );
+	RP_LUA_SHUTDOWN(); t_init( 8 ); t_player( 0, "Alice", qtrue, 11 ); t_start( "mb" ); p = RP_Lua_Find( "mb" );
+	CHECK( p->storeBytes == ( 1 + 6 + 32 ) + ( 1 + 4 + 32 ), "read back from the database: %d bytes", (int)p->storeBytes );
+	p->storeBytes = 0;	// as if the database had counted less than the rows hold: a delete must not underflow the count
+	t_args( "mbd" ); RP_LUA_COMMAND( &g_entities[0], "mbd" );
+	CHECK( p->storeBytes == 1 + 1 + 32 && !strcmp( get_str( p, "WHYS" ), "nil" ), "deleted then set again, from a short count: %d bytes, %s", (int)p->storeBytes, get_str( p, "WHYS" ) );
+	RP_LUA_SHUTDOWN();
+
+	// --- AUDIT M5: a key written by a slice flush and then set again has two pending entries; the character removed subtracts once
+	t_init( 8 ); t_player( 0, "Alice", qtrue, 11 );
+	t_write_plugin( "sl", "Commands.add('many', function(p) Storage.set('keep', ('k'):rep(100)) for i = 1, 100 do Storage.char.set(p, 'c' .. i, ('v'):rep(100)) end end) Commands.add('again', function(p) Storage.char.set(p, 'c1', ('w'):rep(100)) end)\n" );
+	t_start( "sl" ); p = RP_Lua_Find( "sl" ); t_args( "many" ); RP_LUA_COMMAND( &g_entities[0], "many" );
+	CHECK( p->numPending == 101 && p->storeBytes > 100 * 100, "a plugin key and 100 character keys pending" );
+	p->lastFlush = level.time - RP_LUA_STORE_FLUSH_MS - 1; t_frame( 50 ); CHECK( p->flushCursor == RP_LUA_STORE_FLUSH_ROWS, "a slice written (cursor %d)", p->flushCursor );
+	t_args( "again" ); RP_LUA_COMMAND( &g_entities[0], "again" ); CHECK( p->numPending == 102, "c1 set again behind the cursor: a new entry (%d)", p->numPending );
+	RP_LUA_CHAR_REMOVED( 11 ); CHECK( p->storeBytes == 4 + 100 + 32, "the character's rows subtracted once each: %d bytes left (the plugin key)", (int)p->storeBytes );
+	RP_LUA_SHUTDOWN();
+
+	// --- AUDIT M6: a character removed while no plugin runs still loses its rows (the store is open whenever rp_lua is on)
+	t_init( 8 ); t_start( "" ); CHECK( rp_luaActive == 0, "no plugin" );
+	{ sqlite3 *db; sqlite3_open( "./home/" RP_MOD_FOLDER "/database/lua.db", &db ); sqlite3_exec( db, "INSERT INTO char_kv VALUES ('s', 13, 'k', 'v')", 0, 0, NULL ); sqlite3_close( db ); }
+	RP_LUA_CHAR_REMOVED( 13 ); CHECK( count_rows( "SELECT COUNT(*) FROM char_kv WHERE char_id = 13" ) == 0, "character 13 rows deleted with no plugin loaded" );
+	RP_LUA_SHUTDOWN();
+
 	printf( fails ? "%d FAILED\n" : "t_store: ALL OK\n", fails );
 	return fails != 0;
 }

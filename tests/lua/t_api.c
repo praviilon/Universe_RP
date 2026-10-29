@@ -81,6 +81,20 @@ int main( void )
 	t_clear_sent(); Cmd_Scripts_f( &g_entities[1] ); CHECK( t_sent_count( 1 ) == 0, "no power: nothing (check_admin_command stub is silent)" );
 	RP_LUA_SHUTDOWN();
 
+	// --- AUDIT: the command cap, the timer minimum, the guard's ring size and broadcast counting
+	t_init( 8 ); t_player( 5, "Eve", qtrue, 9 );
+	t_write_plugin( "cap", "N = 0 for i = 1, 20 do if Commands.add('cap' .. i, function() end) then N = N + 1 end end\nT = 0 Timer.after(1, function() T = 1 end)\n" );
+	t_start( "cap" ); p = RP_Lua_Find( "cap" );
+	CHECK( p && p->L && get_int( p, "N" ) == RP_LUA_MAX_COMMANDS && p->numCommands == RP_LUA_MAX_COMMANDS, "commands capped at %d: %d", RP_LUA_MAX_COMMANDS, p && p->L ? get_int( p, "N" ) : -1 );
+	t_frame( 10 ); t_frame( 10 ); t_frame( 10 ); CHECK( p && p->L && get_int( p, "T" ) == 0, "a 1 ms timer waits the minimum" );
+	t_frame( RP_LUA_TIMER_MIN_MS ); t_frame( RP_LUA_TIMER_MIN_MS ); CHECK( p && p->L && get_int( p, "T" ) == 1, "and then runs" );
+	rp_luaInCall++;
+	CHECK( !RP_Lua_ScriptCmdRoom( 5, RP_LUA_CMDS_PER_SEC + 1 ), "more than the ring holds never fits" );
+	{ int k, ok = 1; for ( k = 0; k < RP_LUA_CMDS_PER_SEC; k++ ) if ( !RP_Lua_ScriptBroadcastRoom( 1 ) ) ok = 0;
+	  CHECK( ok && !RP_Lua_ScriptBroadcastRoom( 1 ), "a broadcast that passes is counted: %d pass, then none", RP_LUA_CMDS_PER_SEC ); }
+	rp_luaInCall--;
+	RP_LUA_SHUTDOWN();
+
 	printf( fails ? "%d FAILED\n" : "t_api: ALL OK\n", fails );
 	return fails != 0;
 }

@@ -4,9 +4,13 @@ GLX_U: [Lua] the states, the loader, the budget, the errors and the end-of-frame
 
 One Lua state per plugin, made with an allocator that refuses past rp_lua_memkb: the whole library is
 bounded by that, since no string or table can outgrow it. A call runs under a count hook that checks a
-real-clock deadline (RP_LUA_CALL_MS) and an instruction cap, inside lua_pcall, with no nesting: nothing
-a script can call raises another script call, so a plugin is only ever charged for its own code.
-States are closed in one place, RP_Lua_Frame, never inside a call or a game hook.
+real-clock deadline (RP_LUA_CALL_MS) and an instruction cap, inside lua_pcall, with no nesting: an event
+raised while a script call is on the stack (a World.use that pays a level up, or replaces a dialogue) is
+not delivered, so a plugin is only ever charged for its own code. Once a call is past its budget every
+further instruction raises (killed), so a pcall in the script cannot keep it running. Everything that
+is pushed onto a state goes through the protected call (RP_Lua_CallRef): at the memory cap an unprotected
+push would end the process. Finalizers (__gc) are refused at setmetatable, so no script code ever runs
+outside a call. States are closed in one place, RP_Lua_Frame, never inside a call or a game hook.
 ===========================================================================
 */
 #include "rp_lua_local.h"
@@ -24,6 +28,7 @@ int rp_luaInCall = 0;
 static char rpLuaLoadQueue[RP_LUA_MAX_PLUGINS][RP_LUA_NAME_LEN + 1];
 static int rpLuaNumLoadQueued = 0;
 static qboolean rpLuaStoreReady = qfalse;
+static qboolean rpLuaPanicked = qfalse;	// a Lua panic ended the map: the states are not touched again
 
 const char *rpLuaEventNames[RPLE_COUNT] = {
 	"init", "shutdown", "frame", "client_begin", "client_disconnect", "chat",
@@ -36,11 +41,19 @@ const char *rpLuaEventNames[RPLE_COUNT] = {
 Memory: the one limit that bounds the library
 ==================
 */
+// rp_lua_memkb, clamped; read when a state is made (a change applies to the next load or reload, never to
+// a running state: lowering it under a plugin's usage would fail every event in it)
+static size_t RP_Lua_MemCap( void )
+{
+	int kb = rp_lua_memkb.integer < 128 ? 128 : rp_lua_memkb.integer > 4096 ? 4096 : rp_lua_memkb.integer;
+
+	return (size_t)kb * 1024;
+}
+
 static void *RP_Lua_Alloc( void *ud, void *ptr, size_t osize, size_t nsize )
 {
 	rpLuaPlugin_t *p = (rpLuaPlugin_t *)ud;
-	int kb = rp_lua_memkb.integer < 128 ? 128 : rp_lua_memkb.integer > 4096 ? 4096 : rp_lua_memkb.integer;
-	size_t cap = (size_t)kb * 1024;
+	size_t cap = p->memCap ? p->memCap : RP_Lua_MemCap();
 	size_t old = ptr ? osize : 0;	// with no block, osize is a type tag, not a size
 
 	if ( nsize == 0 )
@@ -66,6 +79,18 @@ static void *RP_Lua_Alloc( void *ud, void *ptr, size_t osize, size_t nsize )
 The count hook: real clock and instruction cap
 ==================
 */
+static void RP_Lua_Hook( lua_State *L, lua_Debug *ar );
+
+// past the budget: from here every instruction raises, so the error climbs out of any pcall in the script
+// (each pcall catches one, and the next instruction in the catching frame raises again) up to RP_Lua_Call
+static void RP_Lua_Kill( lua_State *L, rpLuaPlugin_t *p, const char *why )
+{
+	p->killed = qtrue;
+	Q_strncpyz( p->killWhy, why, sizeof( p->killWhy ) );
+	lua_sethook( L, RP_Lua_Hook, LUA_MASKCOUNT, 1 );
+	luaL_error( L, "ran too long (%s)", why );
+}
+
 static void RP_Lua_Hook( lua_State *L, lua_Debug *ar )
 {
 	rpLuaPlugin_t *p = rpLuaCurrent;
@@ -73,20 +98,46 @@ static void RP_Lua_Hook( lua_State *L, lua_Debug *ar )
 	(void)ar;
 	if ( !p )
 		return;
+	if ( p->killed )
+		luaL_error( L, "ran too long (%s)", p->killWhy );	// the same error again: a pcall in the script caught the first
 	p->instructions += RP_LUA_HOOK_COUNT;
 	if ( p->instructions > RP_LUA_CALL_INSTRUCTIONS )
-		luaL_error( L, "ran too long (%d instructions)", RP_LUA_CALL_INSTRUCTIONS );
+		RP_Lua_Kill( L, p, va( "%d instructions", RP_LUA_CALL_INSTRUCTIONS ) );
 	if ( trap->Milliseconds() > p->deadline )
-		luaL_error( L, "ran too long (%d ms)", RP_LUA_CALL_MS );
+		RP_Lua_Kill( L, p, va( "%d ms", p->deadlineMs ) );
 }
 
-// lstrlib.c (GLX_U) every 1024 pattern-match steps: a C-side loop the count hook cannot see
-void RP_Lua_MatchCheck( lua_State *L )
+// lstrlib.c and ltablib.c (GLX_U), every 1024 steps of a C-side loop the count hook cannot see: pattern
+// matching, a plain find, string.rep, table.move
+void RP_Lua_LoopCheck( lua_State *L )
 {
 	rpLuaPlugin_t *p = rpLuaCurrent;
 
-	if ( p && trap->Milliseconds() > p->deadline )
-		luaL_error( L, "ran too long (%d ms, in a pattern)", RP_LUA_CALL_MS );
+	if ( !p )
+		return;
+	if ( p->killed )
+		luaL_error( L, "ran too long (%s)", p->killWhy );
+	if ( trap->Milliseconds() > p->deadline )
+		RP_Lua_Kill( L, p, va( "%d ms, in a library loop", p->deadlineMs ) );
+}
+
+// an API function reached with no script call on the stack: no path leads here (finalizers are refused), kept as the rule
+rpLuaPlugin_t *RP_Lua_NoPlugin( lua_State *L )
+{
+	luaL_error( L, "not inside a script call" );
+	return NULL;
+}
+
+// Lua found an error with no protected call to take it: with every push inside RP_Lua_CallRef this never
+// runs; if it does, the map ends (G_Error) instead of the process (abort), and the states are left alone
+static int RP_Lua_Panic( lua_State *L )
+{
+	const char *msg = ( lua_type( L, -1 ) == LUA_TSTRING ) ? lua_tostring( L, -1 ) : "(no message)";
+
+	rpLuaPanicked = qtrue;
+	G_LogPrintf( "[lua:%s] panic: %s\n", rpLuaCurrent ? rpLuaCurrent->name : "?", msg );
+	trap->Error( ERR_DROP, va( "Lua panic: %s", msg ) );
+	return 0;
 }
 
 static int RP_Lua_MsgHandler( lua_State *L )
@@ -146,19 +197,23 @@ The function and nargs arguments are on the stack. Runs it under the budget; nre
 success. qfalse when it was refused or ended in an error (nothing is left on the stack then).
 ==================
 */
-qboolean RP_Lua_Call( rpLuaPlugin_t *p, int nargs, int nresults )
+// the deadline of an event or command call: RP_LUA_CALL_MS, or RP_LUA_CALL_SHORT_MS once the plugin's or
+// every plugin's frame budget is spent (they keep coming on a busy frame; timers wait instead, RP_LuaApi_RunTimers)
+int RP_Lua_CallMs( rpLuaPlugin_t *p )
+{
+	if ( p->frameMsLeft <= 0 || rpLuaFrameMsLeft <= 0 )
+	{
+		p->eventsShort++;
+		return RP_LUA_CALL_SHORT_MS;
+	}
+	return RP_LUA_CALL_MS;
+}
+
+// the function and nargs arguments are on the stack (pushed by the caller, or by the trampoline inside)
+static qboolean RP_Lua_Run( rpLuaPlugin_t *p, int nargs, int nresults, int ms )
 {
 	lua_State *L = p->L;
 	int base, status, start;
-
-	if ( !L )
-		return qfalse;
-	if ( rpLuaCurrent )
-	{ // a nested call: P1 has no path to one, so this is a bug in C, not a script
-		G_LogPrintf( "[lua:%s] nested script call refused\n", p->name );
-		lua_pop( L, nargs + 1 );
-		return qfalse;
-	}
 
 	base = lua_gettop( L ) - nargs;	// the function's index
 	lua_pushcfunction( L, RP_Lua_MsgHandler );
@@ -166,9 +221,11 @@ qboolean RP_Lua_Call( rpLuaPlugin_t *p, int nargs, int nresults )
 
 	rpLuaCurrent = p;
 	p->inCall = qtrue;
+	p->killed = qfalse;
 	p->instructions = 0;
 	start = trap->Milliseconds();
-	p->deadline = start + RP_LUA_CALL_MS;
+	p->deadlineMs = ms;
+	p->deadline = start + ms;
 	lua_sethook( L, RP_Lua_Hook, LUA_MASKCOUNT, RP_LUA_HOOK_COUNT );
 
 	rp_luaInCall++;
@@ -176,6 +233,7 @@ qboolean RP_Lua_Call( rpLuaPlugin_t *p, int nargs, int nresults )
 	rp_luaInCall--;
 
 	lua_sethook( L, NULL, 0, 0 );
+	p->killed = qfalse;
 	p->inCall = qfalse;
 	rpLuaCurrent = NULL;
 	{
@@ -195,6 +253,57 @@ qboolean RP_Lua_Call( rpLuaPlugin_t *p, int nargs, int nresults )
 		return qfalse;
 	}
 	return qtrue;
+}
+
+qboolean RP_Lua_Call( rpLuaPlugin_t *p, int nargs, int nresults )
+{
+	if ( !p->L )
+		return qfalse;
+	if ( rpLuaCurrent )
+	{ // a nested call: the events raised inside a script call never get here (RP_Lua_FireEvent), so this is a bug in C
+		G_LogPrintf( "[lua:%s] nested script call refused\n", p->name );
+		lua_pop( p->L, nargs + 1 );
+		return qfalse;
+	}
+	return RP_Lua_Run( p, nargs, nresults, RP_LUA_CALL_MS );
+}
+
+// inside the protected call: the function from the registry, its arguments, then the call itself
+typedef struct {
+	int		ref;
+	int		(*push)( lua_State *L, void *ctx );
+	void	*ctx;
+} rpLuaCallReq_t;
+
+static int RP_Lua_Trampoline( lua_State *L )
+{
+	rpLuaCallReq_t *r = (rpLuaCallReq_t *)lua_touserdata( L, 1 );
+	int n;
+
+	lua_settop( L, 0 );
+	lua_rawgeti( L, LUA_REGISTRYINDEX, r->ref );
+	n = r->push ? r->push( L, r->ctx ) : 0;
+	lua_call( L, n, 0 );
+	return 0;
+}
+
+qboolean RP_Lua_CallRef( rpLuaPlugin_t *p, int ref, int ms, int (*push)( lua_State *L, void *ctx ), void *ctx )
+{
+	rpLuaCallReq_t r;
+
+	if ( !p->L || ref == LUA_NOREF )
+		return qfalse;
+	if ( rpLuaCurrent )
+	{
+		G_LogPrintf( "[lua:%s] nested script call refused\n", p->name );
+		return qfalse;
+	}
+	r.ref = ref;
+	r.push = push;
+	r.ctx = ctx;
+	lua_pushcfunction( p->L, RP_Lua_Trampoline );	// a light C function and a light userdata: nothing is allocated
+	lua_pushlightuserdata( p->L, &r );				// before lua_pcall takes over
+	return RP_Lua_Run( p, 1, 0, ms );
 }
 
 /*
@@ -246,6 +355,50 @@ static int RP_Lua_CollectGarbage( lua_State *L )
 	return 1;
 }
 
+static int RP_Lua_SetMetatable( lua_State *L )
+{ // the stock setmetatable, less __gc: a finalizer runs with the hook off and no call on the stack
+	int t = lua_type( L, 2 );
+
+	luaL_checktype( L, 1, LUA_TTABLE );
+	luaL_argexpected( L, t == LUA_TNIL || t == LUA_TTABLE, 2, "nil or table" );
+	if ( luaL_getmetafield( L, 1, "__metatable" ) != LUA_TNIL )
+		return luaL_error( L, "cannot change a protected metatable" );
+	if ( t == LUA_TTABLE )
+	{
+		lua_pushliteral( L, "__gc" );
+		lua_rawget( L, 2 );
+		if ( !lua_isnil( L, -1 ) )
+			return luaL_error( L, "__gc is not allowed" );
+		lua_pop( L, 1 );
+	}
+	lua_settop( L, 2 );
+	lua_setmetatable( L, 1 );
+	return 1;
+}
+
+// xpcall with the handler called after the error unwound, not at the point it was raised: a budget error
+// is raised from inside the count hook, where Lua runs the handler with hooks off (ldo.c, luaD_hook) --
+// a handler that loops would then run for ever. Without the debug library a handler has no use for
+// the stack at the raise anyway. Returns true plus f's results, or false plus the handler's result.
+static int RP_Lua_XPcall( lua_State *L )
+{
+	int n = lua_gettop( L );
+
+	luaL_checkany( L, 1 );
+	luaL_checktype( L, 2, LUA_TFUNCTION );
+	lua_pushboolean( L, 1 );	// f h args... true f
+	lua_pushvalue( L, 1 );
+	lua_rotate( L, 3, 2 );		// f h true f args...
+	if ( lua_pcall( L, n - 2, LUA_MULTRET, 0 ) == LUA_OK )
+		return lua_gettop( L ) - 2;	// true and the results
+	lua_pushvalue( L, 2 );		// f h true err h err
+	lua_pushvalue( L, -2 );
+	lua_call( L, 1, 1 );		// may raise (a killed call does): it climbs further, as it should
+	lua_pushboolean( L, 0 );
+	lua_pushvalue( L, -2 );
+	return 2;
+}
+
 static void RP_Lua_OpenSandbox( rpLuaPlugin_t *p )
 {
 	lua_State *L = p->L;
@@ -266,6 +419,8 @@ static void RP_Lua_OpenSandbox( rpLuaPlugin_t *p )
 	lua_pushcfunction( L, RP_Lua_Print );			lua_setglobal( L, "print" );
 	lua_pushcfunction( L, RP_Lua_Load );			lua_setglobal( L, "load" );
 	lua_pushcfunction( L, RP_Lua_CollectGarbage );	lua_setglobal( L, "collectgarbage" );
+	lua_pushcfunction( L, RP_Lua_SetMetatable );	lua_setglobal( L, "setmetatable" );
+	lua_pushcfunction( L, RP_Lua_XPcall );			lua_setglobal( L, "xpcall" );
 
 	// the string metatable is shared by every string: lock it
 	lua_pushliteral( L, "" );
@@ -390,6 +545,8 @@ static void RP_Lua_ClosePlugin( rpLuaPlugin_t *p, qboolean keepSlot )
 
 	Q_strncpyz( name, p->name, sizeof( name ) );
 	RP_LuaWorld_PluginClose( p );	// its props and NPCs go with it (runs at a frame end or map end only)
+	if ( p->L && rpLuaPanicked )
+		p->L = NULL;	// left as it is: a half-built state is not closed (its memory goes with the process)
 	if ( p->L )
 	{
 		RP_LuaApi_ClosePlugin( p );
@@ -462,6 +619,7 @@ static qboolean RP_Lua_LoadPlugin( const char *name, const char **why )
 	RP_Lua_ResetPlugin( p );
 	Q_strncpyz( p->name, name, sizeof( p->name ) );
 	p->inUse = qtrue;
+	p->memCap = RP_Lua_MemCap();
 	p->L = lua_newstate( RP_Lua_Alloc, p );
 	if ( !p->L )
 	{
@@ -470,6 +628,7 @@ static qboolean RP_Lua_LoadPlugin( const char *name, const char **why )
 		*why = "could not create the state";
 		return qfalse;
 	}
+	lua_atpanic( p->L, RP_Lua_Panic );
 	RP_Lua_OpenSandbox( p );
 	RP_LuaStore_PluginInit( p );
 	RP_Lua_CountActive();
@@ -492,26 +651,23 @@ static qboolean RP_Lua_LoadPlugin( const char *name, const char **why )
 	}
 
 	// init
-	if ( p->handlers[RPLE_INIT] != LUA_NOREF )
-	{
-		lua_rawgeti( p->L, LUA_REGISTRYINDEX, p->handlers[RPLE_INIT] );
-		lua_newtable( p->L );
-		RP_Lua_Call( p, 1, 0 );
-	}
+	RP_Lua_CallRef( p, p->handlers[RPLE_INIT], RP_LUA_CALL_MS, RP_Lua_PushEmptyEvent, NULL );
 	G_LogPrintf( "[lua:%s] loaded\n", name );
 	return qtrue;
 }
 
+static int RP_Lua_PushShutdownEvent( lua_State *L, void *ctx )
+{
+	lua_newtable( L );
+	lua_pushstring( L, (const char *)ctx );
+	lua_setfield( L, -2, "reason" );
+	return 1;
+}
+
 static void RP_Lua_FireShutdown( rpLuaPlugin_t *p, const char *reason )
 {
-	if ( p->L && p->handlers[RPLE_SHUTDOWN] != LUA_NOREF )
-	{
-		lua_rawgeti( p->L, LUA_REGISTRYINDEX, p->handlers[RPLE_SHUTDOWN] );
-		lua_newtable( p->L );
-		lua_pushstring( p->L, reason );
-		lua_setfield( p->L, -2, "reason" );
-		RP_Lua_Call( p, 1, 0 );
-	}
+	if ( p->L && !rpLuaPanicked )
+		RP_Lua_CallRef( p, p->handlers[RPLE_SHUTDOWN], RP_LUA_CALL_MS, RP_Lua_PushShutdownEvent, (void *)reason );
 }
 
 // a state for rcon "lua <code>": the sandbox and budget of a plugin, closed by the caller at once
@@ -520,12 +676,14 @@ qboolean RP_Lua_OpenScratch( rpLuaPlugin_t *p, const char *name )
 	RP_Lua_ResetPlugin( p );
 	Q_strncpyz( p->name, name, sizeof( p->name ) );
 	p->inUse = qtrue;
+	p->memCap = RP_Lua_MemCap();
 	p->L = lua_newstate( RP_Lua_Alloc, p );
 	if ( !p->L )
 	{
 		RP_Lua_ResetPlugin( p );
 		return qfalse;
 	}
+	lua_atpanic( p->L, RP_Lua_Panic );
 	RP_Lua_OpenSandbox( p );
 	RP_LuaStore_PluginInit( p );
 	RP_Lua_CountActive();
@@ -614,22 +772,67 @@ static void RP_Lua_RunQueue( void )
 Events
 ==================
 */
+typedef struct {
+	void	(*fill)( lua_State *L, void *ctx );
+	void	*ctx;
+} rpLuaEventReq_t;
+
+// the event table: {} filled by the hook's fill(), inside the protected call
+static int RP_Lua_PushEvent( lua_State *L, void *ctx )
+{
+	rpLuaEventReq_t *e = (rpLuaEventReq_t *)ctx;
+
+	lua_newtable( L );
+	if ( e->fill )
+		e->fill( L, e->ctx );
+	return 1;
+}
+
+int RP_Lua_PushEmptyEvent( lua_State *L, void *ctx )
+{
+	(void)ctx;
+	lua_newtable( L );
+	return 1;
+}
+
+// an event call past twice the plugin's frame budget is not made (RP_Lua_CallMs: past the budget it runs with
+// the short deadline); init and shutdown always are. Logged once a minute per plugin.
+qboolean RP_Lua_EventRoom( rpLuaPlugin_t *p, rpLuaEvent_t ev )
+{
+	if ( ev == RPLE_INIT || ev == RPLE_SHUTDOWN || p->frameMsLeft > -RP_LUA_PLUGIN_FRAME_MS )
+		return qtrue;
+	p->eventsSkipped++;
+	if ( level.time - p->lastSkipLog >= 60000 || !p->lastSkipLog )
+	{
+		p->lastSkipLog = level.time;
+		G_LogPrintf( "[lua:%s] %s event not run: the plugin's frame budget (%d ms) is spent twice over\n", p->name, rpLuaEventNames[ev], RP_LUA_PLUGIN_FRAME_MS );
+	}
+	return qfalse;
+}
+
+// one plugin's handler for an event, pushed and run inside the protected call
+void RP_Lua_FirePlugin( rpLuaPlugin_t *p, rpLuaEvent_t ev, void (*fill)( lua_State *L, void *ctx ), void *ctx )
+{
+	rpLuaEventReq_t e;
+
+	if ( !p->inUse || !p->L || p->handlers[ev] == LUA_NOREF || !RP_Lua_EventRoom( p, ev ) )
+		return;
+	e.fill = fill;
+	e.ctx = ctx;
+	RP_Lua_CallRef( p, p->handlers[ev], ( ev == RPLE_INIT || ev == RPLE_SHUTDOWN ) ? RP_LUA_CALL_MS : RP_Lua_CallMs( p ), RP_Lua_PushEvent, &e );
+}
+
 void RP_Lua_FireEvent( rpLuaEvent_t ev, void (*fill)( lua_State *L, void *ctx ), void *ctx )
 {
 	int i;
 
-	for ( i = 0; i < RP_LUA_MAX_PLUGINS; i++ )
-	{
-		rpLuaPlugin_t *p = &rpLuaPlugins[i];
-
-		if ( !p->inUse || !p->L || p->handlers[ev] == LUA_NOREF )
-			continue;
-		lua_rawgeti( p->L, LUA_REGISTRYINDEX, p->handlers[ev] );
-		lua_newtable( p->L );
-		if ( fill )
-			fill( p->L, ctx );
-		RP_Lua_Call( p, 1, 0 );
+	if ( rpLuaCurrent )
+	{ // raised by what a script call did (a World.use that paid a level up, replaced a dialogue, killed a player)
+		G_LogPrintf( "[lua:%s] %s event raised inside a script call: not delivered\n", rpLuaCurrent->name, rpLuaEventNames[ev] );
+		return;
 	}
+	for ( i = 0; i < RP_LUA_MAX_PLUGINS; i++ )
+		RP_Lua_FirePlugin( &rpLuaPlugins[i], ev, fill, ctx );
 }
 
 void RP_Lua_RefillTokens( rpLuaPlugin_t *p )
@@ -664,6 +867,7 @@ void RP_Lua_Init( void )
 	rp_luaWatchCount = 0;
 	rp_luaInCall = 0;
 	rpLuaCurrent = NULL;
+	rpLuaPanicked = qfalse;
 	RP_LuaApi_Reset();
 	RP_LuaWorld_Reset();
 
@@ -687,6 +891,8 @@ void RP_Lua_Shutdown( void )
 {
 	int i;
 
+	rpLuaCurrent = NULL;	// an ERR_DROP inside a script call left them set
+	rp_luaInCall = 0;
 	for ( i = 0; i < RP_LUA_MAX_PLUGINS; i++ )
 	{
 		rpLuaPlugin_t *p = &rpLuaPlugins[i];

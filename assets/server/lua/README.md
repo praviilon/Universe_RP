@@ -20,7 +20,7 @@ the server.
 |---|---|---|
 | `rp_lua` | `1` | `0` turns the whole layer off (latched: takes effect at the next map) |
 | `rp_lua_plugins` | `""` | plugin folder names to load at map start, separated by spaces or commas |
-| `rp_lua_memkb` | `512` | memory per plugin in KB (128–4096) |
+| `rp_lua_memkb` | `512` | memory per plugin in KB (128–4096); applies when a plugin is loaded or reloaded, never to a running one |
 
 A plugin is one file: `<fs_homepath>/<mod folder>/lua/plugins/<name>/plugin.lua`,
 a loose file (never inside a pk3), read as text (bytecode is refused).
@@ -64,8 +64,8 @@ however written, costs the server a bounded amount.
 
 | What | Limit | Over it |
 |---|---|---|
-| one call (an event, a command, a timer) | 10 ms, 1,000,000 instructions | the call ends with "ran too long" |
-| all calls in one frame | 20 ms (50 ms for all plugins together) | timers wait for the next frame; nothing is dropped |
+| one call (an event, a command, a timer) | 10 ms, 1,000,000 instructions | the call ends with "ran too long" (a `pcall` cannot catch it: every instruction after it raises again until the call is over) |
+| all calls in one frame | 20 ms (50 ms for all plugins together) | timers wait for the next frame; events and commands still run, with a 1 ms deadline; past twice the budget they are not run (`init` and `shutdown` always are) |
 | memory | `rp_lua_memkb` | "not enough memory" in the call |
 | errors | 20 in 60 s | the plugin is switched off (`/scripts enable` brings it back) |
 | actions (`Msg.*`, `World.use/prop/npc/vehicle`, `Effect.play`, `Sound.play`) | one bucket of 4, one token back per `sv_floodProtect` ms | `false, "too fast"` |
@@ -93,6 +93,12 @@ The last two rows only count what happens inside a script call. A player
 pressing a button, answering a dialogue or killing an NPC is never counted,
 and neither is what fires later through a `target_delay` (it runs as the
 map's own action).
+
+An event raised by what a script call itself did is not delivered: a
+`World.use` that pays a level up (`level_up`), replaces a player's open
+dialogue (`dialog_answer` with reason `replaced`) or kills a player through
+a map entity (`player_death`) raises nothing in any plugin, and the log
+says so. A plugin is only ever charged for its own code.
 
 ## The API
 
@@ -192,7 +198,7 @@ weapons, ammo, items, dispensers and racks, `misc_model_breakable`,
 `misc_gas_tank`, `fx_runner`, `target_speaker`, and the quest entities
 `target_dialog`, `target_reward`, `target_flag` and `target_play_music`
 (see `/enthelp` for their keys). The keys are the class's own, as for
-`/entadd`, except `targetname`, `script_targetname`, `team`, `rpLock` and
+`/entadd`, except `targetname`, `script_targetname`, `team`, `lock` and
 the spawner reward keys, which are refused. A script's entity is named
 `lua.<plugin>.<name>` when `{name=...}` is given, so it can never take a map
 entity's name; admins reach it by that name (`/npc kill lua.quest.guard`,
@@ -289,7 +295,9 @@ end. Rows of a deleted character are removed with it.
 
 No `io`, `os`, `package`, `debug` or `coroutine`; no `require`, `dofile`
 or `loadfile`; `load` takes text only; `collectgarbage` only answers
-`"count"`. Plugins cannot call each other, touch accounts, kick, rename,
+`"count"`; `setmetatable` refuses a metatable with `__gc` (a finalizer would
+run outside any call and its budget); `xpcall` calls its handler after the
+error unwound, not at the point it was raised. Plugins cannot call each other, touch accounts, kick, rename,
 damage, teleport, pay or give to a player directly (only through the map's
 entities and their own NPCs' kill rewards), spawn anything outside the
 exempt classes, link their entities to the map's, give NPCs orders, or

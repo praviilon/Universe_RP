@@ -26,6 +26,14 @@
 #include "lualib.h"
 
 
+/* GLX_U: [Lua] the mod's time budget reaches into this library's loops: pattern matching (every
+** step, across the whole call, including the tail loop and %b, the single-item expansion and a plain
+** find), and string.rep. None runs a VM instruction, so the count hook never sees them. Every 1024
+** steps the mod checks its deadline and raises an error when it is past (rp_lua_core.c). */
+extern void RP_Lua_LoopCheck (lua_State *L);
+#define GLXU_STEP(L, counter)  { if (l_unlikely((++(counter) & 1023u) == 0)) RP_Lua_LoopCheck(L); }
+
+
 /*
 ** maximum number of captures that a pattern can do during
 ** pattern-matching. This limit is arbitrary, but must fit in
@@ -156,11 +164,15 @@ static int str_rep (lua_State *L) {
     lua_pushliteral(L, "");
   else if (l_unlikely(l + lsep < l || l + lsep > MAXSIZE / n))
     return luaL_error(L, "resulting string too large");
+  else if (l + lsep == 0)  /* GLX_U: nothing to repeat: the loop below would run n times for nothing */
+    lua_pushliteral(L, "");
   else {
     size_t totallen = (size_t)n * l + (size_t)(n - 1) * lsep;
     luaL_Buffer b;
+    unsigned int steps = 0;  /* GLX_U */
     char *p = luaL_buffinitsize(L, &b, totallen);
     while (n-- > 1) {  /* first n-1 copies (followed by separator) */
+      GLXU_STEP(L, steps);
       memcpy(p, s, l * sizeof(char)); p += l;
       if (lsep > 0) {  /* empty 'memcpy' is not that cheap */
         memcpy(p, sep, lsep * sizeof(char));
@@ -373,10 +385,6 @@ typedef struct MatchState {
 /* recursive function */
 static const char *match (MatchState *ms, const char *s, const char *p);
 
-/* GLX_U: [Lua] the mod's time budget reaches into pattern matching: a backtracking pattern over a
-** long subject runs no VM instruction, so the count hook never sees it. Every 1024 match steps the
-** mod checks its deadline and raises an error when it is past (rp_lua_core.c). */
-extern void RP_Lua_MatchCheck (lua_State *L);
 
 
 /* maximum recursion depth for 'match' */
@@ -499,6 +507,7 @@ static const char *matchbalance (MatchState *ms, const char *s,
     int e = *(p+1);
     int cont = 1;
     while (++s < ms->src_end) {
+      GLXU_STEP(ms->L, ms->steps);
       if (*s == e) {
         if (--cont == 0) return s+1;
       }
@@ -512,8 +521,10 @@ static const char *matchbalance (MatchState *ms, const char *s,
 static const char *max_expand (MatchState *ms, const char *s,
                                  const char *p, const char *ep) {
   ptrdiff_t i = 0;  /* counts maximum expand for item */
-  while (singlematch(ms, s + i, p, ep))
+  while (singlematch(ms, s + i, p, ep)) {
     i++;
+    GLXU_STEP(ms->L, ms->steps);
+  }
   /* keeps trying to match with the maximum repetitions */
   while (i>=0) {
     const char *res = match(ms, (s+i), ep+1);
@@ -576,9 +587,8 @@ static const char *match_capture (MatchState *ms, const char *s, int l) {
 static const char *match (MatchState *ms, const char *s, const char *p) {
   if (l_unlikely(ms->matchdepth-- == 0))
     luaL_error(ms->L, "pattern too complex");
-  if (l_unlikely((++ms->steps & 1023u) == 0))  /* GLX_U */
-    RP_Lua_MatchCheck(ms->L);
   init: /* using goto to optimize tail recursion */
+  GLXU_STEP(ms->L, ms->steps);  /* GLX_U: every step, the tail loop too */
   if (p != ms->p_end) {  /* end of pattern? */
     switch (*p) {
       case '(': {  /* start capture */
@@ -678,8 +688,9 @@ static const char *match (MatchState *ms, const char *s, const char *p) {
 
 
 
-static const char *lmemfind (const char *s1, size_t l1,
-                               const char *s2, size_t l2) {
+static const char *lmemfind (lua_State *L, const char *s1, size_t l1,
+                               const char *s2, size_t l2) {  /* GLX_U: L for the step check */
+  unsigned int steps = 0;
   if (l2 == 0) return s1;  /* empty strings are everywhere */
   else if (l2 > l1) return NULL;  /* avoids a negative 'l1' */
   else {
@@ -687,6 +698,7 @@ static const char *lmemfind (const char *s1, size_t l1,
     l2--;  /* 1st char will be checked by 'memchr' */
     l1 = l1-l2;  /* 's2' cannot be found after that */
     while (l1 > 0 && (init = (const char *)memchr(s1, *s2, l1)) != NULL) {
+      GLXU_STEP(L, steps);
       init++;   /* 1st char is already checked */
       if (memcmp(init, s2+1, l2) == 0)
         return init-1;
@@ -768,12 +780,12 @@ static void prepstate (MatchState *ms, lua_State *L,
   ms->src_init = s;
   ms->src_end = s + ls;
   ms->p_end = p + lp;
+  ms->steps = 0;  /* GLX_U: counted across the whole call, not per start position */
 }
 
 
 static void reprepstate (MatchState *ms) {
   ms->matchdepth = MAXCCALLS;
-  ms->steps = 0;  /* GLX_U */
   ms->level = 0;
 }
 
@@ -790,7 +802,7 @@ static int str_find_aux (lua_State *L, int find) {
   /* explicit request or no special characters? */
   if (find && (lua_toboolean(L, 4) || nospecials(p, lp))) {
     /* do a plain search */
-    const char *s2 = lmemfind(s + init, ls - init, p, lp);
+    const char *s2 = lmemfind(L, s + init, ls - init, p, lp);
     if (s2) {
       lua_pushinteger(L, (s2 - s) + 1);
       lua_pushinteger(L, (s2 - s) + lp);

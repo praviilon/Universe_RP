@@ -55,7 +55,7 @@ const char *RP_Lua_CurrentName( void );	// the plugin whose call runs, or NULL
 #define RP_LUA_EVENT_USED( s, a )		do { if ( rp_luaWatchCount > 0 && (s)->targetname ) RP_Lua_EventUsed( s, a ); } while ( 0 )
 #define RP_LUA_EVENT_ACCOUNT( e, n, x )	do { if ( rp_luaActive ) RP_Lua_EventAccount( e, n, x ); } while ( 0 )
 #define RP_LUA_COMMAND( e, c )			( rp_luaActive ? RP_Lua_Command( e, c ) : qfalse )
-#define RP_LUA_CHAR_REMOVED( id )		do { if ( rp_luaActive ) RP_Lua_CharacterRemoved( id ); } while ( 0 )
+#define RP_LUA_CHAR_REMOVED( id )		do { if ( rp_lua.integer ) RP_Lua_CharacterRemoved( id ); } while ( 0 )	// the store is open with or without a plugin running
 #define RP_LUA_EVENT_DIALOG( p, n, num, c, o, r )	do { if ( rp_luaActive ) RP_Lua_EventDialog( p, n, num, c, o, r ); } while ( 0 )
 #define RP_LUA_IN_CALL()				( rp_luaInCall != 0 )
 #define RP_LUA_CMD_ROOM( c, n )			( !rp_luaInCall || RP_Lua_ScriptCmdRoom( c, n ) )

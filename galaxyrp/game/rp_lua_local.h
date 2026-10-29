@@ -17,7 +17,8 @@ three cvars (rp_lua, rp_lua_plugins, rp_lua_memkb) are in g_xcvar.h.
 #define RP_LUA_CALL_MS			10		// one script call on the real clock, then "ran too long"
 #define RP_LUA_CALL_INSTRUCTIONS 1000000	// and its instruction cap, counted 1000 at a time
 #define RP_LUA_HOOK_COUNT		100	// the count hook runs every this many VM instructions
-#define RP_LUA_PLUGIN_FRAME_MS	20		// all of a plugin's calls in one frame; timers past it wait
+#define RP_LUA_PLUGIN_FRAME_MS	20		// all of a plugin's calls in one frame; timers past it wait, events run with
+#define RP_LUA_CALL_SHORT_MS	1		// this deadline, and past twice the budget are skipped (init and shutdown never)
 #define RP_LUA_FRAME_MS			50		// all plugins in one frame
 #define RP_LUA_MAX_ERRORS		20		// errors in RP_LUA_ERROR_WINDOW_MS that switch a plugin off
 #define RP_LUA_ERROR_WINDOW_MS	60000
@@ -108,11 +109,15 @@ typedef struct rpLuaPlugin_s {
 
 	// memory
 	size_t			memUsed, memPeak;
+	size_t			memCap;			// rp_lua_memkb when the state was made: a change applies at the next load
 
 	// the call in progress
 	int				deadline;		// Milliseconds
 	int				instructions;
 	qboolean		inCall;
+	qboolean		killed;			// past the budget: every instruction raises until the call unwinds (a pcall cannot keep it)
+	char			killWhy[48];	// the reason, raised again each time
+	int				deadlineMs;		// RP_LUA_CALL_MS, or RP_LUA_CALL_SHORT_MS past the frame budget
 
 	// budget
 	int				tokens;
@@ -121,6 +126,7 @@ typedef struct rpLuaPlugin_s {
 	int				errorTimes[RP_LUA_MAX_ERRORS];
 	int				errorHead;
 	int				lastNotice;
+	int				lastSkipLog;	// level.time of the last "event not run" line
 
 	// what the script registered
 	int				handlers[RPLE_COUNT];	// registry refs, LUA_NOREF for none
@@ -154,6 +160,7 @@ typedef struct rpLuaPlugin_s {
 	int				calls, callMs, errorsTotal, refusedTokens, refusedRecipients, deferredTimers, sent;
 	int				uses, effects, sounds, spawnsRefused;
 	int				usesBusy, cmdsHeld, dbRefused;	// the stability guards (rp_lua_api.c)
+	int				eventsShort, eventsSkipped;		// event calls past the frame budget: with the 1 ms deadline, and not made
 } rpLuaPlugin_t;
 
 extern rpLuaPlugin_t rpLuaPlugins[RP_LUA_MAX_PLUGINS];
@@ -164,13 +171,22 @@ extern rpLuaPlugin_t *rpLuaCurrent;	// the plugin whose call runs, for the API
 // core
 rpLuaPlugin_t *RP_Lua_Find( const char *name );
 qboolean RP_Lua_Call( rpLuaPlugin_t *p, int nargs, int nresults );
-void RP_Lua_MatchCheck( lua_State *L );	// lstrlib.c calls it (GLX_U)
+// the registry function ref called with what push() puts on the stack (it returns the count), all inside the
+// protected call: nothing is pushed onto a state outside one (at the memory cap that would end the process)
+qboolean RP_Lua_CallRef( rpLuaPlugin_t *p, int ref, int ms, int (*push)( lua_State *L, void *ctx ), void *ctx );
+int RP_Lua_CallMs( rpLuaPlugin_t *p );	// an event's or command's deadline: short once the frame budget is spent
+void RP_Lua_LoopCheck( lua_State *L );	// lstrlib.c and ltablib.c call it (GLX_U): C-side loops the count hook cannot see
+rpLuaPlugin_t *RP_Lua_NoPlugin( lua_State *L );	// raises: an API function reached with no script call on the stack
+#define RP_LUA_PLUGIN( L )	( rpLuaCurrent ? rpLuaCurrent : RP_Lua_NoPlugin( L ) )
 void RP_Lua_Error( rpLuaPlugin_t *p, const char *msg );
 qboolean RP_Lua_QueueOp( const char *name, rpLuaOp_t op );
 qboolean RP_Lua_QueueLoad( const char *name );
 qboolean RP_Lua_ValidName( const char *name );
 void RP_Lua_FireEvent( rpLuaEvent_t ev, void (*fill)( lua_State *L, void *ctx ), void *ctx );
 void RP_Lua_RefillTokens( rpLuaPlugin_t *p );
+void RP_Lua_FirePlugin( rpLuaPlugin_t *p, rpLuaEvent_t ev, void (*fill)( lua_State *L, void *ctx ), void *ctx );	// one plugin's handler
+qboolean RP_Lua_EventRoom( rpLuaPlugin_t *p, rpLuaEvent_t ev );
+int RP_Lua_PushEmptyEvent( lua_State *L, void *ctx );	// a push() for RP_Lua_CallRef: {}
 qboolean RP_Lua_OpenScratch( rpLuaPlugin_t *p, const char *name );
 void RP_Lua_CloseScratch( rpLuaPlugin_t *p );
 

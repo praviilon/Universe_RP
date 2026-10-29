@@ -440,6 +440,15 @@ static int RP_LuaWorld_Refuse( lua_State *L, const char *why )
 }
 
 // {x, y, z} of finite numbers within the map, or an error
+// t[key] pushed, read raw: an __index metamethod would run script code in the middle of a spawn (and a
+// World.prop from it would nest these frames until the C stack is gone)
+static void RP_LuaWorld_RawField( lua_State *L, int idx, const char *key )
+{
+	idx = lua_absindex( L, idx );
+	lua_pushstring( L, key );
+	lua_rawget( L, idx );
+}
+
 static void RP_LuaWorld_Vec( lua_State *L, int idx, vec3_t out, const char *what )
 {
 	static const char *const names[3] = { "x", "y", "z" };
@@ -449,7 +458,7 @@ static void RP_LuaWorld_Vec( lua_State *L, int idx, vec3_t out, const char *what
 		luaL_error( L, "%s is a table {x=, y=, z=}", what );
 	for ( i = 0; i < 3; i++ )
 	{
-		lua_getfield( L, idx, names[i] );
+		RP_LuaWorld_RawField( L, idx, names[i] );
 		if ( !lua_isnumber( L, -1 ) )
 			luaL_error( L, "%s.%s is not a number", what, names[i] );
 		out[i] = (float)lua_tonumber( L, -1 );
@@ -498,7 +507,8 @@ static qboolean RP_LuaWorld_OptGet( lua_State *L, int idx, const char *key )
 {
 	if ( lua_isnoneornil( L, idx ) )
 		return qfalse;
-	lua_getfield( L, idx, key );
+	luaL_checktype( L, idx, LUA_TTABLE );
+	RP_LuaWorld_RawField( L, idx, key );
 	if ( lua_isnil( L, -1 ) )
 	{
 		lua_pop( L, 1 );
@@ -632,7 +642,7 @@ static void RP_LuaWorld_Targetname( lua_State *L, int idx, char *out, int outSiz
 	if ( lua_isnoneornil( L, idx ) )
 		return;
 	luaL_checktype( L, idx, LUA_TTABLE );
-	lua_getfield( L, idx, "name" );
+	RP_LuaWorld_RawField( L, idx, "name" );
 	if ( lua_isnil( L, -1 ) )
 	{
 		lua_pop( L, 1 );
@@ -660,7 +670,7 @@ is counted by the stability guards (rp_lua_api.c).
 */
 static int RP_LuaWorld_Use( lua_State *L )
 {
-	rpLuaPlugin_t *p = rpLuaCurrent;
+	rpLuaPlugin_t *p = RP_LUA_PLUGIN( L );
 	static int found[MAX_ENTITIESTOTAL];
 	const char *name = luaL_checkstring( L, 1 );
 	gentity_t *player, *e = NULL;
@@ -719,13 +729,14 @@ does for /entadd.
 static const char *const rpLuaRefusedKeys[] = {
 	"classname", "origin", "angles", "aimoffset",	// arguments of the call, not keys
 	"targetname", "script_targetname", "npc_targetname", "team",	// the name is opts.name; ICARUS and the mover teams are the map's
-	"rpLock", "npccredits", "npcxp",
+	"rpLock", "lock", "npccredits", "npcxp",	// "lock" is the spawn key of rpLock (g_spawn.c): a server lock is the map's
 	NULL
 };
 // a link key: its value is a plain name of one of this plugin's own entities, stored as lua.<plugin>.<name>, so a
 // script's entity can aim only at the plugin's own -- never at the map's, an admin's or another plugin's
 static const char *const rpLuaLinkKeys[] = {
 	"target", "target2", "target3", "target4", "target5", "target6", "paintarget", "opentarget", "closetarget", "npc_target",
+	"npc_target2", "npc_target4", "throwtarget", "goaltarget",	// other spellings of target2/target4 (g_spawn.c, misc_model_breakable's throwtarget)
 	"go1", "go2", "go3", "go4", "go5", "go6", "speaker",	// a target_dialog's options and its speaker
 	NULL
 };
@@ -832,7 +843,7 @@ static int RP_LuaWorld_Keys( lua_State *L, int idx, rpLuaPair_t *pairs, int maxP
 
 static int RP_LuaWorld_Prop( lua_State *L )
 {
-	rpLuaPlugin_t *p = rpLuaCurrent;
+	rpLuaPlugin_t *p = RP_LUA_PLUGIN( L );
 	const char *classname = luaL_checkstring( L, 1 );
 	vec3_t origin, angles;
 	rpLuaPair_t pairs[RP_LUA_MAX_KEYS + 4];
@@ -917,7 +928,7 @@ team, no effect: the NPC does what its type does. Vehicles are refused.
 */
 static int RP_LuaWorld_Npc( lua_State *L )
 {
-	rpLuaPlugin_t *p = rpLuaCurrent;
+	rpLuaPlugin_t *p = RP_LUA_PLUGIN( L );
 	const char *type = luaL_checkstring( L, 1 );
 	vec3_t origin, angles;
 	char targetname[MAX_QPATH];
@@ -1009,7 +1020,7 @@ or not at all. A script never boards, drives or empties a vehicle.
 */
 static int RP_LuaWorld_Vehicle( lua_State *L )
 {
-	rpLuaPlugin_t *p = rpLuaCurrent;
+	rpLuaPlugin_t *p = RP_LUA_PLUGIN( L );
 	const char *type = luaL_checkstring( L, 1 );
 	vec3_t origin, angles;
 	char targetname[MAX_QPATH];
@@ -1080,7 +1091,7 @@ World.remove( handle )
 */
 static int RP_LuaWorld_Remove( lua_State *L )
 {
-	rpLuaPlugin_t *p = rpLuaCurrent;
+	rpLuaPlugin_t *p = RP_LUA_PLUGIN( L );
 	gentity_t *ent = RP_LuaWorld_Handle( L, 1 );
 	int i;
 
@@ -1111,7 +1122,7 @@ the temp entity first: G_TempEntity() does not check (G_Spawn ends the server wh
 */
 static int RP_LuaWorld_EffectPlay( lua_State *L )
 {
-	rpLuaPlugin_t *p = rpLuaCurrent;
+	rpLuaPlugin_t *p = RP_LUA_PLUGIN( L );
 	const char *name = luaL_checkstring( L, 1 );
 	vec3_t origin, angles;
 	int idx;
@@ -1135,7 +1146,7 @@ static int RP_LuaWorld_EffectPlay( lua_State *L )
 
 static int RP_LuaWorld_SoundPlay( lua_State *L )
 {
-	rpLuaPlugin_t *p = rpLuaCurrent;
+	rpLuaPlugin_t *p = RP_LUA_PLUGIN( L );
 	const char *name = luaL_checkstring( L, 1 );
 	vec3_t origin;
 	int idx;

@@ -11,6 +11,15 @@ writes first. A plugin's keys and values together stay under RP_LUA_STORE_MAX.
 
 static sqlite3 *rpLuaDb = NULL;
 
+static int RP_LuaStore_PendingIndex( rpLuaPlugin_t *p, int charId, const char *key );
+
+// storeBytes less a row: never under zero (the count is rebuilt from the database at each load; a row
+// counted differently there than here must not leave the plugin at "storage full" until the next map)
+static void RP_LuaStore_Shrink( rpLuaPlugin_t *p, size_t bytes )
+{
+	p->storeBytes = ( p->storeBytes > bytes ) ? p->storeBytes - bytes : 0;
+}
+
 #define RP_LUA_ROW_OVERHEAD 32
 
 qboolean RP_LuaStore_Open( void )
@@ -106,7 +115,8 @@ void RP_LuaStore_CharacterRemoved( int charId )
 		{
 			if ( p->pending[k].charId == charId && p->pending[k].value )
 			{
-				p->storeBytes -= strlen( p->pending[k].key ) + p->pending[k].valueLen + RP_LUA_ROW_OVERHEAD;
+				if ( RP_LuaStore_PendingIndex( p, charId, p->pending[k].key ) == k )	// the latest entry of the key: the one counted
+					RP_LuaStore_Shrink( p, strlen( p->pending[k].key ) + p->pending[k].valueLen + RP_LUA_ROW_OVERHEAD );
 				free( p->pending[k].value );
 				p->pending[k].value = NULL;
 				p->pending[k].valueLen = 0;
@@ -136,8 +146,8 @@ void RP_LuaStore_PluginInit( rpLuaPlugin_t *p )
 	if ( !rpLuaDb )
 		return;
 	if ( sqlite3_prepare_v2( rpLuaDb,
-		"SELECT COALESCE((SELECT SUM(LENGTH(key) + LENGTH(value) + 32) FROM plugin_kv WHERE plugin = ?1), 0)"
-		" + COALESCE((SELECT SUM(LENGTH(key) + LENGTH(value) + 32) FROM char_kv WHERE plugin = ?1), 0)", -1, &stmt, NULL ) == SQLITE_OK )
+		"SELECT COALESCE((SELECT SUM(LENGTH(CAST(key AS BLOB)) + LENGTH(CAST(value AS BLOB)) + 32) FROM plugin_kv WHERE plugin = ?1), 0)"
+		" + COALESCE((SELECT SUM(LENGTH(CAST(key AS BLOB)) + LENGTH(CAST(value AS BLOB)) + 32) FROM char_kv WHERE plugin = ?1), 0)", -1, &stmt, NULL ) == SQLITE_OK )	// bytes, as everywhere else (LENGTH of a TEXT counts characters)
 	{
 		sqlite3_bind_text( stmt, 1, p->name, -1, SQLITE_STATIC );
 		if ( sqlite3_step( stmt ) == SQLITE_ROW )
@@ -218,7 +228,7 @@ static qboolean RP_LuaStore_Set( rpLuaPlugin_t *p, int charId, const char *key, 
 		*why = "storage is not available";
 		return qfalse;
 	}
-	if ( p->storeBytes - oldSize + newSize > RP_LUA_STORE_MAX )
+	if ( ( p->storeBytes > oldSize ? p->storeBytes - oldSize : 0 ) + newSize > RP_LUA_STORE_MAX )
 	{
 		*why = "storage full";
 		return qfalse;
@@ -268,7 +278,8 @@ static qboolean RP_LuaStore_Set( rpLuaPlugin_t *p, int charId, const char *key, 
 	}
 	else
 		e->valueLen = 0;
-	p->storeBytes = p->storeBytes - oldSize + newSize;
+	RP_LuaStore_Shrink( p, oldSize );
+	p->storeBytes += newSize;
 	return qtrue;
 }
 
@@ -357,7 +368,7 @@ static const char *RP_LuaStore_KeyArg( lua_State *L, int idx )
 
 static int RP_LuaStore_Get( lua_State *L, int charId, int keyIdx )
 {
-	rpLuaPlugin_t *p = rpLuaCurrent;
+	rpLuaPlugin_t *p = RP_LUA_PLUGIN( L );
 	const char *key = RP_LuaStore_KeyArg( L, keyIdx );
 	char value[RP_LUA_VALUE_MAX + 1];
 	int i = p->pending ? RP_LuaStore_PendingIndex( p, charId, key ) : -1;
@@ -379,7 +390,7 @@ static int RP_LuaStore_Get( lua_State *L, int charId, int keyIdx )
 
 static int RP_LuaStore_SetLua( lua_State *L, int charId, int keyIdx )
 {
-	rpLuaPlugin_t *p = rpLuaCurrent;
+	rpLuaPlugin_t *p = RP_LUA_PLUGIN( L );
 	const char *key = RP_LuaStore_KeyArg( L, keyIdx );
 	size_t len;
 	const char *value;
@@ -402,7 +413,7 @@ static int RP_LuaStore_SetLua( lua_State *L, int charId, int keyIdx )
 
 static int RP_LuaStore_DelLua( lua_State *L, int charId, int keyIdx )
 {
-	rpLuaPlugin_t *p = rpLuaCurrent;
+	rpLuaPlugin_t *p = RP_LUA_PLUGIN( L );
 	const char *key = RP_LuaStore_KeyArg( L, keyIdx );
 	const char *why = NULL;
 
