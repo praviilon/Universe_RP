@@ -2866,6 +2866,33 @@ const char *RP_DispenserModel( gentity_t *ent, const char *defaultModel )
 	return ent->model;
 }
 
+// GLX_U fix: [Entity System] whether the server has the sound file a client would load for this name: the engine's
+// own search (S_LoadSound, snd_mem.cpp): lower case, ".wav" added when it has no 3-letter extension, that file, then
+// the same name ending ".mp3". A name the client cannot load (shorter than 5, MAX_QPATH or longer) is not on it either.
+static qboolean RP_SoundFileOnServer( const char *name )
+{
+	char path[MAX_QPATH];
+	int len = name ? (int)strlen( name ) : 0;
+
+	if ( len < 5 || len >= MAX_QPATH )
+		return qfalse;
+	Q_strncpyz( path, name, sizeof( path ) );
+	Q_strlwr( path );
+	if ( path[len - 4] != '.' )
+	{
+		if ( len + 4 >= MAX_QPATH )
+			return qfalse;
+		Q_strcat( path, sizeof( path ), ".wav" );
+		len += 4;
+	}
+	if ( RP_FileExists( path ) )
+		return qtrue;
+	path[len - 3] = 'm';
+	path[len - 2] = 'p';
+	path[len - 1] = '3';
+	return RP_FileExists( path );
+}
+
 qboolean RP_EntitySystemSpawnRefused( gentity_t *ent )
 {
 	qboolean breakable, md3Mover;
@@ -3101,6 +3128,44 @@ qboolean RP_EntitySystemSpawnRefused( gentity_t *ent )
 
 			names[0] = fxFile;
 			if ( !RP_SlotRoomFor( CS_EFFECTS, names, 1, 0, reason, sizeof( reason ) ) )
+				return RP_SpawnRefuse( ent, reason );
+		}
+	}
+
+	// GLX_U fix: [Entity System] a target_speaker's "noise" became a sound slot and a slice of the gamestate for the rest
+	// of the map, whatever it named: a plugin spawning and removing speakers with made-up names spent the gamestate a
+	// joining player's configstring needs (audit 4 B2). Now as a model or an effect: a file the server has, and a slot.
+	// A sound set ("soundSet", checked above) is played instead of "noise", which is not read then (SP_target_speaker)
+	if ( Q_stricmp( ent->classname, "target_speaker" ) == 0 && !( ent->soundSet && ent->soundSet[0] ) )
+	{
+		char *noise = NULL;
+		char reason[256];
+		const char *names[1];
+
+		G_SpawnString( "noise", "", &noise );
+		if ( noise && noise[0] )
+		{
+			if ( noise[0] == '*' )
+			{ // a sound of the activator's model, found on each client: no file to check; never a script's choice
+				if ( RP_LUA_IN_CALL() )
+					return RP_SpawnRefuse( ent, "a script's speaker cannot use a * sound" );
+			}
+			else if ( !RP_SoundFileOnServer( noise ) )
+			{
+				char shown[64];
+				int i;
+
+				Q_strncpyz( shown, RP_ShownText( noise ), sizeof( shown ) );
+				for ( i = 0; shown[i]; i++ )
+				{
+					if ( shown[i] == '"' || shown[i] == '\n' || shown[i] == '\r' || shown[i] == ';' )
+						shown[i] = '?';
+				}
+				return RP_SpawnRefuse( ent, va( "sound %s is not on the server", shown ) );
+			}
+
+			names[0] = noise;
+			if ( !RP_SlotRoomFor( CS_SOUNDS, names, 1, 0, reason, sizeof( reason ) ) )
 				return RP_SpawnRefuse( ent, reason );
 		}
 	}

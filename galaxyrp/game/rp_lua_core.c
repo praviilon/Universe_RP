@@ -262,6 +262,7 @@ static qboolean RP_Lua_Run( rpLuaPlugin_t *p, int nargs, int nresults, int ms )
 {
 	lua_State *L = p->L;
 	int base, status, start;
+	qboolean killed;
 
 	base = lua_gettop( L ) - nargs;	// the function's index
 	lua_pushcfunction( L, RP_Lua_MsgHandler );
@@ -281,6 +282,7 @@ static qboolean RP_Lua_Run( rpLuaPlugin_t *p, int nargs, int nresults, int ms )
 	rp_luaInCall--;
 
 	lua_sethook( L, NULL, 0, 0 );
+	killed = p->killed;
 	p->killed = qfalse;
 	p->inCall = qfalse;
 	rpLuaCurrent = NULL;
@@ -291,6 +293,13 @@ static qboolean RP_Lua_Run( rpLuaPlugin_t *p, int nargs, int nresults, int ms )
 		p->callMs += took;
 		p->frameMsLeft -= took;
 		rpLuaFrameMsLeft -= took;
+		if ( !killed && took >= RP_LUA_OVERRUN_MS )
+		{ // GLX_U fix: [Lua] the hook reads the clock only between VM instructions, and the library loops only every
+		  // so many steps: a call can spend all its time in one C step and return before either looks (a table
+		  // rehash over keys made to collide took 2 s). It went unreported and uncounted, so the plugin was never
+		  // switched off. An error like any other now: logged, told to admins, 20 in a minute switch it off
+			RP_Lua_Error( p, va( "ran too long (%d ms, between the clock's checks)", took ) );
+		}
 	}
 	lua_remove( L, base );	// the message handler
 

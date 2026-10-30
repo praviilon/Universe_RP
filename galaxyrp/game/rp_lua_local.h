@@ -16,6 +16,7 @@ three cvars (rp_lua, rp_lua_plugins, rp_lua_memkb) are in g_xcvar.h.
 #define RP_LUA_NAME_LEN			32		// a plugin folder name
 #define RP_LUA_CALL_MS			10		// one script call on the real clock, then "ran too long"
 #define RP_LUA_CALL_INSTRUCTIONS 1000000	// and its instruction cap, counted 1000 at a time
+#define RP_LUA_OVERRUN_MS		50		// GLX_U fix: a call that took this long without the hook seeing it (one long C step) is an error too
 #define RP_LUA_HOOK_COUNT		100	// the count hook runs every this many VM instructions
 #define RP_LUA_PLUGIN_FRAME_MS	20		// all of a plugin's calls in one frame; timers past it wait, events run with
 #define RP_LUA_CALL_SHORT_MS	1		// this deadline, and past twice the budget are skipped (init and shutdown never)

@@ -2160,7 +2160,7 @@ static const rpEntHelp_t rp_ent_help[] = {
 		"2|LOOPED_OFF|Looping sound, off at the start: each use toggles it.\n"
 		"4|GLOBAL|Each use plays it at full volume for everyone (not with looping).\n"
 		"8|ACTIVATOR|Each use plays it on the activator (not with looping). Forced on when noise starts with *.",
-		"noise||Required unless soundSet is given: the sound file to play. Missing, the entity is not spawned.\n"
+		"noise||Required unless soundSet is given: the sound file to play, which the server must have (.wav or .mp3; without an extension .wav, then .mp3). Missing, the entity is not spawned.\n"
 		"soundSet||An ambient sound set from sound/sound.txt, played instead of noise. It is sent only to players within hearing range of the set (its radius in sound.txt, plus 512). Placed with the entity commands, an unknown set is refused.\n"
 		"wait|0|Seconds between automatic replays, played by the clients without any use. Only works when random is non-zero too (a stock quirk).\n"
 		"random|0|Seconds of variance on wait. Must be non-zero for wait to repeat at all.\n"

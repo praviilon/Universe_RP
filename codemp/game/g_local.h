@@ -98,6 +98,11 @@ extern vec3_t gPainPoint;
 // from being tipped over by the next join.
 #define ZYK_GAMESTATE_HEADROOM		1024
 #define ZYK_GAMESTATE_BUDGET		(MAX_GAMESTATE_CHARS - ZYK_GAMESTATE_HEADROOM)
+// GLX_U fix: [Configstrings] and the headroom was all there was: once anything had filled the budget (a plugin's
+// spawns, /entadd, a heavy map), about a dozen joins later every client errored out ("MAX_GAMESTATE_CHARS
+// exceeded") (audit 4 B2). ClientUserinfoChanged() (g_client.c) now checks a player's own string before writing
+// it, and keeps this much for the engine's own serverinfo/systeminfo changes, which the game cannot refuse
+#define RP_GAMESTATE_SPARE			64
 
 // GalaxyRP: [Slot Reuse] how many names a map may put into model and effect slots taken back from
 // removed Entity System props (RP_SlotReclaim() in g_utils.c). Each client keeps every effect and
@@ -2239,6 +2244,8 @@ typedef struct level_locals_s {
 	qboolean rpMapChangeQueued;		// GLX_U: [Entity System] a target_level_change queued its "map": every later one this map is ignored
 	int rpMusicLastSet;				// GLX_U fix: [Music] level time of the last CS_MUSIC write by G_SetMusic() (0: none this map)
 	char rpMusicPending[MAX_QPATH * 2];	// GLX_U fix: [Music] a change waiting for RP_MUSIC_GAP_MS to pass ("" none)
+	qboolean rpNoRoomForClient;		// GLX_U fix: [Configstrings] ClientUserinfoChanged() refused a connecting player's string: the gamestate is full
+	qboolean rpClientinfoHeld[MAX_CLIENTS];	// GLX_U fix: [Configstrings] a player's changed string was kept old this map (logged once)
 	// GalaxyRP: [Entity System] the ambient sound set names this server knows, read from sound/sound.txt once
 	// per map: 0 not read yet, 1 read, -1 the file could not be read -- see RP_SoundSetKnown() in g_spawn.c
 	int rp_soundsets_state;

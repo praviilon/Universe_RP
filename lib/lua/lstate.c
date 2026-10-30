@@ -386,6 +386,7 @@ LUA_API lua_State *lua_newstate (lua_Alloc f, void *ud) {
   g->ud_warn = NULL;
   g->mainthread = L;
   g->seed = luai_makeseed(L);
+  luaH_seedints(g->seed);  /* GLX_U: integer and float keys hashed with it too */
   g->gcstp = GCSTPGC;  /* no GC while building state */
   g->strt.size = g->strt.nuse = 0;
   g->strt.hash = NULL;

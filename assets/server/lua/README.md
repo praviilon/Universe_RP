@@ -209,8 +209,9 @@ weapons, ammo, items, dispensers and racks, `misc_model_breakable`,
 `/enthelp` for their keys). The keys are the class's own, as for
 `/entadd`, except `targetname`, `script_targetname`, `team`, `lock`,
 the spawner reward keys and the ICARUS keys (any ending in `script`,
-`parm1`-`parm16`, `delayscripttime`, `roffname`, `rofftarget`), which are
-refused. A script's entity is named `lua.<plugin>.<name>` when
+`parm1`-`parm16`, `delayscripttime`, `roffname`, `rofftarget`) and
+`healingsound`, which are refused. A `target_speaker`'s `noise` must be a
+sound file on the server (`.wav` or `.mp3`), not a `*` sound. A script's entity is named `lua.<plugin>.<name>` when
 `{name=...}` is given, so it can never take a map entity's name; admins
 reach it by that name (`/npc kill lua.quest.guard`, `/entuse`).
 

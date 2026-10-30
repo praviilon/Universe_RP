@@ -147,6 +147,8 @@ int main( void )
 	// AUDIT 3 H1: no ICARUS from a script's entity: any key ending in "script", any starting with "parm", and three by name
 	{ static const char *icarus[] = { "spawnscript", "usescript", "deathscript", "victoryscript", "SpawnScript", "parm1", "parm16", "delayscripttime", "roffname", "rofftarget", NULL };
 	  int k; for ( k = 0; icarus[k]; k++ ) { run( p, va( "bad misc_model_breakable %s vjun3/outro", icarus[k] ) ); CHECK( get_int( p, "OK2" ) == 0 && strstr( get_str( p, "E" ), "not allowed" ), "%s refused: %s", icarus[k], get_str( p, "E" ) ); } }
+	// AUDIT 4 B2: healingsound, registered as a sound for every class and used by none a script spawns
+	run( p, "bad target_speaker healingsound sound/made/up/name" ); CHECK( get_int( p, "OK2" ) == 0 && strstr( get_str( p, "E" ), "not allowed" ), "healingsound refused: %s", get_str( p, "E" ) );
 	run( p, "bad misc_model_ghoul mins 1_2" ); CHECK( strstr( get_str( p, "E" ), "three numbers" ), "vector key checked: %s", get_str( p, "E" ) );
 	run( p, "bad misc_model_ghoul 9key x" ); CHECK( strstr( get_str( p, "E" ), "not a key" ), "key syntax: %s", get_str( p, "E" ) );
 	run( p, "bad misc_model_ghoul model a\"b" ); CHECK( strstr( get_str( p, "E" ), "quote" ), "quote in a value refused" );

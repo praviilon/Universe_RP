@@ -237,6 +237,75 @@ int main( void )
 	  { static const char *c[] = { "srtn", "srts", "srtd", "srte" }; int k; for ( k = 0; k < 4; k++ ) { t_args( c[k] ); RP_LUA_COMMAND( &g_entities[0], c[k] ); t_frame( 50 ); } }
 	  lua_getglobal( p->L, "OK" ); CHECK( lua_toboolean( p->L, -1 ) && !t_log_has( "error" ), "ordinary sorts are sorted and within the budget (%s)", strstr( t_log, "error" ) ? strstr( t_log, "error" ) : "-" ); lua_pop( p->L, 1 );
 	  RP_LUA_SHUTDOWN(); }
+	// AUDIT 4 A1: integer (and float) keys chosen to share one main position under the old unseeded hash, k * 4095 for a
+	// table of 4096 nodes: every insert walked the whole chain and each rehash reinserted it at n*n/2 steps inside one
+	// VM instruction (2 s in one call at 4 MB). With the seeded hash they spread: the call ends, quickly, with no error
+	{ static const char *col[][2] = {
+	    { "collide",  "Events.on('init', function() local m = 4095 T = {} for k = 1, 4096 do T[k * m] = true end for k = 4097, 4101 do T[(k - 4096) * m] = nil T[k * m] = true end DONE = true end)\n" },
+	    { "collidef", "Events.on('init', function() T = {} for j = 1, 4096 do T[1 + j * 4095 / 1073741824] = true end for j = 4097, 4101 do T[1 + (j - 4096) * 4095 / 1073741824] = nil T[1 + j * 4095 / 1073741824] = true end DONE = true end)\n" },
+	    // t | t << 32: the two halves cancel in a fold that only XORs (whatever the seed); the multiply first spreads them
+	    { "colfold",  "Events.on('init', function() T = {} for k = 1, 4096 do T[k * 4294967297] = true end DONE = true end)\n" },
+	    { NULL, NULL } };
+	  int i;
+	  for ( i = 0; col[i][0]; i++ )
+	  {
+		rpLuaPlugin_t *p;
+		int t0, took;
+		t_init( 8 ); t_logLen = 0; t_log[0] = 0; t_write_plugin( "col", col[i][1] );
+		t0 = trap->Milliseconds(); t_start( "col" ); took = trap->Milliseconds() - t0; p = RP_Lua_Find( "col" );
+		CHECK( p && p->L, "%s: loaded", col[i][0] );
+		if ( p && p->L ) { lua_getglobal( p->L, "DONE" ); CHECK( lua_toboolean( p->L, -1 ) && !t_log_has( "error" ), "%s: the table built within the budget (%s)", col[i][0], strstr( t_log, "error" ) ? strstr( t_log, "error" ) : "-" ); lua_pop( p->L, 1 ); }
+		CHECK( took < RP_LUA_LIMIT_MS, "%s: init took %d ms", col[i][0], took );
+		RP_LUA_SHUTDOWN();
+	  } }
+	// AUDIT 4 A1: the seed is what keeps a set from being made for the new hash too. 4096 keys that share one main
+	// position in a 4096-node table under the mix *without* a seed (ltable.c's glxu_mixint with glxu_intseed 0,
+	// worked out here); with the state's seed they spread like any others
+	{ rpLuaPlugin_t *p;
+	  unsigned long long u;
+	  int n = 0;
+	  t_init( 8 ); t_player( 0, "Alice", qtrue, 7 );
+	  t_write_plugin( "seed", "K = {} Commands.add('fill', function() T = {} for i = 1, #K do T[K[i]] = true end DONE = true end)\n" );
+	  t_start( "seed" ); p = RP_Lua_Find( "seed" );
+	  CHECK( p && p->L, "seeded: loaded" );
+	  if ( p && p->L )
+	  {
+		lua_getglobal( p->L, "K" );
+		for ( u = 1; n < 4096; u++ )
+		{
+			unsigned long long h = u * 0x9E3779B97F4A7C15ULL;
+			h ^= h >> 32;
+			if ( (unsigned int)h % 4095u == 0 ) { lua_pushinteger( p->L, (lua_Integer)u ); lua_rawseti( p->L, -2, ++n ); }
+		}
+		lua_pop( p->L, 1 );
+		t_logLen = 0; t_log[0] = 0; t_frame( 100 );
+		t_args( "fill" ); RP_LUA_COMMAND( &g_entities[0], t_argv[0] );
+		lua_getglobal( p->L, "DONE" ); CHECK( lua_toboolean( p->L, -1 ) && !t_log_has( "error" ), "seeded: a set made for the unseeded mix spreads (%s)", strstr( t_log, "error" ) ? strstr( t_log, "error" ) : "-" ); lua_pop( p->L, 1 );
+	  }
+	  RP_LUA_SHUTDOWN(); }
+	// AUDIT 4 A1, deterministic: a call that returns before the hook or a library loop reads the clock, yet took
+	// RP_LUA_OVERRUN_MS, is an error (frozen clock: every read is t_tick ms, and a two-instruction function reads it
+	// only at its start and end); 20 of them switch the plugin off. A short one says nothing
+	{ rpLuaPlugin_t *p;
+	  int k;
+	  t_init( 8 ); t_player( 0, "Alice", qtrue, 7 ); t_write_plugin( "ovr", "Commands.add('quick', function() end)\nCommands.add('spin', function() while true do end end)\n" ); t_start( "ovr" ); p = RP_Lua_Find( "ovr" );
+	  CHECK( p && p->L && p->numCommands == 2, "overrun: set up" );
+	  // a call the hook stopped is its one error, however long it ran
+	  t_logLen = 0; t_log[0] = 0; t_clockFrozen = qtrue; t_tick = RP_LUA_OVERRUN_MS;
+	  t_args( "spin" ); RP_LUA_COMMAND( &g_entities[0], t_argv[0] );
+	  CHECK( t_log_has( "ran too long (10 ms)" ) && !t_log_has( "between the clock's checks" ) && p->errorsTotal == 1, "overrun: a call the hook killed is counted once (%d errors; %s)", p->errorsTotal, t_log );
+	  t_clockFrozen = qfalse; t_tick = 0; p->errorsTotal = 0; memset( p->errorTimes, 0, sizeof( p->errorTimes ) ); t_frame( 100 );
+	  t_logLen = 0; t_log[0] = 0; t_clockFrozen = qtrue; t_tick = 1;
+	  t_args( "quick" ); RP_LUA_COMMAND( &g_entities[0], t_argv[0] );
+	  CHECK( !t_log_has( "error" ), "overrun: a 1 ms call says nothing (%s)", t_log );
+	  t_tick = RP_LUA_OVERRUN_MS;
+	  t_args( "quick" ); RP_LUA_COMMAND( &g_entities[0], t_argv[0] );
+	  CHECK( t_log_has( va( "ran too long (%d ms, between the clock's checks)", RP_LUA_OVERRUN_MS ) ) && p->errorsTotal == 1, "overrun: a %d ms call is an error (%d errors; %s)", RP_LUA_OVERRUN_MS, p->errorsTotal, t_log );
+	  for ( k = 1; k < RP_LUA_MAX_ERRORS && p->L; k++ ) { t_frame( 100 ); t_args( "quick" ); RP_LUA_COMMAND( &g_entities[0], t_argv[0] ); }
+	  t_frame( 100 );
+	  t_clockFrozen = qfalse; t_tick = 0;
+	  CHECK( t_log_has( "errors in a minute: switched off" ) && ( !p->L || p->disabled ), "overrun: %d of them switch the plugin off (%d errors)", RP_LUA_MAX_ERRORS, p->errorsTotal );
+	  RP_LUA_SHUTDOWN(); }
 	t_init( 8 );	// TEST ONLY: frees what the stubs still hold (spawned strings, NPC clients): valgrind ends with nothing reachable
 	printf( fails ? "%d FAILED\n" : "t_hostile: ALL OK\n", fails );
 	return fails != 0;

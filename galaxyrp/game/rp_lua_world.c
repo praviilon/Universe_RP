@@ -737,6 +737,9 @@ static const char *const rpLuaRefusedKeys[] = {
 	// rule in RP_LuaWorld_KeyRefused (a key ending in "script", one starting with "parm"): the delay before the
 	// delayed script, and a ROFF move played on the entity
 	"delayscripttime", "roffname", "rofftarget",
+	// GLX_U fix: [Lua] registered as a sound for every class at spawn (G_CallSpawn), unchecked, and used by nothing a script
+	// may spawn: a made-up name on a spawn was a gamestate slice for the rest of the map (audit 4 B2)
+	"healingsound",
 	NULL
 };
 // a link key: its value is a plain name of one of this plugin's own entities, stored as lua.<plugin>.<name>, so a

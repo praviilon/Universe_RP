@@ -2377,6 +2377,18 @@ static void G_RpPublishedColor( int saberMode, const char *cosmetic, char *out, 
 	Q_strncpyz( out, va( "%i%s", saberMode, rp_allow_cosmetics.integer ? cosmetic : "" ), outSize );
 }
 
+// GLX_U fix: [Configstrings] whether a player's configstring can go from oldCs to newCs and leave the gamestate within
+// MAX_GAMESTATE_CHARS less RP_GAMESTATE_SPARE: past it, every client errors out ("MAX_GAMESTATE_CHARS exceeded"). Counted
+// as the client counts it (each string and its terminator). The same string, or a shorter one, always fits
+static qboolean RP_ClientinfoFits( const char *oldCs, const char *newCs ) {
+	int oldLen = oldCs[0] ? (int)strlen( oldCs ) + 1 : 0;
+	int newLen = newCs[0] ? (int)strlen( newCs ) + 1 : 0;
+
+	if ( newLen <= oldLen )
+		return qtrue;
+	return ( G_GamestateBytesUsed() - oldLen + newLen <= MAX_GAMESTATE_CHARS - RP_GAMESTATE_SPARE ) ? qtrue : qfalse;
+}
+
 // GLX_U: [Cosmetics] rp_allow_cosmetics changed: rewrite c1/c2 in every player's configstring.
 // No ClientUserinfoChanged(), so nothing is saved or re-validated.
 void G_RpRepublishCosmetics( void ) {
@@ -2401,6 +2413,11 @@ void G_RpRepublishCosmetics( void ) {
 		Info_SetValueForKey( cs, "c1", color );
 		G_RpPublishedColor( cl->pers.saberColorMode[1], cl->pers.cosmetic[RP_COSMETIC_CAPE], color, sizeof( color ) );
 		Info_SetValueForKey( cs, "c2", color );
+		if ( !RP_ClientinfoFits( raw, cs ) )
+		{ // GLX_U fix: [Configstrings] longer by the cosmetic names: kept as it is while the gamestate has no room for it
+			G_LogPrintf( "Client %d's cosmetics not republished: the gamestate is at %d of %d bytes\n", i, G_GamestateBytesUsed(), MAX_GAMESTATE_CHARS );
+			continue;
+		}
 		trap->SetConfigstring( CS_PLAYERS + i, cs );
 	}
 
@@ -2742,7 +2759,25 @@ qboolean ClientUserinfoChanged( int clientNum ) {
 	}
 
 	trap->GetConfigstring( CS_PLAYERS+clientNum, oldClientinfo, sizeof( oldClientinfo ) );
-	trap->SetConfigstring( CS_PLAYERS+clientNum, buf );
+	if ( !RP_ClientinfoFits( oldClientinfo, buf ) )
+	{ // GLX_U fix: [Configstrings] every client errors out ("MAX_GAMESTATE_CHARS exceeded") on a configstring that takes the
+	  // gamestate past MAX_GAMESTATE_CHARS, and a player's own string was written with no check, after everything else had
+	  // been allowed up to the budget (audit 4 B2). A connecting player (no string yet) is refused instead, alone, with a
+	  // message (ClientConnect); a player in the game keeps the string the others have, until there is room
+		if ( !oldClientinfo[0] )
+		{
+			level.rpNoRoomForClient = qtrue;
+			G_LogPrintf( "Client %d not let in: the gamestate is at %d of %d bytes\n", clientNum, G_GamestateBytesUsed(), MAX_GAMESTATE_CHARS );
+			return qfalse;
+		}
+		if ( !level.rpClientinfoHeld[clientNum] )
+		{
+			level.rpClientinfoHeld[clientNum] = qtrue;
+			G_LogPrintf( "Client %d's clientinfo not updated: the gamestate is at %d of %d bytes\n", clientNum, G_GamestateBytesUsed(), MAX_GAMESTATE_CHARS );
+		}
+	}
+	else
+		trap->SetConfigstring( CS_PLAYERS+clientNum, buf );
 
 	// only going to be true for allowable server-side custom skeleton cases
 	if ( modelChanged ) {
@@ -2976,8 +3011,14 @@ char *ClientConnect( int clientNum, qboolean firstTime, qboolean isBot ) {
 	}
 
 	// get and distribute relevent paramters
+	level.rpNoRoomForClient = qfalse;
+	level.rpClientinfoHeld[clientNum] = qfalse;
 	if ( !ClientUserinfoChanged( clientNum ) )
+	{ // GLX_U fix: [Configstrings] or no room in the gamestate for this player's string (see ClientUserinfoChanged)
+		if ( level.rpNoRoomForClient )
+			return "The server has no room for another player on this map (its gamestate is full); try again after the map changes";
 		return "Failed userinfo validation";
+	}
 
 	if ( !isBot && firstTime )
 	{

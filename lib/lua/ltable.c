@@ -100,17 +100,43 @@ static const TValue absentkey = {ABSTKEYCONSTANT};
 
 
 /*
+** GLX_U fix: [Lua] integer and float keys were hashed as the plain remainder
+** of the key (no seed), so a script could choose keys that all share one main
+** position (k * ((sizenode-1)|1)): every rehash then walks one chain per key,
+** n*n/2 steps inside a single VM instruction, which the count hook cannot
+** interrupt -- 2 s in one call. Mixed here with a seed taken from the first
+** state's string seed (luai_makeseed: addresses and the time), so such a set
+** cannot be worked out in advance. The seed is per process: 'hashint' has no
+** lua_State, and every state then hashes alike. Where a key sits in the node
+** array is all that changes (traversal order of hash-part keys was never
+** defined, as for strings).
+*/
+static lua_Unsigned glxu_intseed = 0;
+static int glxu_seeded = 0;
+
+void luaH_seedints (unsigned int seed) {
+  if (!glxu_seeded) {  /* the first state's seed; later states share it */
+    /* spread the 32-bit seed over the whole word, so the high bits of a key
+       are mixed too */
+    glxu_intseed = (cast(lua_Unsigned, seed) * cast(lua_Unsigned, 0xD6E8FEB86659FD93ULL)) ^ seed;
+    glxu_seeded = 1;
+  }
+}
+
+static unsigned int glxu_mixint (lua_Unsigned u) {
+  u ^= glxu_intseed;
+  u *= cast(lua_Unsigned, 0x9E3779B97F4A7C15ULL);  /* odd: a bijection */
+  u ^= u >> (sizeof(lua_Unsigned) * 4);  /* the high half into the low */
+  return cast_uint(u);
+}
+
+
+/*
 ** Hash for integers. To allow a good hash, use the remainder operator
-** ('%'). If integer fits as a non-negative int, compute an int
-** remainder, which is faster. Otherwise, use an unsigned-integer
-** remainder, which uses all bits and ensures a non-negative result.
+** ('%') on the mixed key (GLX_U).
 */
 static Node *hashint (const Table *t, lua_Integer i) {
-  lua_Unsigned ui = l_castS2U(i);
-  if (ui <= cast_uint(INT_MAX))
-    return hashmod(t, cast_int(ui));
-  else
-    return hashmod(t, ui);
+  return hashmod(t, glxu_mixint(l_castS2U(i)));
 }
 
 
@@ -156,7 +182,7 @@ static Node *mainpositionTV (const Table *t, const TValue *key) {
     }
     case LUA_VNUMFLT: {
       lua_Number n = fltvalue(key);
-      return hashmod(t, l_hashfloat(n));
+      return hashmod(t, glxu_mixint(cast_uint(l_hashfloat(n))));  /* GLX_U */
     }
     case LUA_VSHRSTR: {
       TString *ts = tsvalue(key);
