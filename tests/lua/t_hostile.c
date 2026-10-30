@@ -206,6 +206,10 @@ int main( void )
 	    { "sortlong","local s = ('s'):rep(6000) T = {} for i = 1, 40 do T[i] = s .. string.char(65 + (i * 7) % 40) end Commands.add('golib', function() table.sort(T) end)" },
 	    { "find",   "local a = ('a'):rep(4000) S = ('x' .. a):rep(60) N = 'x' .. a .. 'b' Commands.add('golib', function() S:find(N, 1, true) end)" },	// 59 candidates, 4 KB compared each
 	    { "rep",    "SEP = ('-'):rep(8000) Commands.add('golib', function() local x = ('x'):rep(30, SEP) end)" },
+	    // AUDIT 4: a bracket class costs its length at every character it is tried on (about 800 tries of a 20 KB class
+	    // here); weighted, those are checks; counted as 1 each the call never reads the clock (the timed "bigclass" shape
+	    // above caught that only by a few milliseconds)
+	    { "class",  "S = ('a'):rep(40) C = '[' .. ('b'):rep(20000) .. 'a]+x' Commands.add('golib', function() S:find(C) end)" },
 	    { NULL, NULL } };
 	  int i;
 	  for ( i = 0; lib[i][0]; i++ )
