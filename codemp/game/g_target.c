@@ -764,8 +764,9 @@ A plugin's World.use may reach one (rp_lua_world.c): how much and how often is t
 The log line then names the plugin, and RP_PayReward() keeps database writes from inside script calls to
 RP_LUA_DB_WRITES_FRAME a frame (a payout past it is skipped, as if "wait" had stopped it).
 
-The per-player stamps are a G_Alloc block, made only when "playerwait" or ONCE_EACH needs one: {enterTime,
-time paid} per client, so a reconnect is a new player.
+The per-player stamps are a G_Alloc block, made only when "playerwait" or ONCE_EACH needs one: {connectTime,
+time paid} per client, so a reconnect is a new player. GLX_U fix: keyed on connectTime, which ClientConnect alone
+sets; enterTime is set again by ClientBegin on every team change, which let a player start them over.
 ==================
 */
 #define RP_REWARD_ONCE_EACH	1
@@ -779,9 +780,9 @@ static int *RP_RewardSlot( gentity_t *self, gentity_t *activator )
 	if ( !self->rpRewardSlots )
 		return NULL;
 	slot = &self->rpRewardSlots[activator->s.number * 2];
-	if ( slot[0] != activator->client->pers.enterTime )
+	if ( slot[0] != activator->client->pers.connectTime )
 	{ // another connection in this slot: a fresh record
-		slot[0] = activator->client->pers.enterTime;
+		slot[0] = activator->client->pers.connectTime;
 		slot[1] = 0;
 	}
 	return slot;

@@ -264,7 +264,7 @@ void SP_target_dialog( gentity_t *self )
 
 	self->rpRewardSlots = NULL;
 	if ( self->spawnflags & RP_DLG_ONCE_EACH )
-	{ // the per-player record target_reward keeps: {enterTime, time shown}
+	{ // the per-player record target_reward keeps: {connectTime, time shown} (GLX_U fix: not enterTime, which a team change sets again)
 		if ( !G_AllocRoomFor( MAX_CLIENTS * 2 * sizeof( int ) ) )
 		{
 			G_LogPrintf( "target_dialog %d: no room in the memory pool for its per-player record; removed\n", self->s.number );
@@ -400,9 +400,9 @@ static void RP_DialogOpen( gentity_t *self, gentity_t *player )
 	{ // ONCE_EACH: once per connection
 		int *slot = &self->rpRewardSlots[player->s.number * 2];
 
-		if ( slot[0] != player->client->pers.enterTime )
+		if ( slot[0] != player->client->pers.connectTime )
 		{
-			slot[0] = player->client->pers.enterTime;
+			slot[0] = player->client->pers.connectTime;
 			slot[1] = 0;
 		}
 		if ( slot[1] )
