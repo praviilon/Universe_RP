@@ -15,6 +15,8 @@ static char t_cvars[64][2][300]; static int t_ncvars;
 static void s_CvarSet( const char *name, const char *value ) { int i; for ( i = 0; i < t_ncvars; i++ ) if ( !strcmp( t_cvars[i][0], name ) ) { Q_strncpyz( t_cvars[i][1], value, 300 ); return; } Q_strncpyz( t_cvars[t_ncvars][0], name, 300 ); Q_strncpyz( t_cvars[t_ncvars][1], value, 300 ); t_ncvars++; }
 static const char *cvar( const char *name ) { int i; for ( i = 0; i < t_ncvars; i++ ) if ( !strcmp( t_cvars[i][0], name ) ) return t_cvars[i][1]; return "(unset)"; }
 static void s_CvarRegister( vmCvar_t *v, const char *name, const char *value, uint32_t flags ) { (void)v; (void)flags; s_CvarSet( name, value ); }
+static void s_CvarString( const char *name, char *buf, int size ) { const char *v = cvar( name ); Q_strncpyz( buf, strcmp( v, "(unset)" ) ? v : "", size ); }
+static char t_sentCmd[256]; static int t_nsentCmd; static void s_SendClientCommand( const char *c ) { Q_strncpyz( t_sentCmd, c, sizeof( t_sentCmd ) ); t_nsentCmd++; }
 static int t_argc; static char t_argv[16][300];
 static int s_Argc( void ) { return t_argc; }
 static void s_Argv( int n, char *buf, int size ) { Q_strncpyz( buf, n < t_argc ? t_argv[n] : "", size ); }
@@ -35,9 +37,10 @@ static int width( const char *s ) { return s_StrLen( s, 7, 0.58f ); }
 int main( void )
 {
 	int i;
-	trap = &imp; imp.Cvar_Set = s_CvarSet; imp.Cvar_Register = s_CvarRegister; imp.Cmd_Argc = s_Argc; imp.Cmd_Argv = s_Argv; imp.Key_GetCatcher = s_GetCatcher; imp.OpenUIMenu = s_OpenUIMenu; imp.R_RegisterFont = s_RegisterFont; imp.R_Font_StrLenPixels = s_StrLen; imp.Print = s_Print;
+	trap = &imp; imp.Cvar_Set = s_CvarSet; imp.Cvar_Register = s_CvarRegister; imp.Cmd_Argc = s_Argc; imp.Cmd_Argv = s_Argv; imp.Key_GetCatcher = s_GetCatcher; imp.OpenUIMenu = s_OpenUIMenu; imp.R_RegisterFont = s_RegisterFont; imp.R_Font_StrLenPixels = s_StrLen; imp.Cvar_VariableStringBuffer = s_CvarString; imp.SendClientCommand = s_SendClientCommand; imp.Print = s_Print;
 	setvbuf( stdout, NULL, _IONBF, 0 );
 	CG_RpDialogInit();
+	CHECK( t_nsentCmd == 0, "init with no dialogue id (unset): nothing sent" );
 	CHECK( !strcmp( cvar( "rpdlg" ), "1" ) && !strcmp( cvar( "ui_rpdlg_id" ), "0" ) && !strcmp( cvar( "ui_rpdlg_opt1" ), "" ), "init: the userinfo key, clean cvars" );
 
 	// a plain dialogue
@@ -86,6 +89,14 @@ int main( void )
 	  CHECK( f != NULL, "the menu file exists" );
 	  if ( f ) { while ( fgets( line, sizeof( line ), f ) ) { if ( strstr( line, "textscale           0.58" ) ) scale58++; if ( strstr( line, "rect                14 " ) && strstr( line, " 572 " ) ) col572++; if ( strstr( line, "name                rpdlg_opt" ) ) opts++; if ( strstr( line, "name                rpdlg_line" ) ) lines++; } fclose( f );
 	    CHECK( scale58 == 13 && col572 >= 13 && opts == 6 && lines == 7, "menu: 13 items at 0.58 (%d), 572 wide (%d), 6 options (%d), 7 lines (%d)", scale58, col572, opts, lines ); } }
+	// AUDIT 3 H3: a restart (CG_Init) walks away from a dialogue its ui_rpdlg_id says was open, as Esc does
+	t_nsentCmd = 0; s_CvarSet( "ui_rpdlg_id", "7" ); CG_RpDialogInit();
+	CHECK( t_nsentCmd == 1 && !strcmp( t_sentCmd, "dialog 0 7" ) && !strcmp( cvar( "ui_rpdlg_id" ), "0" ), "init with id 7: \"dialog 0 7\" sent once, the cvar cleared (%d: %s)", t_nsentCmd, t_sentCmd );
+	t_nsentCmd = 0; CG_RpDialogInit(); CHECK( t_nsentCmd == 0, "init again with id 0: nothing sent" );
+	t_nsentCmd = 0; s_CvarSet( "ui_rpdlg_id", "junk" ); CG_RpDialogInit(); CHECK( t_nsentCmd == 0, "a non-number: nothing sent" );
+	t_nsentCmd = 0; s_CvarSet( "ui_rpdlg_id", "-3" ); CG_RpDialogInit(); CHECK( t_nsentCmd == 0, "a negative id: nothing sent" );
+	t_nsentCmd = 0; t_catcher = 0; cg.demoPlayback = qfalse; cmd( "rpdlg 9 30 \"T\" \"x\" \"a\"" ); CG_RpDialogCmd(); CG_RpDialogInit();
+	CHECK( t_nsentCmd == 1 && !strcmp( t_sentCmd, "dialog 0 9" ), "a dialogue received, then a restart: \"dialog 0 9\" (%s)", t_sentCmd );
 	printf( fails ? "%d FAILED\n" : "t_cgdlg: ALL OK\n", fails );
 	return fails != 0;
 }

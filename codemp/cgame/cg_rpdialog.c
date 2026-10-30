@@ -218,11 +218,27 @@ void CG_RpDialogFrame( void )
 	}
 }
 
-// CG_Init: the userinfo key the server looks for, the font the menu measures with, and clean cvars (a map
-// change leaves nothing open: a menu still up can only send a "dialog 0" for an old id, which the server ignores)
+// CG_Init: a dialogue a restart left open walked away from, the userinfo key the server looks for, the font the
+// menu measures with, and clean cvars (a map change leaves nothing open: a menu still up can only send a "dialog 0"
+// for an old id, which the server ignores)
 void CG_RpDialogInit( void )
 {
 	int i;
+
+	{ // GLX_U fix: [Dialogues] a restart (vid_restart, a cgame or ui restart) takes the menu away with a dialogue still
+	  // open on the server, and nothing told it: the menu's onClose is a menu script, and a ui shutdown runs none. The
+	  // dialogue then stayed open and unseen, and using its speaker again only refreshed it (the held-Use guard,
+	  // g_dialog.c). ui_rpdlg_id outlives the restart: walk away from that dialogue, as Esc does ("dialog 0 <id>").
+	  // The server closes it if it is still the one open, and ignores a stale id, or a player not in the game yet
+	  // (a map load), without a word.
+		char buf[16];
+		int id;
+
+		trap->Cvar_VariableStringBuffer( "ui_rpdlg_id", buf, sizeof( buf ) );
+		id = atoi( buf );
+		if ( id > 0 )
+			trap->SendClientCommand( va( "dialog 0 %d", id ) );
+	}
 
 	memset( &rpdlg, 0, sizeof( rpdlg ) );
 	trap->Cvar_Register( NULL, "rpdlg", "1", CVAR_USERINFO | CVAR_ROM );
