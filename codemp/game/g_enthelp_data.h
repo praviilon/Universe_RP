@@ -888,7 +888,7 @@ static const rpEntHelp_t rp_ent_help[] = {
 		"2048|NO_EXPLOSION|No explosion when destroyed.\n"
 		"4096|START_OFF|Starts hidden and not solid. Using it makes it visible (still not solid), and without USE_NOT_BREAK that use also breaks it.\n"
 		"65536|NO_DEFAULT_BOX|No default box: only mins/maxs set it.",
-		"model||The .md3 to show (required; see /list md3). The Entity System refuses one not on the server, not an .md3 or with no model slot.\n"
+		"model||The .md3 to show (required, see /list md3). The Entity System refuses one not on the server, not an .md3 or with no model slot.\n"
 		"health|0|Damage it takes before breaking. 0: it cannot be shot (using it still breaks it).\n"
 		"material|8|Chunks: 0 metal, 1 glass, 2 sparks, 3 metal and sparks, 4 brown stone, 5 tan stone, 6 glass and metal, 7 blue metal, 8 none, 9 grey stone, 10 mixed metal, 11 yellow crate, 12 grate, 13 rope bits, 14 red crate, 15 white metal.\n"
 		"radius|1|Scales how many chunks it throws.\n"
@@ -936,7 +936,7 @@ static const rpEntHelp_t rp_ent_help[] = {
 		"1|SOLID|Blocks movement and shots with its box.\n"
 		"2|LOOP|Plays the frames over and over (needs more than one frame).\n"
 		"4096|START_OFF|Starts hidden and not solid.",
-		"model||Any .glm: as given or under models/, with .glm added when there is no extension (required; see /list glm).\n"
+		"model||Any .glm: as given or under models/, with .glm added when there is no extension (required, see /list glm).\n"
 		"skin||Skin name: test shows model_test.skin from the model's folder. Empty or default: the model's own. A missing file shows the default skin.\n"
 		"mins|-16 -16 -16|Box corner: what SOLID blocks and the entity commands aim at.\n"
 		"maxs|16 16 16|Box corner.\n"
@@ -1957,21 +1957,21 @@ static const rpEntHelp_t rp_ent_help[] = {
 		"target_delay targetname later wait 3 target lights1",
 		"common target" },
 	{ "target_dialog", 0, NULL,
-		"A conversation: used with a player as activator -- by a trigger_multiple with USE_BUTTON placed on an NPC or a prop, a button, a relay, /entuse -- it shows that player a title, a text and up to six numbered answers, in the console area for everyone and as a menu for players with the " RP_MOD_NAME " client. The player answers with /dialog <number> (/dialog shows it again, /dialog 0 walks away). The chosen option's go<n> is then fired with the player as activator, exactly as a button press would fire it: another target_dialog continues the conversation, a target_reward pays, a target_level_change changes the map, a target_kill kills, a door opens. An option with need<n> is offered only to a player holding that target_flag (!flag: not holding it); the options offered are numbered in order. The dialogue closes by itself after timeout seconds, when the player goes farther than range from its speaker (or from itself), dies, is knocked down, goes spectator, leaves, or opens another dialogue; a restart of the player's game (vid_restart) walks away from it. Its own target fires then (walk-away, timeout, range), not after an answer. One dialogue per player at a time; the same dialogue used again while it is open (a held Use key on its trigger) only refreshes its timer, nothing is sent again. A dialogue with many options is longer than one console line (255 characters): add it with the first options, then the rest with /entedit <id> option4 ... go4 ..., or exec the whole line from a .cfg. A server-side script's use of it (or of anything leading to it) opens it for that player like a button would.",
+		"A conversation: used with a player as activator, it shows that player a title, a text and up to six numbered answers, printed in the console for every player and shown as a menu to players with the " RP_MOD_NAME " client. The player answers with /dialog <number> (/dialog alone shows it again, /dialog 0 walks away), and the answer fires its go<n> with the player as activator, as a button press would: another target_dialog continues the conversation, a target_reward pays, a target_level_change changes the map, a door opens. One dialogue per player at a time: it closes when answered, after timeout, past range, when the player dies, is knocked down, goes spectator, leaves or opens another, and a restart of the player's game (vid_restart) walks away from it. Usually opened by a trigger_multiple with USE_BUTTON on an NPC or a prop.",
 		"1|ONCE_EACH|Shown to each player once per map and per connection.\n"
-		"4|NO_CANCEL_TEXT|No \"(the conversation is over)\" line when it closes without an answer.\n"
-		"128|INACTIVE|Starts inactive: it ignores every use until a target_activate names it.",
-		"title||Who speaks, up to 48 characters. Colour codes work.\n"
-		"message||Required. The text, up to 255 characters; quotes become ' and a word longer than 40 characters is broken.\n"
-		"option1|...|Required. The first answer, up to 64 characters. option2 to option6 follow; the first missing one ends the list.\n"
-		"go1|...|Targetname fired when option1 is chosen, with the player as activator. go2 to go6 likewise. Empty: the dialogue just closes.\n"
-		"need1|...|A target_flag flag the player must hold for option1 to be offered (!flag: must not hold it). need2 to need6 likewise.\n"
+		"4|NO_CANCEL_TEXT|No '(the conversation is over)' line when it closes without an answer.\n"
+		"128|INACTIVE|Starts inactive: it ignores every use, /entuse included, until a target_activate names it.",
+		"title||Who speaks, shown above the text, up to 48 characters. Colour codes work.\n"
+		"message||Required: the text, up to 255 characters, typed in quotes when it has spaces. A double quote in it becomes ' and a word longer than 40 characters is broken.\n"
+		"option1||option1 to option6: the answers, up to 64 characters each, typed in quotes when they have spaces. option1 is required, and the first one missing ends the list. A dialogue with many answers is longer than one console line (255 characters): /entadd it with the first answers, then add the rest with /entedit <id> option4 ... go4 ..., or exec the whole line from a .cfg.\n"
+		"go1||go1 to go6: the targetname each answer fires, with the player as activator. Empty: that answer just closes the dialogue.\n"
+		"need1||need1 to need6: a target_flag flag the player must hold for that answer to be offered (!flag: must not hold it). The answers offered are numbered in order.\n"
 		"timeout|60|Seconds before it closes by itself, 5 to 600.\n"
 		"range|256|Units from the speaker past which it closes. 0: never.\n"
 		"speaker||Targetname of the NPC or prop the player talks to, for range. Empty: this entity's own origin.\n"
-		"target||Fired when it closes without an answer (walk-away, timeout, range), with the player as activator.\n"
-		"targetname||Using it opens the dialogue for the activator.",
-		"target_dialog targetname oracle_talk title Oracle message \"What walks on four legs in the morning?\" option1 \"A dog\" go1 oracle_wrong option2 Man go2 oracle_right spawnflags 1",
+		"target||Fired when it closes without an answer (walked away, timeout, out of range), with the player as activator. Not fired after an answer.\n"
+		"targetname||Using it opens the dialogue for the activator, a server-side script's use included. Used again while it is open for that player (a held Use key), it only refreshes the timer and sends nothing.",
+		"target_dialog targetname oracle_talk title Oracle message Welcome option1 Trade go1 oracle_trade option2 Leave spawnflags 1",
 		"common target target_flag target_reward target_level_change trigger_multiple" },
 	{ "target_escapetrig", RP_EH_MAPONLY | RP_EH_REMOVED, "Only works in the single-player gametype, which " RP_MOD_NAME " does not run: it removes itself at spawn.",
 		"Starts, or with escapegoal ends, a timed escape in the single-player gametype (survivors get points and the round ends). In every gametype " RP_MOD_NAME " runs it removes itself at spawn.",
@@ -1981,10 +1981,10 @@ static const rpEntHelp_t rp_ent_help[] = {
 		NULL,
 		"common target" },
 	{ "target_flag", 0, NULL,
-		"Sets a named flag on the player who started the chain that used it (or clears it with CLEAR). A player's flags last for this connection on this map and are gone on a reconnect or a map change; each player may hold 16. They are read by a target_dialog's need<n> keys: a quest's last step fires a target_flag, and the quest-giver's dialogue offers \"I finished the job\" only to a player holding it. /entflags <player> lists a player's flags. Then it fires its target with the same activator.",
+		"Sets a named flag on the player who started the chain that used it, or clears it with CLEAR. A player's flags last for this connection on this map, 16 at most, and are gone on a reconnect or a map change. A target_dialog's need<n> keys read them: a quest's last step fires a target_flag, and the quest-giver offers 'I finished the job' only to a player holding it. /entflags <player> lists a player's flags.",
 		"1|CLEAR|Clears the flag instead of setting it.\n"
-		"128|INACTIVE|Starts inactive until a target_activate names it.",
-		"flag||Required. The flag's name: letters, digits and '_', up to 31.\n"
+		"128|INACTIVE|Starts inactive: it ignores every use, /entuse included, until a target_activate names it.",
+		"flag||Required: the flag's name, letters, digits and '_', up to 31 characters.\n"
 		"target||Fired after the flag is set or cleared, with the same activator.\n"
 		"targetname||Using it sets (or clears) the flag on the activator.",
 		"target_flag targetname quest1_done_set flag quest1_done",
@@ -2024,15 +2024,6 @@ static const rpEntHelp_t rp_ent_help[] = {
 		"targetname||Using it changes the map.",
 		"target_level_change targetname exit mapname mp/ffa1",
 		"common target" },
-	{ "target_lua", 0, NULL,
-		"Loads, unloads or reloads a server-side Lua plugin when it is used -- by a button, a trigger, a relay, a dialogue option, an ICARUS script or /entuse -- exactly as /scripts load|unload|reload does: the plugin is checked and started at the end of the frame, for this map (rp_lua_plugins is not changed). Who tripped it is logged. It fires no target of its own: the plugin's init is what happens next. A script cannot set it off: a plugin's World.use skips it, and a chain a script started is refused when it reaches it (logged); a target_delay in between fires later and is not refused, so do not put one behind a delay a script can reach. With rp_lua off it logs and does nothing.",
-		"1|ONCE|Does its action once per map, then ignores further uses.\n"
-		"128|INACTIVE|Does nothing until a target_activate wakes it.",
-		"plugin||Required: the plugin's folder name under lua/plugins (letters, digits, '_' and '-', up to 32). Placed with the entity commands, the server must have lua/plugins/<name>/plugin.lua, or it is refused.\n"
-		"action|load|load, unload or reload.\n"
-		"targetname||Using it does the action.",
-		"target_lua targetname startquest plugin quest",
-		"common target" },
 	{ "target_location", RP_EH_MAPONLY, "It only registers its name and removes itself at once, so there is nothing for the Entity System to keep, edit or save: locations belong in the map.",
 		"Names the area around it: team chat (say_team, and tells between teammates) and scripts asking for a location get the name of the nearest target_location in view (PVS). It registers the name and removes itself, so /entadd says it did not survive spawning and there is no entity left to edit or remove: the name stays until the map changes. At most 64 per map. With a targetname it is only a position marker instead.",
 		NULL,
@@ -2041,6 +2032,15 @@ static const rpEntHelp_t rp_ent_help[] = {
 		"targetname||If set, it names no location: it stays as a plain position others can target, like target_position.",
 		"target_location message Cantina count 3",
 		"common target target_position" },
+	{ "target_lua", 0, NULL,
+		"Loads, unloads or reloads a server-side Lua plugin when used (by a button, a trigger, a relay, a dialogue answer, an ICARUS script or /entuse), as /scripts load, unload or reload does: the plugin is checked and started at the end of the frame, for this map only (rp_lua_plugins is not changed). Who tripped it is logged, and it fires no target: the plugin's init is what follows. A server-side script cannot set it off: a plugin's World.use skips it, and a chain a script started is refused when it reaches it (logged). A target_delay in between fires later and is not refused, so keep it out of a script's reach behind a delay. With rp_lua off it logs and does nothing.",
+		"1|ONCE|Does its action once per map, then ignores further uses.\n"
+		"128|INACTIVE|Starts inactive: it ignores every use, /entuse included, until a target_activate names it.",
+		"plugin||Required: the plugin's folder name under lua/plugins, letters, digits, '_' and '-', up to 32. Placed with the entity commands, the server must have lua/plugins/<name>/plugin.lua, or it is refused.\n"
+		"action|load|load, unload or reload.\n"
+		"targetname||Using it does the action.",
+		"target_lua targetname startquest plugin quest",
+		"common target" },
 	{ "target_play_music", 0, NULL,
 		"Changes the background music for everyone on the server when used. With one file that file loops, with two the first plays as an intro and the second then loops. A change that would overflow the gamestate is refused and logged.",
 		NULL,
@@ -2093,27 +2093,27 @@ static const rpEntHelp_t rp_ent_help[] = {
 		"targetname||Using it fires its target.",
 		"target_relay targetname relay1 target door1 wait -1",
 		"common target target_random" },
-	{ "target_reward", 0, NULL,
-		"Pays credits and XP to the player who started the chain that used it: whoever walked into the trigger, pressed the button or finished the counter. The player must be logged in to a character in RPG mode; anyone else is paid nothing and nothing fires. A player at the credit cap or the maximum level is paid what fits, possibly nothing; the reward still counts as theirs (ONCE_EACH, playerwait, wait, ONCE) and fires its target. The same rules as an NPC kill reward: credits stop at rp_max_rpg_credits, XP carries into as many levels as it covers and is not given at the maximum level, the character is saved at once, and every payout is logged. After paying it fires its target with the same activator, so a target_print or a sound can follow. Used through /entuse, the activator is the admin, and the log says so. A lock on it (/entlockadd) limits who it pays. A server-side script may use it too (how much and how often is the server's design); the log then names the plugin.",
-		"1|ONCE_EACH|Pays each player once per map and per connection; a reconnect starts over.\n"
-		"2|ONCE|Pays once in all, fires its target, then removes itself.\n"
-		"4|SILENT|No line in the player's console (the log line stays).\n"
-		"128|INACTIVE|Starts inactive: it ignores every use, /entuse included, until a target_activate names it.",
-		"credits|0|Credits paid per use, 0 to 100000.\n"
-		"xp|0|XP paid per use, 0 to 100. Both credits and xp 0 (or missing): refused at spawn.\n"
-		"wait|0|Seconds before it pays anyone again. 0: no limit.\n"
-		"playerwait|0|Seconds before it pays the same player again. 0: no limit.\n"
-		"message|Reward|The first words of the player's line: \"<message>: +50 credits, +5 XP\".\n"
-		"target||Fired after a payout, with the same activator.\n"
-		"targetname||Using it pays the activator.",
-		"target_reward targetname chest_pay credits 250 spawnflags 1 target chest_msg",
-		"common target target_relay target_counter trigger_multiple npc_spawner target_dialog" },
 	{ "target_remove_powerups", 0, NULL,
 		"Takes every powerup from the activator when used: a carried CTF flag goes back to its base, cloak is switched off properly, and all other powerups (speed, enlightenment, ysalamiri and the rest) are cleared.",
 		NULL,
 		"targetname||Using it strips the activator's powerups.",
 		"target_remove_powerups targetname strip",
 		"common target" },
+	{ "target_reward", 0, NULL,
+		"Pays credits and XP to the player who started the chain that used it: whoever walked into the trigger, pressed the button or finished the counter. Only a player logged in to a character in RPG mode is paid: for anyone else nothing happens and nothing fires. It follows the NPC kill reward's rules: credits stop at rp_max_rpg_credits, XP carries into as many levels as it covers and is not given at the maximum level, the character is saved at once, and every payout is logged. A player at either cap is paid what fits, possibly nothing, and the reward still counts as taken. A lock on it (/entlockadd) limits who it pays. Through /entuse the admin is the one paid, and the log says so. A server-side script's use is logged with the plugin's name.",
+		"1|ONCE_EACH|Pays each player once per map and per connection. A reconnect starts over.\n"
+		"2|ONCE|Pays once in all, fires its target, then removes itself.\n"
+		"4|SILENT|No line in the player's console (the log line stays).\n"
+		"128|INACTIVE|Starts inactive: it ignores every use, /entuse included, until a target_activate names it.",
+		"credits|0|Credits paid per use, 0 to 100000.\n"
+		"xp|0|XP paid per use, 0 to 100. With credits and xp both 0 (or missing) it is refused at spawn.\n"
+		"wait|0|Seconds before it pays anyone again, up to 86400. 0: no limit.\n"
+		"playerwait|0|Seconds before it pays the same player again, up to 86400. 0: no limit.\n"
+		"message|Reward|The first words of the player's line, as in Reward: +50 credits, +5 XP.\n"
+		"target||Fired after each payout (a capped one too), with the same activator, so a target_print or a sound can follow.\n"
+		"targetname||Using it pays the activator.",
+		"target_reward targetname chest_pay credits 250 spawnflags 1 target chest_msg",
+		"common target target_relay target_counter trigger_multiple npc_spawner target_dialog target_flag" },
 	{ "target_score", 0, NULL,
 		"Adds count points to the activator's score when used. Nothing happens when the activator is not a player or NPC, or during warmup.",
 		NULL,
@@ -2160,7 +2160,7 @@ static const rpEntHelp_t rp_ent_help[] = {
 		"2|LOOPED_OFF|Looping sound, off at the start: each use toggles it.\n"
 		"4|GLOBAL|Each use plays it at full volume for everyone (not with looping).\n"
 		"8|ACTIVATOR|Each use plays it on the activator (not with looping). Forced on when noise starts with *.",
-		"noise||Required unless soundSet is given: the sound file to play, which the server must have (.wav or .mp3; without an extension .wav, then .mp3). Missing, the entity is not spawned.\n"
+		"noise||Required unless soundSet is given: the sound file to play, which the server must have (.wav or .mp3: without an extension, .wav then .mp3). Missing, the entity is not spawned.\n"
 		"soundSet||An ambient sound set from sound/sound.txt, played instead of noise. It is sent only to players within hearing range of the set (its radius in sound.txt, plus 512). Placed with the entity commands, an unknown set is refused.\n"
 		"wait|0|Seconds between automatic replays, played by the clients without any use. Only works when random is non-zero too (a stock quirk).\n"
 		"random|0|Seconds of variance on wait. Must be non-zero for wait to repeat at all.\n"
