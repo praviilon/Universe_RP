@@ -4,14 +4,14 @@
 	<meta charset="utf-8">
 	<meta name="viewport" content="width=device-width, initial-scale=1">
 	<title>Features · Universe RP</title>
-	<meta name="description" content="What Universe RP adds to Jedi Academy multiplayer: characters and skills, RP chat with ranges, emotes, melee moves, custom lightsabers, hats and capes, in-game world building and server tools.">
+	<meta name="description" content="What Universe RP adds to Jedi Academy multiplayer: characters and skills, RP chat with ranges, emotes, melee moves, custom lightsabers, hats and capes, in-game world building, dialogues, rewards and Lua scripts, and server tools.">
 	<meta name="theme-color" content="#04060c">
 	<link rel="icon" type="image/png" sizes="32x32" href="assets/img/favicon-32.png">
 	<link rel="apple-touch-icon" href="assets/img/apple-touch-icon.png">
 	<meta property="og:type" content="website">
 	<meta property="og:site_name" content="Universe RP">
 	<meta property="og:title" content="Universe RP features">
-	<meta property="og:description" content="What Universe RP adds to Jedi Academy multiplayer: characters and skills, RP chat with ranges, emotes, melee moves, custom lightsabers, hats and capes, in-game world building and server tools.">
+	<meta property="og:description" content="What Universe RP adds to Jedi Academy multiplayer: characters and skills, RP chat with ranges, emotes, melee moves, custom lightsabers, hats and capes, in-game world building, dialogues, rewards and Lua scripts, and server tools.">
 	<meta property="og:image" content="https://praviilon.github.io/Universe_RP/assets/img/og-cover.jpg">
 	<meta property="og:image:width" content="1200">
 	<meta property="og:image:height" content="630">
@@ -63,6 +63,7 @@
 					<li><a href="#sabers">Lightsabers</a></li>
 					<li><a href="#looks">Looks</a></li>
 					<li><a href="#building">Building worlds</a></li>
+					<li><a href="#quests">Quests and scripts</a></li>
 					<li><a href="#admin">Running a server</a></li>
 					<li><a href="#platforms">Platforms</a></li>
 				</ul>
@@ -325,6 +326,7 @@
 							<li><code>/entcopy</code>, <code>/entcut</code> and <code>/entrotate</code> move things by aim; <code>/entedit</code> and <code>/entremove</code> change them.</li>
 							<li><code>/entsave default</code> saves it all so it loads with the map next time.</li>
 							<li><code>/settings 6</code> draws the box of whatever you aim at.</li>
+							<li>A second pool of logical entities, so spawners and markers don't use up the map's entity limit.</li>
 						</ul>
 					</div>
 					<div class="card">
@@ -344,16 +346,43 @@
 						</ul>
 					</div>
 					<div class="card">
-						<h3>The map itself</h3>
-						<ul>
-							<li><code>/remap</code> swaps a shader in the map, saved per map like entities.</li>
-							<li><code>/admweather</code> sets the weather for everyone, and can layer several effects.</li>
-							<li>A second pool of logical entities, so spawners and markers don't use up the map's entity limit.</li>
-						</ul>
+						<h3>Shader remaps</h3>
+						<p>Swap any shader in the map for another, for everyone and at once: a texture, a model's skin, the sky. <code>/remap &lt;old&gt; &lt;new&gt;</code> makes a swap, <code>/remaplist</code> shows what is swapped and <code>/remapreset</code> puts it all back.</p>
+						<p><code>/remapsave &lt;name&gt;</code> and <code>/remapload &lt;name&gt;</code> keep sets of swaps per map, and the set saved as <code>default</code> loads with the map.</p>
 					</div>
 					<div class="card">
 						<h3>Single player maps</h3>
 						<p>Jedi Academy's single player maps, and Jedi Outcast's, can be played in multiplayer, with entity classes such as <code>misc_model_ghoul</code> brought over from single player.</p>
+					</div>
+				</div>
+			</div>
+		</section>
+
+		<section class="section group" id="quests" aria-labelledby="quests-title">
+			<div class="wrap">
+				<div class="group-head"><span class="ico" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 4h16v11H10l-4 4v-4H4z"/><path d="M12 7.5v3.5M12 13.5h.01"/></svg></span><h2 id="quests-title">Quests and scripts</h2></div>
+				<p class="lede">Conversations, rewards and quest steps built from entities, and server-side Lua scripts for the rest.</p>
+				<div class="grid-2">
+					<div class="card">
+						<h3>Dialogues</h3>
+						<p>NPCs and props that talk. A <code>target_dialog</code> shows a player a title, a text and up to six answers: as a menu for players with the Universe RP client (click an answer or press its number), in the console for anyone else (<code>/dialog &lt;number&gt;</code>).</p>
+						<p>Each answer fires its own target with that player, as a button would: the next line of the conversation, a door, a reward, a trip to another map. A conversation ends when the player walks away from the speaker, after a timeout, or with Esc, and can be shown to each player once.</p>
+					</div>
+					<div class="card">
+						<h3>Rewards</h3>
+						<p>A <code>target_reward</code> pays credits and XP to the player who used it, with a pause between payouts, a wait per player, once per player or once in all. Every payout is saved at once and logged, and a lock limits who it pays.</p>
+						<p>Put one behind a dialogue answer, a button or the end of a race.</p>
+					</div>
+					<div class="card">
+						<h3>Quest steps</h3>
+						<p>A <code>target_flag</code> marks a player, "met the trader" or "job done", for the rest of the visit. A dialogue's answers can need a flag, or its absence, so the quest-giver offers "I finished the job" only to those who did. <code>/entflags &lt;player&gt;</code> shows a player's flags.</p>
+						<p>All of it is placed with <code>/entadd</code> in game, or built into the map.</p>
+					</div>
+					<div class="card">
+						<h3>Lua scripts</h3>
+						<p>Server hosts can add their own features in Lua 5.4. A plugin reacts to what happens (players joining, chat, deaths, entities used, dialogue answers), adds chat commands and timers, stores data per character, and places its own props, NPCs, vehicles, dialogues and rewards.</p>
+						<p>Each runs in a sandbox with time, memory and rate limits, and can never touch accounts or act on players except through the map's own entities. Admins with the Scripts power manage them with <code>/scripts</code>; a map can load one with a <code>target_lua</code>.</p>
+						<p>The Full package includes the guide, <code>UniverseRP/lua/README.md</code>: setup, the whole API and its limits, and three example plugins to start from. It is also <a href="https://github.com/praviilon/Universe_RP/blob/main/assets/server/lua/README.md">on GitHub</a>.</p>
 					</div>
 				</div>
 			</div>
@@ -371,7 +400,7 @@
 					<div class="card">
 						<h3>Server tools</h3>
 						<ul>
-							<li><code>/admmap</code> changes map and gametype together; <code>/admweather</code> sets the weather.</li>
+							<li><code>/admmap</code> changes map and gametype together; <code>/admweather</code> sets the weather, and can layer several effects.</li>
 							<li><code>/teleport</code>, <code>/teleaim</code>, <code>/paralyze</code>, <code>/silence</code>, <code>/noclip</code> and more.</li>
 							<li><code>/admhidden</code> and <code>/admwalkthrough</code> hide you or let you walk through people.</li>
 						</ul>
