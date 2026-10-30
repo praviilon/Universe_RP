@@ -530,7 +530,7 @@ static const char *RP_LockMessageProblem( const char *text )
 		return va( "a message has at most %d lines (%d times \\n)", RP_LOCK_MESSAGE_LINES, RP_LOCK_MESSAGE_LINES - 1 );
 
 	if ( RP_HasStringEdRef( text ) )
-		return "a message cannot contain @@@";
+		return "a message cannot contain three @ in a row";
 
 	return NULL;
 }
