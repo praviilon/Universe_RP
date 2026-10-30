@@ -28,6 +28,9 @@ static int s_StrLen( const char *s, int font, float scale ) { float w = 0; (void
 static char t_printed[4096]; static void QDECL s_Print( const char *fmt, ... ) { va_list a; char b[1024]; va_start( a, fmt ); Q_vsnprintf( b, sizeof( b ), fmt, a ); va_end( a ); Q_strcat( t_printed, sizeof( t_printed ), b ); }
 static void QDECL s_Error( int l, const char *fmt, ... ) { (void)l; printf( "Error: %s\n", fmt ); exit( 1 ); }
 qboolean t_chat; qboolean CG_RpChatActive( void ) { return t_chat; }
+static int t_ms; static int s_Milliseconds( void ) { return t_ms; }
+static char t_systeminfo[256] = "\\sv_serverid\\1234\\sv_pure\\0";
+const char *CG_ConfigString( int index ) { return index == CS_SYSTEMINFO ? t_systeminfo : ""; }
 NORETURN_PTR void (*Com_Error)( int level, const char *error, ... ) = (void *)s_Error;
 void (*Com_Printf)( const char *msg, ... ) = s_Print;
 
@@ -37,7 +40,7 @@ static int width( const char *s ) { return s_StrLen( s, 7, 0.58f ); }
 int main( void )
 {
 	int i;
-	trap = &imp; imp.Cvar_Set = s_CvarSet; imp.Cvar_Register = s_CvarRegister; imp.Cmd_Argc = s_Argc; imp.Cmd_Argv = s_Argv; imp.Key_GetCatcher = s_GetCatcher; imp.OpenUIMenu = s_OpenUIMenu; imp.R_RegisterFont = s_RegisterFont; imp.R_Font_StrLenPixels = s_StrLen; imp.Cvar_VariableStringBuffer = s_CvarString; imp.SendClientCommand = s_SendClientCommand; imp.Print = s_Print;
+	trap = &imp; imp.Cvar_Set = s_CvarSet; imp.Cvar_Register = s_CvarRegister; imp.Cmd_Argc = s_Argc; imp.Cmd_Argv = s_Argv; imp.Key_GetCatcher = s_GetCatcher; imp.OpenUIMenu = s_OpenUIMenu; imp.R_RegisterFont = s_RegisterFont; imp.R_Font_StrLenPixels = s_StrLen; imp.Cvar_VariableStringBuffer = s_CvarString; imp.SendClientCommand = s_SendClientCommand; imp.Print = s_Print; imp.Milliseconds = s_Milliseconds;
 	setvbuf( stdout, NULL, _IONBF, 0 );
 	CG_RpDialogInit();
 	CHECK( t_nsentCmd == 0, "init with no dialogue id (unset): nothing sent" );
@@ -89,14 +92,40 @@ int main( void )
 	  CHECK( f != NULL, "the menu file exists" );
 	  if ( f ) { while ( fgets( line, sizeof( line ), f ) ) { if ( strstr( line, "textscale           0.58" ) ) scale58++; if ( strstr( line, "rect                14 " ) && strstr( line, " 572 " ) ) col572++; if ( strstr( line, "name                rpdlg_opt" ) ) opts++; if ( strstr( line, "name                rpdlg_line" ) ) lines++; } fclose( f );
 	    CHECK( scale58 == 13 && col572 >= 13 && opts == 6 && lines == 7, "menu: 13 items at 0.58 (%d), 572 wide (%d), 6 options (%d), 7 lines (%d)", scale58, col572, opts, lines ); } }
-	// AUDIT 3 H3: a restart (CG_Init) walks away from a dialogue its ui_rpdlg_id says was open, as Esc does
-	t_nsentCmd = 0; s_CvarSet( "ui_rpdlg_id", "7" ); CG_RpDialogInit();
-	CHECK( t_nsentCmd == 1 && !strcmp( t_sentCmd, "dialog 0 7" ) && !strcmp( cvar( "ui_rpdlg_id" ), "0" ), "init with id 7: \"dialog 0 7\" sent once, the cvar cleared (%d: %s)", t_nsentCmd, t_sentCmd );
-	t_nsentCmd = 0; CG_RpDialogInit(); CHECK( t_nsentCmd == 0, "init again with id 0: nothing sent" );
-	t_nsentCmd = 0; s_CvarSet( "ui_rpdlg_id", "junk" ); CG_RpDialogInit(); CHECK( t_nsentCmd == 0, "a non-number: nothing sent" );
-	t_nsentCmd = 0; s_CvarSet( "ui_rpdlg_id", "-3" ); CG_RpDialogInit(); CHECK( t_nsentCmd == 0, "a negative id: nothing sent" );
-	t_nsentCmd = 0; t_catcher = 0; cg.demoPlayback = qfalse; cmd( "rpdlg 9 30 \"T\" \"x\" \"a\"" ); CG_RpDialogCmd(); CG_RpDialogInit();
-	CHECK( t_nsentCmd == 1 && !strcmp( t_sentCmd, "dialog 0 9" ), "a dialogue received, then a restart: \"dialog 0 9\" (%s)", t_sentCmd );
+	// AUDIT 3 H3 / AUDIT 4 C2: a restart (CG_Init) walks away from a dialogue its ui_rpdlg_id says was open, as Esc does,
+	// but not from init: vid_restart sends nothing while it reloads, and the engine's "vdr" and "cp" go first, in the
+	// first packet after it; the server's flood protection then ignored ours. So once, RP_FLOOD_PROTECT_MS + 60 after
+	// the first drawn frame and after the ui's own last send, and only under the sv_serverid the dialogue came with
+	CHECK( !strcmp( cvar( "ui_rpdlg_sid" ), "1234" ), "a dialogue stores the sv_serverid it came with: %s", cvar( "ui_rpdlg_sid" ) );
+	{ const int gap = RP_FLOOD_PROTECT_MS + 60;
+	  t_nsentCmd = 0; t_catcher = 0; s_CvarSet( "ui_rpx_sent", "0" );
+	  t_ms = 1000; s_CvarSet( "ui_rpdlg_id", "7" ); s_CvarSet( "ui_rpdlg_sid", "1234" ); CG_RpDialogInit();
+	  CHECK( t_nsentCmd == 0 && !strcmp( cvar( "ui_rpdlg_id" ), "0" ) && !strcmp( cvar( "ui_rpdlg_sid" ), "" ), "init with id 7: nothing sent yet, the cvars cleared (%d: %s)", t_nsentCmd, t_sentCmd );
+	  t_ms = 6000; CG_RpDialogFrame(); CHECK( t_nsentCmd == 0, "the first drawn frame, after a long reload: nothing yet" );
+	  t_ms = 6000 + gap - 1; CG_RpDialogFrame(); CHECK( t_nsentCmd == 0, "%d ms after it: nothing yet", gap - 1 );
+	  t_ms = 6000 + gap; CG_RpDialogFrame(); CHECK( t_nsentCmd == 1 && !strcmp( t_sentCmd, "dialog 0 7" ) && atoi( cvar( "ui_rpx_sent" ) ) == 6000 + gap, "%d ms after the first frame: \"dialog 0 7\", ui_rpx_sent stamped (%d: %s, %s)", gap, t_nsentCmd, t_sentCmd, cvar( "ui_rpx_sent" ) );
+	  for ( i = 1; i <= 5; i++ ) { t_ms += 1000; CG_RpDialogFrame(); } CHECK( t_nsentCmd == 1, "sent once (%d)", t_nsentCmd );
+	  // another level or another server: nothing ever
+	  t_nsentCmd = 0; t_ms = 20000; s_CvarSet( "ui_rpdlg_id", "7" ); s_CvarSet( "ui_rpdlg_sid", "999" ); CG_RpDialogInit();
+	  for ( i = 0; i < 5; i++ ) { CG_RpDialogFrame(); t_ms += 500; } CHECK( t_nsentCmd == 0, "another sv_serverid (a map load, map_restart, another server): nothing sent" );
+	  t_nsentCmd = 0; s_CvarSet( "ui_rpdlg_id", "7" ); s_CvarSet( "ui_rpdlg_sid", "" ); CG_RpDialogInit();
+	  for ( i = 0; i < 5; i++ ) { CG_RpDialogFrame(); t_ms += 500; } CHECK( t_nsentCmd == 0, "no sv_serverid stored: nothing sent" );
+	  // demo playback: nothing
+	  t_nsentCmd = 0; cg.demoPlayback = qtrue; s_CvarSet( "ui_rpdlg_id", "7" ); s_CvarSet( "ui_rpdlg_sid", "1234" ); CG_RpDialogInit();
+	  for ( i = 0; i < 5; i++ ) { CG_RpDialogFrame(); t_ms += 500; } CHECK( t_nsentCmd == 0, "demo playback: nothing sent" ); cg.demoPlayback = qfalse;
+	  // the ui sent one just before: after it
+	  t_nsentCmd = 0; t_ms = 40000; s_CvarSet( "ui_rpdlg_id", "8" ); s_CvarSet( "ui_rpdlg_sid", "1234" ); CG_RpDialogInit();
+	  CG_RpDialogFrame(); s_CvarSet( "ui_rpx_sent", va( "%d", 40000 + gap - 50 ) );
+	  t_ms = 40000 + gap; CG_RpDialogFrame(); CHECK( t_nsentCmd == 0, "the ui sent one 50 ms ago: waits" );
+	  t_ms = 40000 + gap - 50 + gap - 1; CG_RpDialogFrame(); CHECK( t_nsentCmd == 0, "still within the gap after the ui's" );
+	  t_ms = 40000 + gap - 50 + gap; CG_RpDialogFrame(); CHECK( t_nsentCmd == 1 && !strcmp( t_sentCmd, "dialog 0 8" ), "%d ms after the ui's: sent (%d: %s)", gap, t_nsentCmd, t_sentCmd );
+	  // nothing to walk away from
+	  t_nsentCmd = 0; t_ms = 60000; s_CvarSet( "ui_rpdlg_sid", "1234" );
+	  { static const char *bad[] = { "0", "junk", "-3", "", NULL }; int k; for ( k = 0; bad[k]; k++ ) { s_CvarSet( "ui_rpdlg_id", bad[k] ); s_CvarSet( "ui_rpdlg_sid", "1234" ); CG_RpDialogInit(); CG_RpDialogFrame(); t_ms += 1000; CG_RpDialogFrame(); } }
+	  CHECK( t_nsentCmd == 0, "id 0, junk, negative, empty: nothing sent" );
+	  // the whole way: a dialogue received, a restart, the frames
+	  t_nsentCmd = 0; t_ms = 80000; cmd( "rpdlg 9 30 \"T\" \"x\" \"a\"" ); CG_RpDialogCmd(); CG_RpDialogInit(); CG_RpDialogFrame(); t_ms += gap; CG_RpDialogFrame();
+	  CHECK( t_nsentCmd == 1 && !strcmp( t_sentCmd, "dialog 0 9" ), "a dialogue received, then a restart: \"dialog 0 9\" (%d: %s)", t_nsentCmd, t_sentCmd ); }
 	printf( fails ? "%d FAILED\n" : "t_cgdlg: ALL OK\n", fails );
 	return fails != 0;
 }

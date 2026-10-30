@@ -27,7 +27,18 @@ static struct {
 	int			shownLeft;		// the seconds last written to ui_rpdlg_left
 	qboolean	pendingOpen;	// the menu waits for the console or the chat line to close
 	qhandle_t	font;
+	int			walkAwayId;		// GLX_U fix: a dialogue a restart left open, to walk away from (CG_RpDialogFrame); 0 none
+	int			walkAwayAt;		// trap->Milliseconds() when it may go; 0 until the first drawn frame
+	char		walkAwaySid[16];	// the sv_serverid it was opened under
 } rpdlg;
+
+// GLX_U fix: [Dialogues] the server's sv_serverid (systeminfo): new at every map load and map_restart, and another
+// server's is another. A dialogue id is only meaningful under the one it came with: the game numbers dialogues
+// from 1 again on every map (g_dialog.c)
+static const char *RP_DlgServerId( void )
+{
+	return Info_ValueForKey( CG_ConfigString( CS_SYSTEMINFO ), "sv_serverid" );
+}
 
 static int RP_DlgWidth( const char *s, float scale )
 {
@@ -176,6 +187,7 @@ void CG_RpDialogCmd( void )
 	}
 	trap->Cvar_Set( "ui_rpdlg_count", va( "%d", count ) );
 	trap->Cvar_Set( "ui_rpdlg_id", va( "%d", id ) );
+	trap->Cvar_Set( "ui_rpdlg_sid", RP_DlgServerId() );	// GLX_U fix: kept with the id, for a restart's walk-away (CG_RpDialogFrame)
 	rpdlg.id = id;
 	rpdlg.endTime = cg.time + seconds * 1000;
 	rpdlg.shownLeft = -1;
@@ -205,9 +217,43 @@ void CG_RpDialogCloseCmd( void )
 	trap->OpenUIMenu( UIMENU_RPDIALOG_CLOSE );
 }
 
-// each frame (CG_DrawActiveFrame): the time left, and a pending open
+// each frame (CG_DrawActiveFrame): a restart's walk-away, the time left, and a pending open
 void CG_RpDialogFrame( void )
 {
+	if ( rpdlg.walkAwayId )
+	{ // GLX_U fix: [Dialogues] the walk-away CG_RpDialogInit kept: "dialog 0 <id>", as Esc. Sent from init, it went in the
+	  // first packet after the restart with the engine's own "vdr" and "cp", and the server's flood protection (one
+	  // command per RP_FLOOD_PROTECT_MS, held by the game) ignored it: those count first. vid_restart sends nothing
+	  // while it reloads, so the wait counts from the first drawn frame, as RPX_FloodGap (cg_rpextras.c) spaces the
+	  // Extras list, and from the ui's own last send (ui_rpx_sent), which this then stamps. Once: if a command typed
+	  // in those 150 ms still takes its place, the dialogue ends as before (its timeout, walking away, /dialog)
+		int now = trap->Milliseconds();
+
+		if ( !rpdlg.walkAwayAt )
+		{ // the first drawn frame: the configstrings are here now. Another level (a map load, map_restart) or another
+		  // server has no dialogue of ours open, and the id may be a new dialogue's there: nothing to walk away from
+			if ( cg.demoPlayback || !rpdlg.walkAwaySid[0] || strcmp( rpdlg.walkAwaySid, RP_DlgServerId() ) )
+				rpdlg.walkAwayId = 0;
+			else
+				rpdlg.walkAwayAt = now + RP_FLOOD_PROTECT_MS + 60;
+		}
+		else if ( now >= rpdlg.walkAwayAt )
+		{
+			char buf[16];
+			int ui;
+
+			trap->Cvar_VariableStringBuffer( "ui_rpx_sent", buf, sizeof( buf ) );
+			ui = atoi( buf );
+			if ( ui && now - ui >= 0 && now - ui < RP_FLOOD_PROTECT_MS + 60 )
+				rpdlg.walkAwayAt = ui + RP_FLOOD_PROTECT_MS + 60;	// a menu sent one just now: after it
+			else
+			{
+				trap->SendClientCommand( va( "dialog 0 %d", rpdlg.walkAwayId ) );
+				trap->Cvar_Set( "ui_rpx_sent", va( "%d", now ) );
+				rpdlg.walkAwayId = 0;
+			}
+		}
+	}
 	if ( !rpdlg.id )
 		return;
 	RP_DlgSetLeft();
@@ -218,29 +264,32 @@ void CG_RpDialogFrame( void )
 	}
 }
 
-// CG_Init: a dialogue a restart left open walked away from, the userinfo key the server looks for, the font the
+// CG_Init: a dialogue a restart left open kept to walk away from (CG_RpDialogFrame), the userinfo key the server looks for, the font the
 // menu measures with, and clean cvars (a map change leaves nothing open: a menu still up can only send a "dialog 0"
 // for an old id, which the server ignores)
 void CG_RpDialogInit( void )
 {
 	int i;
 
+	memset( &rpdlg, 0, sizeof( rpdlg ) );
 	{ // GLX_U fix: [Dialogues] a restart (vid_restart, a cgame or ui restart) takes the menu away with a dialogue still
 	  // open on the server, and nothing told it: the menu's onClose is a menu script, and a ui shutdown runs none. The
 	  // dialogue then stayed open and unseen, and using its speaker again only refreshed it (the held-Use guard,
-	  // g_dialog.c). ui_rpdlg_id outlives the restart: walk away from that dialogue, as Esc does ("dialog 0 <id>").
-	  // The server closes it if it is still the one open, and ignores a stale id, or a player not in the game yet
-	  // (a map load), without a word.
+	  // g_dialog.c). ui_rpdlg_id and ui_rpdlg_sid outlive the restart: kept here, and CG_RpDialogFrame walks away from
+	  // that dialogue, as Esc does ("dialog 0 <id>"), once the game is drawn again and only under the same sv_serverid.
+	  // The server closes it if it is still the one open, and ignores a stale id without a word.
 		char buf[16];
 		int id;
 
 		trap->Cvar_VariableStringBuffer( "ui_rpdlg_id", buf, sizeof( buf ) );
 		id = atoi( buf );
 		if ( id > 0 )
-			trap->SendClientCommand( va( "dialog 0 %d", id ) );
+		{
+			rpdlg.walkAwayId = id;
+			trap->Cvar_VariableStringBuffer( "ui_rpdlg_sid", rpdlg.walkAwaySid, sizeof( rpdlg.walkAwaySid ) );
+		}
 	}
 
-	memset( &rpdlg, 0, sizeof( rpdlg ) );
 	trap->Cvar_Register( NULL, "rpdlg", "1", CVAR_USERINFO | CVAR_ROM );
 	trap->Cvar_Set( "rpdlg", "1" );
 	rpdlg.font = trap->R_RegisterFont( "ergoec" );	// the menus' font 2; registered here so a HUD font change cannot change the measuring
@@ -251,5 +300,6 @@ void CG_RpDialogInit( void )
 		trap->Cvar_Set( va( "ui_rpdlg_opt%d", i ), "" );
 	trap->Cvar_Set( "ui_rpdlg_count", "0" );
 	trap->Cvar_Set( "ui_rpdlg_id", "0" );
+	trap->Cvar_Set( "ui_rpdlg_sid", "" );
 	trap->Cvar_Set( "ui_rpdlg_left", "" );
 }

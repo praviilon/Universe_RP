@@ -764,6 +764,10 @@ A plugin's World.use may reach one (rp_lua_world.c): how much and how often is t
 The log line then names the plugin, and RP_PayReward() keeps database writes from inside script calls to
 RP_LUA_DB_WRITES_FRAME a frame (a payout past it is skipped, as if "wait" had stopped it).
 
+GLX_U fix: a player at the credit cap or the maximum level is paid what fits, possibly nothing, and the reward still
+counts as theirs (wait, playerwait, ONCE_EACH, ONCE) and fires its target: it used to fire nothing then, and a
+quest built as reward -> flag or reward -> next step could not be finished by them.
+
 The per-player stamps are a G_Alloc block, made only when "playerwait" or ONCE_EACH needs one: {connectTime,
 time paid} per client, so a reconnect is a new player. GLX_U fix: keyed on connectTime, which ClientConnect alone
 sets; enterTime is set again by ClientBegin on every team change, which let a player start them over.
@@ -815,7 +819,7 @@ void target_reward_use( gentity_t *self, gentity_t *other, gentity_t *activator 
 	if ( !RP_PayReward( activator, self->rpRewardCredits, self->rpRewardXP, self->message ? self->message : "Reward", logTag,
 			( self->spawnflags & RP_REWARD_SILENT ) ? qtrue : qfalse ) )
 	{
-		return;	// not eligible (logged out, no character, not in RPG mode), or nothing could be given
+		return;	// not eligible (logged out, no character, not in RPG mode), or past the script write limit
 	}
 
 	self->rpRewardLastPaid = level.time;

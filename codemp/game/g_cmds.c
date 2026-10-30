@@ -21726,8 +21726,11 @@ else is paid nothing and qfalse comes back. Credits go through add_credits() (rp
 them, the shortfall is said), XP carries over level by level through RP_LevelUpFromXP() unless the player is
 at rp_rpg_max_level. One console line ("<label>: +50 credits, +5 XP"; none when silent), one save of
 credits, XP, level and skillpoints together, one log line "<logTag>: <player> ...: N credits, M XP".
-qtrue when anything was paid. From inside a script call (a plugin's World.use set it off), the write must fit
-RP_LUA_DB_WRITES_FRAME (RP_LUA_DB_WRITE_OK, rp_lua_api.c), or nothing is paid and qfalse comes back.
+qtrue when the payout happened: an eligible player, paid what the caps allow -- possibly nothing (GLX_U fix: was
+qfalse then, so a target_reward fired nothing for a player at the credit cap or the maximum level, and a quest
+built as reward -> next step could not be finished by them). From inside a script call (a plugin's World.use set
+it off), the write must fit RP_LUA_DB_WRITES_FRAME (RP_LUA_DB_WRITE_OK, rp_lua_api.c), or nothing is paid and
+qfalse comes back.
 ==================
 */
 qboolean RP_PayReward( gentity_t *player, int credits, int xp, const char *label, const char *logTag, qboolean silent )
@@ -21793,7 +21796,10 @@ qboolean RP_PayReward( gentity_t *player, int credits, int xp, const char *label
 		G_LogPrintf( "%s: %s^7: %d credits, %d XP\n", tag, player->client->pers.netname, credits_given, xp_given );
 		return qtrue;
 	}
-	return qfalse;
+	// GLX_U fix: [Rewards] eligible, but the caps left nothing to give (the line above already says so): still a payout,
+	// so a target_reward counts as taken and fires its target. Nothing changed, nothing to save
+	G_LogPrintf( "%s: %s^7: nothing given (at the maximum)\n", tag, player->client->pers.netname );
+	return qtrue;
 }
 
 /*
