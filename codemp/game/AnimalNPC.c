@@ -350,6 +350,13 @@ void AnimalProcessOri(Vehicle_t *pVeh)
 }
 
 #ifdef _GAME //back to our game-only functions
+// GLX_U fix: [Vehicles] the shortest an animal's boarding may last, in ms (see AnimateVehicle). Boarding time comes
+// from the animal's own BOTH_VT_MOUNT_L/_R/_B, and one its animation.cfg lacks has 0 frames: boarding was over on
+// the next frame, while the rider's USE tap was still down, so UpdateRider() (g_vehicles.c) and TryUse() (g_utils.c)
+// took that same press for "get off" -- a third-party bantha (no mount animations) or eopie (back only) threw its
+// rider straight off. A tap is over well within this; holding USE past it still dismounts, as on a tauntaun.
+#define RP_ANIMAL_BOARD_MIN_MS	700
+
 static void AnimateVehicle( Vehicle_t *pVeh )
 {
 	animNumber_t	Anim = BOTH_VT_IDLE;
@@ -421,6 +428,10 @@ static void AnimateVehicle( Vehicle_t *pVeh )
 			// Set the delay time (which happens to be the time it takes for the animation to complete).
 			// NOTE: Here I made it so the delay is actually 70% (0.7f) of the animation time.
 			iAnimLen = BG_AnimLength( parent->localAnimIndex, Anim ) * 0.7f;
+			if ( iAnimLen < RP_ANIMAL_BOARD_MIN_MS )
+			{ // GLX_U fix: [Vehicles] never shorter than this (USE and jump boarding alike; see the define)
+				iAnimLen = RP_ANIMAL_BOARD_MIN_MS;
+			}
 			pVeh->m_iBoarding = level.time + iAnimLen;
 
 			// Set the animation, which won't be interrupted until it's completed.
