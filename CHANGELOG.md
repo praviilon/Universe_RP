@@ -10,6 +10,8 @@
 ### Fixed
 - A player who goes AFK with `/away` now has their open dialogue closed (the idle timer doesn't run while one is open), and no dialogue opens for a player who is dead, downed, paralyzed, spectating or AFK. Before, it stayed open until its timeout, or was shown and closed again at once.
 - Minor fixes to vehicles (fighters, animal boarding) and widescreen loading screens.
+- A `target_level_change` to a map the server doesn't have is now ignored and logged when used. Before, it blocked every other level change on that map until the next map.
+- `target_level_change` map names now follow the `map` command's own rules, so maps with characters such as `'` or `+` in their name (e.g. `Jedi'sHomeJL_II`) work, also with the entity commands.
 
 ## [3.9.0]
 
