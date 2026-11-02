@@ -13587,7 +13587,7 @@ void Cmd_ListAccount_f( gentity_t *ent ) {
 				// GLX_U: [Phase] /ghost and /holo are player commands now (Misc below); only their use on others is here.
 				trap->SendServerCommand(ent - g_entities, "print \"^3/ghost ^7or ^3/holo <player name or ID>: ^7Same as in Misc, on another player.\n\
 ^3/admwalkthrough <player name (optional)>: ^7Lets a player (or you) walk through other players and NPCs, with no change in look. Again to turn it off.\n\
-^3/admhidden <player name (optional)>: ^7Makes a player (or you) invisible to everyone else and walk-through, off the radar. They can still be hit and targeted; Force Sight sees them. Again to turn it off.\n\n\" ");
+^3/admhidden <player name (optional)>: ^7Makes a player (or you) invisible to everyone else and walk-through, off the radar. They can still be hit and targeted; Force Sight sees them. Again to turn it off.\n\" ");
 				// GLX_U: [Lua] its own print, like the block above: the one before it is near the 1022-character limit
 				trap->SendServerCommand(ent - g_entities, "print \"^3/scripts <list/stats/help/load/unload/reload/enable/disable>: ^7Manages the server's Lua plugins. ^3/scripts help ^7lists the commands the plugins add. ^1(Scripts admin flag)\n\n\" ");
 				trap->SendServerCommand(ent - g_entities, "print \"^3--------RP Inventory System--------\n\
