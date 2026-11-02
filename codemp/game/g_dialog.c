@@ -8,7 +8,8 @@ its userinfo. The player answers with /dialog <n> (the menu sends "dialog <n> <i
 "go<n>" targetname is fired with the player as activator through G_UseTargets2(): exactly what a button
 press does, so another target_dialog, a target_reward, a target_level_change, a target_kill or a door
 behave as they do behind a button. A dialogue closes by itself on a timeout, when the player walks away
-from its speaker, dies, is knocked down, goes spectator, leaves, or opens another.
+from its speaker, dies, is knocked down, goes spectator, goes AFK, leaves, or opens another; it does not open for
+a player in one of those states.
 
 target_flag sets or clears a named flag on its activator, kept per player for this connection and map
 (clientPersistant_t::rpFlags): a dialogue's "need<n>" offers an option only to players with (or, with
@@ -37,11 +38,12 @@ qboolean BG_InKnockDown( int anim );	// bg_pmove.c
 #define RP_DLG_NO_CANCEL_TEXT	4
 
 typedef enum {
-	RPDLG_ANSWERED, RPDLG_CANCELLED, RPDLG_TIMEOUT, RPDLG_AWAY, RPDLG_DIED, RPDLG_LEFT, RPDLG_REPLACED, RPDLG_GONE
+	RPDLG_ANSWERED, RPDLG_CANCELLED, RPDLG_TIMEOUT, RPDLG_AWAY, RPDLG_DIED, RPDLG_LEFT, RPDLG_REPLACED, RPDLG_GONE,
+	RPDLG_AFK	// GLX_U: the player went AFK (/away or the idle timer): like died, the walk-away target does not fire
 } rpDialogReason_t;
 
 static const char *rpDialogReasonText[] = {
-	"answered", "cancelled", "timeout", "away", "died", "left", "replaced", "gone"
+	"answered", "cancelled", "timeout", "away", "died", "left", "replaced", "gone", "afk"
 };
 
 static int rpDialogNextId = 1;
@@ -368,6 +370,19 @@ static void RP_DialogClose( int clientNum, rpDialogReason_t why )
 		RP_LUA_EVENT_DIALOG( player, e && e->targetname ? e->targetname : "", e ? e->s.number : -1, 0, NULL, rpDialogReasonText[why] );
 }
 
+// GLX_U: [Dialogues] why this player cannot hold a dialogue now: RPDLG_DIED (dead, spectating, knocked down -- the
+// Death System's downed state and /paralyze keep that pose), RPDLG_AFK, or RPDLG_ANSWERED for none. One test for
+// both the open and the half-second check, so a dialogue is never sent only to be closed at the next check.
+static rpDialogReason_t RP_DialogPlayerCannotTalk( const gentity_t *player )
+{
+	if ( player->health <= 0 || player->client->ps.pm_type == PM_DEAD || player->client->sess.sessionTeam == TEAM_SPECTATOR ||
+		BG_InKnockDown( player->client->ps.legsAnim ) )
+		return RPDLG_DIED;
+	if ( player->client->pers.player_statuses & ( 1 << PLAYER_STATUS_AFK ) )
+		return RPDLG_AFK;
+	return RPDLG_ANSWERED;
+}
+
 static void RP_DialogOpen( gentity_t *self, gentity_t *player )
 {
 	rpDialogOpen_t *o = RP_DialogOf( player->s.number );
@@ -377,6 +392,8 @@ static void RP_DialogOpen( gentity_t *self, gentity_t *player )
 
 	if ( !o || !d )
 		return;
+	if ( RP_DialogPlayerCannotTalk( player ) != RPDLG_ANSWERED )
+		return;	// GLX_U: dead, spectating, knocked down or AFK: ignored, as with nothing to say (no ONCE_EACH stamp)
 	for ( i = 0; i < d->numOptions; i++ )
 	{ // GLX_U: built here, written into the record only once this dialogue really opens: a use that returns
 	  // below (nothing to say, ONCE_EACH) must leave an open dialogue's option map as it is
@@ -541,11 +558,14 @@ void RP_DialogFrame( void )
 			RP_DialogClose( i, RPDLG_GONE );
 			continue;
 		}
-		if ( player->health <= 0 || player->client->ps.pm_type == PM_DEAD || player->client->sess.sessionTeam == TEAM_SPECTATOR ||
-			BG_InKnockDown( player->client->ps.legsAnim ) )
 		{
-			RP_DialogClose( i, RPDLG_DIED );
-			continue;
+			rpDialogReason_t why = RP_DialogPlayerCannotTalk( player );	// GLX_U: AFK too
+
+			if ( why != RPDLG_ANSWERED )
+			{
+				RP_DialogClose( i, why );
+				continue;
+			}
 		}
 		if ( level.time >= o->deadline )
 		{

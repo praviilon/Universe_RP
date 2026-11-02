@@ -73,6 +73,29 @@ int main( void )
 	GlobalUse( &g_entities[d], &g_entities[0], &g_entities[0] ); g_entities[0].client->ps.legsAnim = 999; frames( 500 ); CHECK( level.rpDialog[0].id == 0, "knockdown closes" ); g_entities[0].client->ps.legsAnim = 0;
 	GlobalUse( &g_entities[d], &g_entities[0], &g_entities[0] ); g_entities[0].client->sess.sessionTeam = TEAM_SPECTATOR; frames( 500 ); CHECK( level.rpDialog[0].id == 0, "spectator closes" ); g_entities[0].client->sess.sessionTeam = TEAM_FREE;
 	GlobalUse( &g_entities[d], &g_entities[0], &g_entities[0] ); RP_DialogPlayerGone( 0, qtrue ); CHECK( level.rpDialog[0].id == 0 && t_log_has( ": left" ), "disconnect closes" );
+	// AFK (/away or the idle timer set the same bit): closes with "afk", the walk-away target not fired, the menu and the over line
+	{ int bye = t_mapEntity( "target_print", "bye_afk", NULL ), da; t_key( "message", "Hello?" ); t_key( "option1", "Hi" ); da = spawn_dialog( "afkdlg", "bye_afk", 0 );
+	  g_entities[0].client->pers.rpDialogMenu = qtrue; clear_sent(); GlobalUse( &g_entities[da], &g_entities[0], &g_entities[0] ); { int id = level.rpDialog[0].id; CHECK( id, "opened for the AFK test" );
+	  clear_sent(); g_entities[0].client->pers.player_statuses |= ( 1 << PLAYER_STATUS_AFK ); frames( 500 );
+	  CHECK( level.rpDialog[0].id == 0 && t_log_has( ": afk" ), "AFK closes: afk" );
+	  CHECK( t_usedCount[bye] == 0, "AFK: the walk-away target not fired" );
+	  CHECK( t_nsent[0] == 2 && !strcmp( t_sent[0][0], va( "rpdlgclose %d", id ) ) && strstr( t_sent[0][1], "conversation is over" ), "AFK: rpdlgclose and the over line (%d sent)", t_nsent[0] ); }
+	  // while AFK nothing opens and nothing is sent; back, it opens
+	  clear_sent(); GlobalUse( &g_entities[da], &g_entities[0], &g_entities[0] ); CHECK( level.rpDialog[0].id == 0 && t_nsent[0] == 0, "AFK: a use opens nothing, sends nothing" );
+	  g_entities[0].client->pers.player_statuses &= ~( 1 << PLAYER_STATUS_AFK ); GlobalUse( &g_entities[da], &g_entities[0], &g_entities[0] ); CHECK( level.rpDialog[0].id, "back from AFK: opens" );
+	  dialog_cmd( 0, "dialog 0" ); CHECK( t_usedCount[bye] == 1, "a walk-away still fires target (%d)", t_usedCount[bye] );
+	  g_entities[0].client->pers.rpDialogMenu = qfalse;
+	  // NO_CANCEL_TEXT: no over line for afk either
+	  t_key( "message", "Quiet" ); t_key( "option1", "ok" ); { int dq = spawn_dialog( "quiet", NULL, 4 ); GlobalUse( &g_entities[dq], &g_entities[0], &g_entities[0] ); clear_sent();
+	  g_entities[0].client->pers.player_statuses |= ( 1 << PLAYER_STATUS_AFK ); frames( 500 ); CHECK( level.rpDialog[0].id == 0 && t_nsent[0] == 0, "AFK with NO_CANCEL_TEXT: closed silently (%d)", t_nsent[0] );
+	  g_entities[0].client->pers.player_statuses &= ~( 1 << PLAYER_STATUS_AFK ); }
+	  // refused for dead, knocked down and spectating players: nothing sent, nothing open
+	  clear_sent(); g_entities[0].health = 0; GlobalUse( &g_entities[da], &g_entities[0], &g_entities[0] ); CHECK( level.rpDialog[0].id == 0 && t_nsent[0] == 0, "dead: no dialogue" ); g_entities[0].health = 100;
+	  g_entities[0].client->ps.pm_type = PM_DEAD; GlobalUse( &g_entities[da], &g_entities[0], &g_entities[0] ); CHECK( level.rpDialog[0].id == 0 && t_nsent[0] == 0, "PM_DEAD: no dialogue" ); g_entities[0].client->ps.pm_type = PM_NORMAL;
+	  g_entities[0].client->ps.legsAnim = 999; GlobalUse( &g_entities[da], &g_entities[0], &g_entities[0] ); CHECK( level.rpDialog[0].id == 0 && t_nsent[0] == 0, "knocked down: no dialogue" ); g_entities[0].client->ps.legsAnim = 0;
+	  g_entities[0].client->sess.sessionTeam = TEAM_SPECTATOR; GlobalUse( &g_entities[da], &g_entities[0], &g_entities[0] ); CHECK( level.rpDialog[0].id == 0 && t_nsent[0] == 0, "spectator: no dialogue" ); g_entities[0].client->sess.sessionTeam = TEAM_FREE;
+	  // an open dialogue is left as it is by a refused use (closed by the check, not by the use)
+	  GlobalUse( &g_entities[da], &g_entities[0], &g_entities[0] ); { int id = level.rpDialog[0].id; g_entities[0].client->ps.legsAnim = 999; GlobalUse( &g_entities[da], &g_entities[0], &g_entities[0] ); CHECK( level.rpDialog[0].id == id, "a refused use leaves the open one" ); frames( 500 ); CHECK( level.rpDialog[0].id == 0, "then the check closes it" ); g_entities[0].client->ps.legsAnim = 0; } }
 	t_key( "message", "Other?" ); t_key( "option1", "x" ); { int d2 = spawn_dialog( "other", NULL, 0 ); GlobalUse( &g_entities[d], &g_entities[0], &g_entities[0] ); { int first = level.rpDialog[0].id; GlobalUse( &g_entities[d2], &g_entities[0], &g_entities[0] ); CHECK( level.rpDialog[0].id == first + 1 && t_log_has( ": replaced" ), "another opens: replaced" ); } dialog_cmd( 0, "dialog 0" ); }
 	// AUDIT H2: the same dialogue used again while open (a USE_BUTTON trigger held down) goes on: same id, nothing sent, the clock refreshed
 	GlobalUse( &g_entities[d], &g_entities[0], &g_entities[0] ); { int first = level.rpDialog[0].id, dl = level.rpDialog[0].deadline; frames( 2000 ); clear_sent(); GlobalUse( &g_entities[d], &g_entities[0], &g_entities[0] );
@@ -98,7 +121,10 @@ int main( void )
 	t_key( "message", "Once" ); t_key( "option1", "ok" ); { int d3 = spawn_dialog( "once", NULL, 1 ); clear_sent(); GlobalUse( &g_entities[d3], &g_entities[0], &g_entities[0] ); CHECK( level.rpDialog[0].id, "first time opens" ); dialog_cmd( 0, "dialog 1" );
 	  GlobalUse( &g_entities[d3], &g_entities[0], &g_entities[0] ); CHECK( level.rpDialog[0].id == 0, "second time: nothing" );
 	  g_entities[0].client->pers.enterTime = 250; GlobalUse( &g_entities[d3], &g_entities[0], &g_entities[0] ); CHECK( level.rpDialog[0].id == 0, "a team change (ClientBegin sets enterTime again): still nothing" );
-	  g_entities[0].client->pers.connectTime = 300; GlobalUse( &g_entities[d3], &g_entities[0], &g_entities[0] ); CHECK( level.rpDialog[0].id, "a reconnect: opens again" ); dialog_cmd( 0, "dialog 0" ); }
+	  g_entities[0].client->pers.connectTime = 300; GlobalUse( &g_entities[d3], &g_entities[0], &g_entities[0] ); CHECK( level.rpDialog[0].id, "a reconnect: opens again" ); dialog_cmd( 0, "dialog 0" );
+	  // a use while AFK does not use up ONCE_EACH
+	  g_entities[0].client->pers.connectTime = 400; g_entities[0].client->pers.player_statuses |= ( 1 << PLAYER_STATUS_AFK ); GlobalUse( &g_entities[d3], &g_entities[0], &g_entities[0] ); CHECK( level.rpDialog[0].id == 0, "AFK: ONCE_EACH not opened" );
+	  g_entities[0].client->pers.player_statuses &= ~( 1 << PLAYER_STATUS_AFK ); GlobalUse( &g_entities[d3], &g_entities[0], &g_entities[0] ); CHECK( level.rpDialog[0].id, "back: ONCE_EACH still opens (not stamped by the refused use)" ); dialog_cmd( 0, "dialog 0" ); }
 	// a chain: an answer opens the next dialogue
 	t_key( "message", "Second" ); t_key( "option1", "end" ); { int dB = spawn_dialog( "second", NULL, 0 ); t_key( "message", "First" ); t_key( "option1", "next" ); t_key( "go1", "second" ); { int dA = spawn_dialog( "first", NULL, 0 ); GlobalUse( &g_entities[dA], &g_entities[0], &g_entities[0] ); dialog_cmd( 0, "dialog 1" ); CHECK( level.rpDialog[0].id && level.rpDialog[0].entNum == dB, "the answer opened the second dialogue" ); } }
 	// bots and the longest command
@@ -122,15 +148,16 @@ int main( void )
 	  { int d2; t_key( "message", "Open?" ); t_key( "option1", "Yes please" ); t_key( "go1", "door2" ); t_key( "option2", "No" ); t_key( "timeout", "5" ); t_key( "range", "100" ); d2 = spawn_dialog( "gate2", NULL, 0 );
 	    GlobalUse( &g_entities[d], &g_entities[0], &g_entities[0] ); GlobalUse( &g_entities[d2], &g_entities[0], &g_entities[0] ); dialog_cmd( 0, "dialog 2" ); D2 = d2; }
 	  GlobalUse( &g_entities[d], &g_entities[0], &g_entities[0] ); RP_DialogPlayerGone( 0, qtrue );
-	  { lua_State *L = pl->L; const char *tails[] = { "nil nil cancelled Alice", "nil nil timeout Alice", "nil nil away Alice", "nil nil replaced Alice", "2 No answered Alice", "nil nil left Alice" }; char exp[6][64]; int k;
-	    for ( k = 0; k < 6; k++ ) Com_sprintf( exp[k], sizeof( exp[k] ), k == 4 ? "gate2 %d %s" : "gate %d %s", k == 4 ? D2 : d, tails[k] );
-	    lua_getglobal( L, "L" ); CHECK( (int)lua_rawlen( L, -1 ) == 7, "7 events: %d", (int)lua_rawlen( L, -1 ) );
-	    for ( k = 0; k < 6; k++ ) { lua_rawgeti( L, -1, k + 2 ); CHECK( lua_tostring( L, -1 ) && !strcmp( lua_tostring( L, -1 ), exp[k] ), "event %d: %s (wanted %s)", k + 2, lua_tostring( L, -1 ) ? lua_tostring( L, -1 ) : "nil", exp[k] ); lua_pop( L, 1 ); } lua_pop( L, 1 ); }
+	  GlobalUse( &g_entities[d], &g_entities[0], &g_entities[0] ); g_entities[0].client->pers.player_statuses |= ( 1 << PLAYER_STATUS_AFK ); frames( 500 ); g_entities[0].client->pers.player_statuses &= ~( 1 << PLAYER_STATUS_AFK );
+	  { lua_State *L = pl->L; const char *tails[] = { "nil nil cancelled Alice", "nil nil timeout Alice", "nil nil away Alice", "nil nil replaced Alice", "2 No answered Alice", "nil nil left Alice", "nil nil afk Alice" }; char exp[7][64]; int k;
+	    for ( k = 0; k < 7; k++ ) Com_sprintf( exp[k], sizeof( exp[k] ), k == 4 ? "gate2 %d %s" : "gate %d %s", k == 4 ? D2 : d, tails[k] );
+	    lua_getglobal( L, "L" ); CHECK( (int)lua_rawlen( L, -1 ) == 8, "8 events: %d", (int)lua_rawlen( L, -1 ) );
+	    for ( k = 0; k < 7; k++ ) { lua_rawgeti( L, -1, k + 2 ); CHECK( lua_tostring( L, -1 ) && !strcmp( lua_tostring( L, -1 ), exp[k] ), "event %d: %s (wanted %s)", k + 2, lua_tostring( L, -1 ) ? lua_tostring( L, -1 ) : "nil", exp[k] ); lua_pop( L, 1 ); } lua_pop( L, 1 ); }
 	  CHECK( t_usedCount[door] == 1 && pl->errorsTotal == 0, "the door opened once, no script errors (%d)", pl->errorsTotal );
 	  // a bot's use raises nothing (it gets no dialogue); the entity gone
 	  g_entities[2].inuse = qtrue; g_entities[2].client->pers.connected = CON_CONNECTED; g_entities[2].r.svFlags |= SVF_BOT; GlobalUse( &g_entities[d], &g_entities[2], &g_entities[2] );
 	  GlobalUse( &g_entities[d], &g_entities[1], &g_entities[1] ); { rpDialogDef_t *def = g_entities[d].rpDialogDef; g_entities[d].rpDialogDef = NULL; frames( 500 ); g_entities[d].rpDialogDef = def; }
-	  { lua_State *L = pl->L; lua_getglobal( L, "L" ); CHECK( (int)lua_rawlen( L, -1 ) == 8, "the bot raised nothing, the gone one did: %d", (int)lua_rawlen( L, -1 ) ); lua_rawgeti( L, -1, 8 ); CHECK( lua_tostring( L, -1 ) && strstr( lua_tostring( L, -1 ), "gone Bob" ), "gone: %s", lua_tostring( L, -1 ) ); lua_pop( L, 2 ); }
+	  { lua_State *L = pl->L; lua_getglobal( L, "L" ); CHECK( (int)lua_rawlen( L, -1 ) == 9, "the bot raised nothing, the gone one did: %d", (int)lua_rawlen( L, -1 ) ); lua_rawgeti( L, -1, 9 ); CHECK( lua_tostring( L, -1 ) && strstr( lua_tostring( L, -1 ), "gone Bob" ), "gone: %s", lua_tostring( L, -1 ) ); lua_pop( L, 2 ); }
 	  RP_LUA_SHUTDOWN(); }
 
 	// --- a script's World.use opens a dialogue; the answer is the player's own action (a reward behind it pays, no plugin
