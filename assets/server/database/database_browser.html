@@ -3,59 +3,131 @@
 <head>
 	<meta charset="utf-8">
 	<meta name="viewport" content="width=device-width, initial-scale=1.0">
-	<title>Universe RP Accounts Database</title>
+	<title>Universe RP databases</title>
 	<style>
+		:root {
+			color-scheme: light dark;
+			--text: #222;
+			--muted: #555;
+			--bg: #fff;
+			--code: #f2f2f2;
+			--line: #ddd;
+			--note: #fff6e0;
+			--note-line: #e0b84c;
+			--link: #2a6496;
+			--button: #3474a8;
+			--button-hover: #285a86;
+		}
+		@media (prefers-color-scheme: dark) {
+			:root {
+				--text: #e6e6e6;
+				--muted: #aaa;
+				--bg: #1b1d20;
+				--code: #2b2e33;
+				--line: #3a3d42;
+				--note: #332b17;
+				--note-line: #a8862f;
+				--link: #7ab4e6;
+				--button: #3a82bd;
+				--button-hover: #4a92cd;
+			}
+		}
 		body {
 			font-family: Arial, Helvetica, sans-serif;
-			max-width: 640px;
-			margin: 60px auto;
-			padding: 0 20px;
-			color: #222;
+			max-width: 680px;
+			margin: 48px auto;
+			padding: 0 16px;
+			color: var(--text);
+			background: var(--bg);
 			line-height: 1.5;
 		}
 		h1 {
 			font-size: 22px;
+			margin-bottom: 8px;
+		}
+		h2 {
+			font-size: 17px;
+			margin-top: 28px;
+		}
+		a {
+			color: var(--link);
+		}
+		code {
+			background: var(--code);
+			padding: 1px 5px;
+			border-radius: 3px;
+			overflow-wrap: anywhere;
+		}
+		table {
+			border-collapse: collapse;
+			width: 100%;
+		}
+		th, td {
+			text-align: left;
+			vertical-align: top;
+			padding: 6px 8px;
+			border-bottom: 1px solid var(--line);
+		}
+		td.file, td.file code {
+			white-space: nowrap;
+			overflow-wrap: normal;
+		}
+		.note {
+			background: var(--note);
+			border-left: 4px solid var(--note-line);
+			padding: 8px 12px;
 		}
 		.button {
 			display: inline-block;
-			margin: 16px 0;
+			margin: 4px 0 8px;
 			padding: 12px 20px;
-			background: #3474A8;
+			background: var(--button);
 			color: #fff;
 			text-decoration: none;
 			border-radius: 4px;
 			font-weight: bold;
 		}
 		.button:hover {
-			background: #285a86;
-		}
-		code {
-			background: #f2f2f2;
-			padding: 2px 5px;
-			border-radius: 3px;
+			background: var(--button-hover);
 		}
 		ol {
-			padding-left: 20px;
+			padding-left: 22px;
+		}
+		.small {
+			color: var(--muted);
+			font-size: 14px;
 		}
 	</style>
 </head>
 <body>
-	<h1>Universe RP Accounts Database</h1>
-	<p>
-		This folder's <code>accounts.db</code> file is the SQLite database Universe RP uses for
-		player accounts and characters. To browse or edit it outside the game, use the
-		<a href="https://inloop.github.io/sqlite-viewer/" class="button">Open SQLite Viewer</a>
-	</p>
-	<p>This is a free, third-party, browser-based tool (by Juraj Novák) that runs entirely
-		client-side &mdash; the database file is read locally in your browser and is never
-		uploaded anywhere.</p>
-	<p>To use it:</p>
+	<h1>Universe RP databases</h1>
+	<p>Universe RP keeps its data in two SQLite database files.</p>
+	<table>
+		<tr><th>File</th><th>What it holds</th></tr>
+		<tr><td class="file"><code>accounts.db</code></td><td>Player accounts and characters, the characters' skills, weapons and items, and the news.</td></tr>
+		<tr><td class="file"><code>lua.db</code></td><td>What Lua plugins store: <code>plugin_kv</code> holds each plugin's own data (<code>Storage</code>), <code>char_kv</code> its data per character (<code>Storage.char</code>; <code>char_id</code> is the character's <code>CharID</code> in <code>accounts.db</code>).</td></tr>
+	</table>
+
+	<h2>Where they are</h2>
+	<p>In this folder, when the server is started with the Universe RP host launchers. Otherwise in
+		<code>&lt;fs_homepath&gt;/UniverseRP/database/</code>.</p>
+
+	<p class="note"><strong>Keep them private.</strong> <code>accounts.db</code> holds every account's password as
+		plain text. Don't share the file or upload it to a website. The viewer below reads it inside your browser
+		and uploads nothing.</p>
+
+	<h2>Look inside</h2>
+	<a href="https://inloop.github.io/sqlite-viewer/" class="button" target="_blank" rel="noopener noreferrer">Open SQLite Viewer</a>
 	<ol>
-		<li>Click the button above to open the viewer in a new tab.</li>
-		<li>Click the drop zone (or drag and drop) and browse to <code>accounts.db</code> in this
-			same <code>database</code> folder.</li>
-		<li>Browse tables, or run SQL queries against the loaded database.</li>
+		<li>Drop <code>accounts.db</code> or <code>lua.db</code> from this folder on the viewer (or click it and pick the file).</li>
+		<li>Pick a table, or run an SQL query. Tables can be saved as CSV.</li>
 	</ol>
-	<p>Source: <a href="https://github.com/inloop/sqlite-viewer">github.com/inloop/sqlite-viewer</a></p>
+	<p>The viewer only views: nothing done in it is saved to the file.</p>
+	<p>While the server runs, the newest Lua data may not be in <code>lua.db</code> yet: the server keeps it in
+		memory and writes it every 30 seconds and at the end of a map, and the latest writes can sit in
+		<code>lua.db-wal</code> beside it, which the viewer doesn't read. For an exact view, stop the server first.</p>
+
+	<p class="small">SQLite Viewer is a free, third-party tool by Juraj Novák. Source:
+		<a href="https://github.com/inloop/sqlite-viewer" target="_blank" rel="noopener noreferrer">github.com/inloop/sqlite-viewer</a></p>
 </body>
 </html>
