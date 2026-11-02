@@ -291,6 +291,10 @@ World.players_within({x=0, y=0, z=0}, 512)   -- radius up to 8192
 World.time()                                 -- the server's level time, ms
 World.mapname()
 World.entity("door1")                        -- {number, classname, origin} of the first match, or nil
+World.find{classname="func_door", near=p.origin, radius=512}   -- see below
+World.trace(from, to, {mask="opaque"})        -- see below
+World.visible(a, b)                          -- nothing opaque between two points, players or own entities
+World.contents(pos)                          -- {solid=, water=, lava=, slime=, trigger=, playerclip=, empty=}
 World.watch("door1")  World.unwatch("door1") -- for entity_used
 Cvar.get("g_gametype")                       -- rp_, g_ and sv_ cvars only, as strings
 Log.info("text")                             -- the server log, as [lua:<name>] text; so does print()
@@ -302,6 +306,34 @@ Stored values are strings (numbers are stored as their text; use
 `tonumber`), kept byte for byte: any string, `string.pack` output
 included. Keys are text, 1 to 64 bytes, without a zero byte. Writes are kept in memory and written every 30 s and at map
 end. Rows of a deleted character are removed with it.
+
+**Reading the world** (nothing is created or changed, no token is spent):
+
+- `World.find(spec)` lists entities as plain tables `{number, classname,
+  targetname, origin, npc_type}` (`npc_type` for NPCs and vehicles, `mine =
+  true` for the plugin's own, `distance` with `near`), never a handle: the
+  map is read, not held. `spec` takes `classname` and `targetname` (exact,
+  case-insensitive), `near` with `radius` (1–8192, nearest first), `box =
+  {mins=, maxs=}` (an origin test, sides up to 8192), `npcs` (`true`: only
+  NPCs and vehicles, `false`: none) and `limit` (1–64, default 64). At
+  least one of `classname`, `targetname`, `near` or `box` is required. Players
+  and temp events are never listed (`Players.all`, `World.players_within`).
+- `World.trace(from, to [, opts])` runs one engine trace and returns
+  `{fraction, hit, endpos, startsolid, normal, entity}`: `entity` is a
+  player handle, a table as `find` gives (the world as `worldspawn`), or
+  nil. `opts.mask` is `opaque` (default: line of sight), `solid` (walls and
+  movers, for floors and spawn spots), `shot` (walls, bodies, corpses) or
+  `players`; `opts.ignore` a player or one of the plugin's own entities
+  whose body the trace passes through; `opts.size` 0–64 sweeps a box of
+  that half-width instead of a line. Coordinates must be finite and within
+  ±65536. **At most 32 traces per script call** (`World.visible` counts):
+  the 33rd returns `false, "too many traces in one call"`; spread more over
+  timers. `/scripts stats` counts them.
+- `World.visible(a, b [, ignore])`: true when an `opaque` trace from `a` to
+  `b` reaches `b`. Each may be a vector, a player (eye height, and ignored
+  when it is `a`) or one of the plugin's own entities.
+- `World.contents(pos)`: what is at a point, as booleans, for refusing a
+  spawn spot inside a wall or under water.
 
 ### What is not there
 

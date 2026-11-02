@@ -14,6 +14,7 @@ int t_mapEntity( const char *classname, const char *targetname, const char *targ
 int t_rewardEntity( const char *targetname, const char *target, int credits, int spawnflags ); extern int t_paidCredits[MAX_CLIENTS], t_payouts, t_musicChanges, t_teleports, t_teleportedTo;
 const char *t_recordValue( int n, const char *key ); void t_spawnReal( gentity_t *ent );
 void t_key( const char *k, const char *v ); void t_keysClear( void ); extern qboolean t_esMade;	// spawn keys for the next SP_ call
+extern int t_traces, t_traceEntity, t_tracePass, t_traceMask, t_contents; extern float t_traceFraction; extern qboolean t_traceStartSolid, t_traceBoxed; extern vec3_t t_traceFrom, t_traceTo, t_traceMins, t_traceMaxs;
 void t_init( int maxclients ); void t_player( int i, const char *name, qboolean loggedin, int charId ); void t_frame( int ms );
 
 static int fails;

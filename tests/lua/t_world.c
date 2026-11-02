@@ -446,6 +446,87 @@ int main( void )
 	run( p, "eff env/fire" ); run( p, "eff env/fire" ); run( p, "eff env/fire" ); CHECK( !strcmp( get_str( p, "WHY" ), "too fast" ), "the bucket: %s", get_str( p, "WHY" ) );
 	RP_LUA_SHUTDOWN();
 
+	// --- World.trace / visible / contents / find: read-only, coordinates checked, a trace cap per call
+	t_init( 8 ); t_player( 0, "Alice", qtrue, 7 ); t_player( 1, "Bob", qtrue, 8 );
+	VectorSet( g_entities[1].client->ps.origin, 100, 0, 0 ); g_entities[1].client->ps.viewheight = 40; g_entities[0].client->ps.viewheight = 30;
+	{ int d1 = t_mapEntity( "func_door", "door1", NULL ), d2 = t_mapEntity( "func_door", "door2", NULL ), n1 = t_mapEntity( "NPC", "guard", NULL ), tp;
+	  VectorSet( g_entities[d1].r.currentOrigin, 100, 0, 0 ); VectorSet( g_entities[d2].r.currentOrigin, 300, 0, 0 );
+	  g_entities[n1].client = &g_clients_store[7]; g_entities[n1].NPC_type = (char *)"reborn"; VectorSet( g_entities[n1].r.currentOrigin, 50, 0, 0 );
+	  tp = t_mapEntity( "target_print", "msg1", NULL ); VectorSet( g_entities[tp].r.currentOrigin, 1000, 0, 0 );	// far away
+	  t_mapEntity( "tempevent", NULL, NULL ); g_entities[level.num_entities - 1].s.eType = ET_EVENTS + 3; VectorSet( g_entities[level.num_entities - 1].r.currentOrigin, 10, 0, 0 );
+	  // a logical entity (the second region), unlinked, with an origin
+	  { gentity_t *le = &g_entities[MAX_GENTITIES]; memset( le, 0, sizeof( *le ) ); le->inuse = qtrue; le->s.number = MAX_GENTITIES; le->classname = (char *)"target_relay"; le->targetname = (char *)"relay9"; VectorSet( le->r.currentOrigin, 20, 0, 0 ); level.num_logicalents = 1; }
+	  t_write_plugin( "tr",
+		"Commands.add('trc', function(p, a) T, WHY = World.trace({x=0,y=0,z=0}, {x=200,y=0,z=0}, {mask=a[1], ignore=(a[2]=='me' and p) or (a[2]=='bob' and Players.get(1)) or nil, size=tonumber(a[3])}) if T then F = T.fraction HIT = T.hit SS = T.startsolid EX = T.endpos.x E = T.entity ET = type(E) EN = (ET=='table') and E.number or -1 EC = (ET=='table') and E.classname or '' ENPC = (ET=='table') and (E.npc_type or '') or '' NZ = T.normal and T.normal.z or -9 end end)\n"
+		"Commands.add('zero', function(p) T = World.trace({x=5,y=5,z=5}, {x=5,y=5,z=5}) F = T.fraction HIT = T.hit ET = type(T.entity) end)\n"
+		"Commands.add('bad', function(p, a) local v = (a[1]=='nan' and 0/0) or (a[1]=='inf' and 1/0) or tonumber(a[1]) OK, E = pcall(World.trace, {x=v,y=0,z=0}, {x=0,y=0,z=0}) E = tostring(E) end)\n"
+		"Commands.add('badopt', function(p, a) OK, E = pcall(World.trace, {x=0,y=0,z=0}, {x=1,y=0,z=0}, a[1]=='mask' and {mask='lasers'} or a[1]=='size' and {size=65} or a[1]=='ign' and {ignore='door1'} or {ignore=H}) E = tostring(E) end)\n"
+		"Commands.add('many', function(p) N = 0 for i = 1, 40 do local t, why = World.trace({x=0,y=0,z=0}, {x=i,y=0,z=0}) if t then N = N + 1 else WHY = why end end end)\n"
+		"Commands.add('vis', function(p, a) local b = (a[1]=='bob' and Players.get(1)) or (a[1]=='h' and H) or {x=200,y=0,z=0} local x = (a[2]=='me' and p) or {x=0,y=0,z=50} V = World.visible(x, b) end)\n"
+		"Commands.add('con', function(p) local c = World.contents({x=1,y=2,z=3}) SOL = c.solid WAT = c.water EMP = c.empty LAV = c.lava TRG = c.trigger end)\n"
+		"Commands.add('prop', function(p) H = World.prop('misc_model_breakable', {x=400,y=0,z=0}, {x=0,y=0,z=0}, {model='models/map_objects/crate.md3'}, {name='box'}) end)\n"
+		"Commands.add('find', function(p, a) local spec = load('return ' .. table.concat(a, ' '))() OK, R = pcall(World.find, spec) if OK then N = #R C1 = N > 0 and R[1].classname or '' T1 = N > 0 and (R[1].targetname or '') or '' D1 = N > 0 and (R[1].distance or -1) or -1 M1 = N > 0 and (R[1].mine or false) or false NPC1 = N > 0 and (R[1].npc_type or '') or '' NUM1 = N > 0 and R[1].number or -1 NUMS = '' for _, e in ipairs(R) do NUMS = NUMS .. e.number .. ',' end else E = tostring(R) end end)\n" );
+	  t_start( "tr" ); p = RP_Lua_Find( "tr" ); CHECK( p && p->L, "tr loaded" );
+	  // trace: the engine call as given, the result table, the hit as handle/table/nil
+	  run( p, "trc" ); CHECK( t_traces == 1 && t_traceMask == MASK_OPAQUE && t_tracePass == ENTITYNUM_NONE && !t_traceBoxed && t_traceTo[0] == 200, "default trace: opaque, no pass entity, a line" );
+	  CHECK( get_int( p, "F" ) == 1 && get_int( p, "HIT" ) == 0 && !strcmp( get_str( p, "ET" ), "nil" ) && get_int( p, "EX" ) == 200 && get_int( p, "NZ" ) == -9, "nothing hit: fraction 1, no entity, no normal" );
+	  run( p, "trc solid me 15" ); CHECK( t_traceMask == MASK_SOLID && t_tracePass == 0 && t_traceBoxed && t_traceMins[0] == -15 && t_traceMaxs[2] == 15, "solid, ignoring Alice, a 15 box" );
+	  run( p, "trc shot bob" ); CHECK( t_traceMask == MASK_SHOT && t_tracePass == 1, "shot, ignoring Bob" );
+	  run( p, "trc players" ); CHECK( t_traceMask == CONTENTS_BODY, "players mask" );
+	  t_traceFraction = 0.5f; t_traceEntity = 1; run( p, "trc" ); CHECK( get_int( p, "HIT" ) == 1 && !strcmp( get_str( p, "ET" ), "userdata" ) && get_int( p, "EX" ) == 100 && get_int( p, "NZ" ) == 1, "hit Bob: a player handle, endpos halfway, a normal" );
+	  t_traceEntity = n1; run( p, "trc" ); CHECK( !strcmp( get_str( p, "ET" ), "table" ) && get_int( p, "EN" ) == n1 && !strcmp( get_str( p, "EC" ), "NPC" ) && !strcmp( get_str( p, "ENPC" ), "reborn" ), "hit an NPC: a table with npc_type" );
+	  t_traceEntity = ENTITYNUM_WORLD; run( p, "trc" ); CHECK( !strcmp( get_str( p, "EC" ), "worldspawn" ) && get_int( p, "EN" ) == ENTITYNUM_WORLD, "hit the world" );
+	  t_traceStartSolid = qtrue; run( p, "trc" ); CHECK( get_int( p, "SS" ) == 1, "startsolid" ); t_traceStartSolid = qfalse; t_traceFraction = 1.0f; t_traceEntity = ENTITYNUM_NONE;
+	  t_traces = 0; run( p, "zero" ); CHECK( t_traces == 0 && get_int( p, "F" ) == 1 && !strcmp( get_str( p, "ET" ), "nil" ), "a zero-length trace never reaches the engine" );
+	  run( p, "bad nan" ); CHECK( get_int( p, "OK" ) == 0 && strstr( get_str( p, "E" ), "from.x is not a finite" ), "NaN refused: %s", get_str( p, "E" ) );
+	  run( p, "bad inf" ); CHECK( get_int( p, "OK" ) == 0, "inf refused" );
+	  run( p, "bad 70000" ); CHECK( get_int( p, "OK" ) == 0, "70000 refused" ); run( p, "bad -70000" ); CHECK( get_int( p, "OK" ) == 0, "-70000 refused" );
+	  run( p, "bad 60000" ); CHECK( get_int( p, "OK" ) == 1, "60000 allowed" );
+	  run( p, "badopt mask" ); CHECK( get_int( p, "OK" ) == 0 && strstr( get_str( p, "E" ), "mask must be" ), "bad mask: %s", get_str( p, "E" ) );
+	  run( p, "badopt size" ); CHECK( get_int( p, "OK" ) == 0 && strstr( get_str( p, "E" ), "size must be" ), "size 65 refused" );
+	  run( p, "badopt ign" ); CHECK( get_int( p, "OK" ) == 0 && strstr( get_str( p, "E" ), "ignore must be" ), "a string ignore refused" );
+	  // the cap: 32 in one call, fresh in the next
+	  t_traces = 0; run( p, "many" ); CHECK( get_int( p, "N" ) == RP_LUA_TRACES_PER_CALL && t_traces == RP_LUA_TRACES_PER_CALL && !strcmp( get_str( p, "WHY" ), "too many traces in one call" ), "33rd trace refused: %d made, %s", get_int( p, "N" ), get_str( p, "WHY" ) );
+	  run( p, "many" ); CHECK( get_int( p, "N" ) == RP_LUA_TRACES_PER_CALL && p->traces == 2 * RP_LUA_TRACES_PER_CALL + 10, "the next call starts fresh; stats count %d", p->traces );
+	  CHECK( p->tokens == RP_LUA_TOKENS, "no token spent on reads" );
+	  // own handle as ignore, and in visible
+	  refill( p ); run( p, "prop" ); CHECK( RP_LuaWorld_CountLive( p, qfalse ) == 1, "a prop for the handle tests" );
+	  run( p, "badopt handle" ); CHECK( get_int( p, "OK" ) == 1 && t_tracePass >= MAX_CLIENTS, "an own handle as ignore passes its number (%d)", t_tracePass );
+	  // visible: points, a player at eye height (and ignored), an own handle as b
+	  t_traces = 0; run( p, "vis" ); CHECK( get_int( p, "V" ) == 1 && t_traces == 1 && t_traceMask == MASK_OPAQUE && t_traceFrom[2] == 50 && t_tracePass == ENTITYNUM_NONE, "two points visible" );
+	  run( p, "vis bob me" ); CHECK( t_traceFrom[2] == 30 && t_traceTo[0] == 100 && t_traceTo[2] == 40 && t_tracePass == 0, "player to player: eye heights, Alice ignored" );
+	  t_traceFraction = 0.3f; t_traceEntity = ENTITYNUM_WORLD; run( p, "vis bob me" ); CHECK( get_int( p, "V" ) == 0, "a wall between: not visible" );
+	  run( p, "vis h" ); CHECK( get_int( p, "V" ) == 0 && t_traceTo[0] == 400, "to an own handle, blocked" ); t_traceFraction = 1.0f; t_traceEntity = ENTITYNUM_NONE;
+	  run( p, "vis h" ); CHECK( get_int( p, "V" ) == 1, "to an own handle, clear" );
+	  t_traces = 0; run( p, "many" ); run( p, "vis" ); CHECK( t_traces == RP_LUA_TRACES_PER_CALL + 1, "visible counts as a trace (its own call)" );
+	  // contents
+	  t_contents = CONTENTS_SOLID; run( p, "con" ); CHECK( get_int( p, "SOL" ) == 1 && get_int( p, "EMP" ) == 0 && get_int( p, "WAT" ) == 0, "solid" );
+	  t_contents = CONTENTS_WATER | CONTENTS_TRIGGER; run( p, "con" ); CHECK( get_int( p, "WAT" ) == 1 && get_int( p, "TRG" ) == 1 && get_int( p, "SOL" ) == 0 && get_int( p, "EMP" ) == 0, "water and trigger" );
+	  t_contents = 0; run( p, "con" ); CHECK( get_int( p, "EMP" ) == 1 && get_int( p, "LAV" ) == 0, "empty" );
+	  // find
+	  run( p, "find {classname='func_door'}" ); CHECK( get_int( p, "OK" ) == 1 && get_int( p, "N" ) == 2 && !strcmp( get_str( p, "C1" ), "func_door" ), "two doors by classname: %d", get_int( p, "N" ) );
+	  run( p, "find {classname='FUNC_DOOR', targetname='Door2'}" ); CHECK( get_int( p, "N" ) == 1 && !strcmp( get_str( p, "T1" ), "door2" ), "case-insensitive, both filters" );
+	  run( p, "find {targetname='relay9'}" ); CHECK( get_int( p, "N" ) == 1 && get_int( p, "NUM1" ) == MAX_GENTITIES && !strcmp( get_str( p, "C1" ), "target_relay" ), "a logical entity is found (%d)", get_int( p, "NUM1" ) );
+	  run( p, "find {near={x=0,y=0,z=0}, radius=150}" ); CHECK( get_int( p, "N" ) == 3 && get_int( p, "NUM1" ) == MAX_GENTITIES && get_int( p, "D1" ) == 20, "near: relay9 (20), guard (50), door1 (100), nearest first, no temp event, no players: %d %s", get_int( p, "N" ), get_str( p, "NUMS" ) );
+	  run( p, "find {near={x=0,y=0,z=0}, radius=150, limit=2}" ); CHECK( get_int( p, "N" ) == 2 && get_int( p, "NUM1" ) == MAX_GENTITIES, "limit keeps the nearest two: %s", get_str( p, "NUMS" ) );
+	  run( p, "find {near={x=0,y=0,z=0}, radius=150, npcs=true}" ); CHECK( get_int( p, "N" ) == 1 && !strcmp( get_str( p, "NPC1" ), "reborn" ) && get_int( p, "D1" ) == 50, "npcs only" );
+	  run( p, "find {near={x=0,y=0,z=0}, radius=150, npcs=false}" ); CHECK( get_int( p, "N" ) == 2 && !strcmp( get_str( p, "NPC1" ), "" ), "no npcs" );
+	  run( p, "find {box={mins={x=15,y=-1,z=-1}, maxs={x=60,y=1,z=1}}}" ); CHECK( get_int( p, "N" ) == 2, "box: relay9 and guard (not the event at 10, not door1 at 100): %d %s", get_int( p, "N" ), get_str( p, "NUMS" ) );
+	  run( p, "find {box={mins={x=99,y=-1,z=-1}, maxs={x=99.5,y=1,z=1}}}" ); CHECK( get_int( p, "N" ) == 0, "an origin just outside the box" );
+	  run( p, "find {classname='misc_model_breakable'}" ); CHECK( get_int( p, "N" ) == 1 && get_int( p, "M1" ) == 1 && !strcmp( get_str( p, "T1" ), "lua.tr.box" ), "an own prop: mine = true, a plain table (number %d)", get_int( p, "NUM1" ) );
+	  run( p, "find {classname='func_door', mine=true, limit=1}" ); CHECK( get_int( p, "N" ) == 1, "limit 1" );
+	  run( p, "find {}" ); CHECK( get_int( p, "OK" ) == 0 && strstr( get_str( p, "E" ), "find needs" ), "an empty spec refused: %s", get_str( p, "E" ) );
+	  run( p, "find {limit=0, classname='x'}" ); CHECK( get_int( p, "OK" ) == 0, "limit 0 refused" );
+	  run( p, "find {near={x=0,y=0,z=0}, radius=9000}" ); CHECK( get_int( p, "OK" ) == 0, "radius 9000 refused" );
+	  run( p, "find {box={mins={x=0,y=0,z=0}, maxs={x=-1,y=0,z=0}}}" ); CHECK( get_int( p, "OK" ) == 0, "maxs below mins refused" );
+	  run( p, "find {classname=''}" ); CHECK( get_int( p, "OK" ) == 0, "empty classname refused" );
+	  // more than 64 matches: cut at 64
+	  { int k; for ( k = 0; k < 70; k++ ) t_mapEntity( "info_null", NULL, NULL ); }
+	  run( p, "find {classname='info_null'}" ); CHECK( get_int( p, "N" ) == RP_LUA_FIND_MAX, "70 matches cut at %d: %d", RP_LUA_FIND_MAX, get_int( p, "N" ) );
+	  run( p, "find {near={x=0,y=0,z=0}, radius=8000}" ); CHECK( get_int( p, "N" ) == RP_LUA_FIND_MAX && get_int( p, "D1" ) == 0, "near with more than 64 matches: the nearest 64 (the array never overflows): %d", get_int( p, "N" ) );
+	  CHECK( p->tokens == RP_LUA_TOKENS - 1, "no token spent on finds (the prop's one only): %d", p->tokens ); }
+	RP_LUA_SHUTDOWN();
+
 	printf( fails ? "%d FAILED\n" : "t_world: ALL OK\n", fails );
 	return fails ? 1 : 0;
 }

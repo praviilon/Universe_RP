@@ -51,6 +51,9 @@ three cvars (rp_lua, rp_lua_plugins, rp_lua_memkb) are in g_xcvar.h.
 #define RP_LUA_STORE_FLUSH_ROWS	64		// rows written per frame of a flush
 #define RP_LUA_PENDING_MAX		2048	// pending writes per plugin (bounded by RP_LUA_STORE_MAX anyway)
 #define RP_LUA_RADIUS_MAX		8192.0f
+#define RP_LUA_COORD_MAX		65536.0f	// GLX_U: [Lua] a coordinate a script hands the engine (World.trace, find, contents): finite and within this
+#define RP_LUA_TRACES_PER_CALL	32		// World.trace and World.visible inside one script call: a trace is a C step the count hook never sees
+#define RP_LUA_FIND_MAX			64		// World.find results
 // P2: the world
 #define RP_LUA_MAX_PROPS		32		// a plugin's props alive at once
 #define RP_LUA_MAX_NPCS			8		// and its NPCs
@@ -170,6 +173,7 @@ typedef struct rpLuaPlugin_s {
 	int				eventsShort, eventsSkipped;		// event calls past the frame budget: with the 1 ms deadline, and not made
 	int				luaUsesHeld;					// target_lua uses made from inside this plugin's calls, refused
 	int				chainsCut;						// use chains stopped at RP_LUA_USE_CHAIN
+	int				traces, tracesCall;				// World.trace/visible this map, and in the call in progress (reset by RP_Lua_Run)
 } rpLuaPlugin_t;
 
 extern rpLuaPlugin_t rpLuaPlugins[RP_LUA_MAX_PLUGINS];
@@ -221,6 +225,7 @@ void RP_LuaWorld_ReleasedFrame( void );	// every frame: released vehicles nobody
 void RP_LuaWorld_Reset( void );			// a new map: no released vehicle survives it
 rpLuaPlugin_t *RP_LuaWorld_OwnerOf( const gentity_t *ent );	// the plugin that spawned it, or NULL
 void RP_LuaWorld_PushEntity( lua_State *L, const gentity_t *ent );	// a handle for an entity it owns
+gentity_t *RP_LuaWorld_HandleAt( lua_State *L, int idx );	// the entity behind an own-entity handle at idx, NULL when idx is not one; raises when it is stale
 
 // store
 qboolean RP_LuaStore_Open( void );

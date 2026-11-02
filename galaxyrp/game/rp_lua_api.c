@@ -803,6 +803,421 @@ static int RP_LuaApi_WorldEntity( lua_State *L )
 	return 1;
 }
 
+/*
+==================
+World, read-only sight and search (GLX_U: [Lua] P3 trace/find)
+
+World.trace, World.visible, World.contents and World.find read the world and change nothing: no hook,
+nothing owned, no command token. The engine is only ever handed finite coordinates within
+RP_LUA_COORD_MAX, and a trace is a C step the count hook never sees, so a call may make at most
+RP_LUA_TRACES_PER_CALL of them (the 10 ms clock and the overrun check stay behind that).
+==================
+*/
+#define RP_LUA_FIND_SPEC_MAX	64	// a classname or targetname in a World.find spec
+
+// a vector {x, y, z} of finite coordinates within the world, else an error naming the field
+static void RP_LuaApi_ReadCoord( lua_State *L, int idx, const char *what, vec3_t out )
+{
+	static const char *const axis[3] = { "x", "y", "z" };
+	int i;
+
+	if ( idx < 0 )
+		idx = lua_gettop( L ) + 1 + idx;
+	if ( lua_type( L, idx ) != LUA_TTABLE )
+		luaL_error( L, "%s must be a vector {x, y, z}", what );
+	for ( i = 0; i < 3; i++ )
+	{
+		lua_Number v;
+
+		lua_getfield( L, idx, axis[i] );
+		if ( lua_type( L, -1 ) != LUA_TNUMBER )
+			luaL_error( L, "%s.%s must be a number", what, axis[i] );
+		v = lua_tonumber( L, -1 );
+		lua_pop( L, 1 );
+		if ( v != v || v > RP_LUA_COORD_MAX || v < -RP_LUA_COORD_MAX )
+			luaL_error( L, "%s.%s is not a finite coordinate within %d", what, axis[i], (int)RP_LUA_COORD_MAX );
+		out[i] = (float)v;
+	}
+}
+
+static void RP_LuaApi_PushVec( lua_State *L, const vec3_t v )
+{
+	lua_createtable( L, 0, 3 );
+	lua_pushnumber( L, v[0] ); lua_setfield( L, -2, "x" );
+	lua_pushnumber( L, v[1] ); lua_setfield( L, -2, "y" );
+	lua_pushnumber( L, v[2] ); lua_setfield( L, -2, "z" );
+}
+
+// a plain table describing an entity (never a handle: the map is read, not held)
+static void RP_LuaApi_PushEntityInfo( lua_State *L, const gentity_t *ent )
+{
+	lua_createtable( L, 0, 6 );
+	lua_pushinteger( L, ent - g_entities );
+	lua_setfield( L, -2, "number" );
+	lua_pushstring( L, ( ent - g_entities == ENTITYNUM_WORLD ) ? "worldspawn" : ( ent->classname ? ent->classname : "" ) );
+	lua_setfield( L, -2, "classname" );
+	if ( ent->targetname && ent->targetname[0] )
+	{
+		lua_pushstring( L, ent->targetname );
+		lua_setfield( L, -2, "targetname" );
+	}
+	if ( ent->client && ent->s.number >= MAX_CLIENTS )
+	{
+		lua_pushstring( L, ent->NPC_type ? ent->NPC_type : "" );
+		lua_setfield( L, -2, "npc_type" );
+	}
+	RP_LuaApi_PushVec( L, ent->r.currentOrigin );
+	lua_setfield( L, -2, "origin" );
+	if ( rpLuaCurrent && ent->rpLuaPlugin == (int)( rpLuaCurrent - rpLuaPlugins ) + 1 )
+	{
+		lua_pushboolean( L, 1 );
+		lua_setfield( L, -2, "mine" );
+	}
+}
+
+// what a trace hit: a player handle, an entity table, or nil
+static void RP_LuaApi_PushHit( lua_State *L, int entityNum )
+{
+	if ( entityNum < 0 || entityNum >= ENTITYNUM_NONE )
+		lua_pushnil( L );
+	else if ( entityNum < MAX_CLIENTS && RP_LuaApi_Counted( &g_entities[entityNum] ) )
+		RP_LuaApi_PushPlayer( L, entityNum );
+	else
+		RP_LuaApi_PushEntityInfo( L, &g_entities[entityNum] );
+}
+
+// a point for trace/visible: a vector, a player handle (eye height) or one of the plugin's own entities;
+// *ent is set to the entity for the latter two (its number passes through the trace)
+static void RP_LuaApi_ReadPoint( lua_State *L, int idx, const char *what, vec3_t out, gentity_t **ent )
+{
+	gentity_t *e;
+
+	*ent = NULL;
+	if ( luaL_testudata( L, idx, RP_LUA_PLAYER_MT ) )
+	{
+		e = RP_LuaApi_Handle( L, idx, qtrue );
+		VectorCopy( e->client->ps.origin, out );
+		out[2] += e->client->ps.viewheight;
+		*ent = e;
+		return;
+	}
+	if ( ( e = RP_LuaWorld_HandleAt( L, idx ) ) != NULL )
+	{
+		VectorCopy( e->r.currentOrigin, out );
+		*ent = e;
+		return;
+	}
+	RP_LuaApi_ReadCoord( L, idx, what, out );
+}
+
+static int RP_LuaApi_MaskByName( lua_State *L, const char *name )
+{
+	if ( !name || !strcmp( name, "opaque" ) ) return MASK_OPAQUE;
+	if ( !strcmp( name, "solid" ) ) return MASK_SOLID;
+	if ( !strcmp( name, "shot" ) ) return MASK_SHOT;
+	if ( !strcmp( name, "players" ) ) return CONTENTS_BODY;
+	return luaL_error( L, "mask must be opaque, solid, shot or players" );
+}
+
+// the trace itself; qfalse (and false, "why" pushed) when the call has made its share
+static qboolean RP_LuaApi_DoTrace( lua_State *L, trace_t *tr, const vec3_t from, const vec3_t to, int passEnt, int mask, float size )
+{
+	rpLuaPlugin_t *p = RP_LUA_PLUGIN( L );
+
+	if ( p->tracesCall >= RP_LUA_TRACES_PER_CALL )
+	{
+		lua_pushboolean( L, 0 );
+		lua_pushstring( L, "too many traces in one call" );
+		return qfalse;
+	}
+	p->tracesCall++;
+	p->traces++;
+	memset( tr, 0, sizeof( *tr ) );
+	if ( VectorCompare( from, to ) )
+	{ // nowhere to go: answered here
+		tr->fraction = 1.0f;
+		tr->entityNum = ENTITYNUM_NONE;
+		VectorCopy( to, tr->endpos );
+		return qtrue;
+	}
+	if ( size > 0 )
+	{
+		vec3_t mins, maxs;
+
+		VectorSet( mins, -size, -size, -size );
+		VectorSet( maxs, size, size, size );
+		trap->Trace( tr, from, mins, maxs, to, passEnt, mask, qfalse, 0, 0 );
+	}
+	else
+		trap->Trace( tr, from, NULL, NULL, to, passEnt, mask, qfalse, 0, 0 );
+	return qtrue;
+}
+
+// World.trace(from, to [, {mask=, ignore=, size=}])
+static int RP_LuaApi_WorldTrace( lua_State *L )
+{
+	vec3_t from, to;
+	trace_t tr;
+	int passEnt = ENTITYNUM_NONE, mask = MASK_OPAQUE;
+	float size = 0;
+
+	RP_LuaApi_ReadCoord( L, 1, "from", from );
+	RP_LuaApi_ReadCoord( L, 2, "to", to );
+	if ( !lua_isnoneornil( L, 3 ) )
+	{
+		luaL_checktype( L, 3, LUA_TTABLE );
+		lua_getfield( L, 3, "mask" );
+		if ( !lua_isnil( L, -1 ) )
+			mask = RP_LuaApi_MaskByName( L, luaL_checkstring( L, -1 ) );
+		lua_pop( L, 1 );
+		lua_getfield( L, 3, "ignore" );
+		if ( !lua_isnil( L, -1 ) )
+		{
+			gentity_t *e = RP_LuaWorld_HandleAt( L, -1 );
+
+			if ( !e )
+			{
+				if ( !luaL_testudata( L, -1, RP_LUA_PLAYER_MT ) )
+					return luaL_error( L, "ignore must be a player or one of the plugin's own entities" );
+				e = RP_LuaApi_Handle( L, -1, qtrue );
+			}
+			passEnt = e - g_entities;
+		}
+		lua_pop( L, 1 );
+		lua_getfield( L, 3, "size" );
+		if ( !lua_isnil( L, -1 ) )
+		{
+			lua_Number v = luaL_checknumber( L, -1 );
+
+			if ( v != v || v < 0 || v > 64 )
+				return luaL_error( L, "size must be 0 to 64" );
+			size = (float)v;
+		}
+		lua_pop( L, 1 );
+	}
+
+	if ( !RP_LuaApi_DoTrace( L, &tr, from, to, passEnt, mask, size ) )
+		return 2;
+
+	lua_createtable( L, 0, 6 );
+	lua_pushnumber( L, tr.fraction ); lua_setfield( L, -2, "fraction" );
+	lua_pushboolean( L, tr.fraction < 1.0f ); lua_setfield( L, -2, "hit" );
+	lua_pushboolean( L, tr.startsolid ); lua_setfield( L, -2, "startsolid" );
+	RP_LuaApi_PushVec( L, tr.endpos ); lua_setfield( L, -2, "endpos" );
+	if ( tr.fraction < 1.0f )
+	{
+		RP_LuaApi_PushVec( L, tr.plane.normal ); lua_setfield( L, -2, "normal" );
+	}
+	RP_LuaApi_PushHit( L, tr.entityNum ); lua_setfield( L, -2, "entity" );
+	return 1;
+}
+
+// World.visible(a, b [, ignore]): nothing opaque between a and b (points, players at eye height, own entities)
+static int RP_LuaApi_WorldVisible( lua_State *L )
+{
+	vec3_t a, b;
+	gentity_t *ea, *eb, *ignore = NULL;
+	trace_t tr;
+	int passEnt;
+
+	RP_LuaApi_ReadPoint( L, 1, "a", a, &ea );
+	RP_LuaApi_ReadPoint( L, 2, "b", b, &eb );
+	if ( !lua_isnoneornil( L, 3 ) )
+	{
+		ignore = RP_LuaWorld_HandleAt( L, 3 );
+		if ( !ignore )
+		{
+			if ( !luaL_testudata( L, 3, RP_LUA_PLAYER_MT ) )
+				return luaL_error( L, "ignore must be a player or one of the plugin's own entities" );
+			ignore = RP_LuaApi_Handle( L, 3, qtrue );
+		}
+	}
+	passEnt = ignore ? ignore - g_entities : ( ea ? ea - g_entities : ENTITYNUM_NONE );
+	if ( !RP_LuaApi_DoTrace( L, &tr, a, b, passEnt, MASK_OPAQUE, 0 ) )
+		return 2;
+	// a trace to a body stops at it: reaching b's own entity counts as seeing it
+	lua_pushboolean( L, tr.fraction >= 1.0f || ( eb && tr.entityNum == eb - g_entities ) );
+	return 1;
+}
+
+// World.contents(pos): what is at a point, as booleans
+static int RP_LuaApi_WorldContents( lua_State *L )
+{
+	vec3_t pos;
+	int c;
+
+	RP_LuaApi_ReadCoord( L, 1, "pos", pos );
+	c = trap->PointContents( pos, ENTITYNUM_NONE );
+	lua_createtable( L, 0, 7 );
+	lua_pushboolean( L, ( c & CONTENTS_SOLID ) != 0 ); lua_setfield( L, -2, "solid" );
+	lua_pushboolean( L, ( c & CONTENTS_WATER ) != 0 ); lua_setfield( L, -2, "water" );
+	lua_pushboolean( L, ( c & CONTENTS_LAVA ) != 0 ); lua_setfield( L, -2, "lava" );
+	lua_pushboolean( L, ( c & CONTENTS_SLIME ) != 0 ); lua_setfield( L, -2, "slime" );
+	lua_pushboolean( L, ( c & CONTENTS_TRIGGER ) != 0 ); lua_setfield( L, -2, "trigger" );
+	lua_pushboolean( L, ( c & CONTENTS_PLAYERCLIP ) != 0 ); lua_setfield( L, -2, "playerclip" );
+	lua_pushboolean( L, ( c & ( CONTENTS_SOLID | CONTENTS_WATER | CONTENTS_LAVA | CONTENTS_SLIME | CONTENTS_TRIGGER | CONTENTS_PLAYERCLIP ) ) == 0 );
+	lua_setfield( L, -2, "empty" );
+	return 1;
+}
+
+// a string field of the spec, up to RP_LUA_FIND_SPEC_MAX, or NULL
+static const char *RP_LuaApi_FindString( lua_State *L, const char *key, char *buf, int size )
+{
+	const char *v;
+	size_t len;
+
+	lua_getfield( L, 1, key );
+	if ( lua_isnil( L, -1 ) )
+	{
+		lua_pop( L, 1 );
+		return NULL;
+	}
+	v = lua_tolstring( L, -1, &len );
+	if ( !v || !len || len >= (size_t)size )
+		luaL_error( L, "%s must be a string of 1 to %d characters", key, size - 1 );
+	Q_strncpyz( buf, v, size );
+	lua_pop( L, 1 );
+	return buf;
+}
+
+// World.find{classname=, targetname=, near=, radius=, box={mins=,maxs=}, npcs=, limit=}: plain tables, nearest first with near
+static int RP_LuaApi_WorldFind( lua_State *L )
+{
+	char classname[RP_LUA_FIND_SPEC_MAX], targetname[RP_LUA_FIND_SPEC_MAX];
+	const char *cn, *tn;
+	vec3_t near, mins, maxs;
+	qboolean hasNear = qfalse, hasBox = qfalse;
+	float r2 = 0;
+	int npcs = -1, limit = RP_LUA_FIND_MAX, i, n = 0, region;
+	struct { gentity_t *ent; float d2; } picks[RP_LUA_FIND_MAX];
+
+	luaL_checktype( L, 1, LUA_TTABLE );
+	lua_settop( L, 1 );
+	cn = RP_LuaApi_FindString( L, "classname", classname, sizeof( classname ) );
+	tn = RP_LuaApi_FindString( L, "targetname", targetname, sizeof( targetname ) );
+	lua_getfield( L, 1, "near" );
+	if ( !lua_isnil( L, -1 ) )
+	{
+		lua_Number radius;
+
+		RP_LuaApi_ReadCoord( L, -1, "near", near );
+		lua_getfield( L, 1, "radius" );
+		radius = luaL_checknumber( L, -1 );
+		lua_pop( L, 1 );
+		if ( radius != radius || radius < 1 || radius > RP_LUA_RADIUS_MAX )
+			return luaL_error( L, "radius must be 1 to %d", (int)RP_LUA_RADIUS_MAX );
+		r2 = (float)( radius * radius );
+		hasNear = qtrue;
+	}
+	lua_pop( L, 1 );
+	lua_getfield( L, 1, "box" );
+	if ( !lua_isnil( L, -1 ) )
+	{
+		luaL_checktype( L, -1, LUA_TTABLE );
+		lua_getfield( L, -1, "mins" );
+		RP_LuaApi_ReadCoord( L, -1, "box.mins", mins );
+		lua_pop( L, 1 );
+		lua_getfield( L, -1, "maxs" );
+		RP_LuaApi_ReadCoord( L, -1, "box.maxs", maxs );
+		lua_pop( L, 1 );
+		for ( i = 0; i < 3; i++ )
+		{
+			if ( maxs[i] < mins[i] || maxs[i] - mins[i] > RP_LUA_RADIUS_MAX )
+				return luaL_error( L, "box sides must be 0 to %d, maxs above mins", (int)RP_LUA_RADIUS_MAX );
+		}
+		hasBox = qtrue;
+	}
+	lua_pop( L, 1 );
+	lua_getfield( L, 1, "npcs" );
+	if ( !lua_isnil( L, -1 ) )
+		npcs = lua_toboolean( L, -1 ) ? 1 : 0;
+	lua_pop( L, 1 );
+	lua_getfield( L, 1, "limit" );
+	if ( !lua_isnil( L, -1 ) )
+	{
+		lua_Integer v = luaL_checkinteger( L, -1 );
+
+		if ( v < 1 || v > RP_LUA_FIND_MAX )
+			return luaL_error( L, "limit must be 1 to %d", RP_LUA_FIND_MAX );
+		limit = (int)v;
+	}
+	lua_pop( L, 1 );
+	if ( !cn && !tn && !hasNear && !hasBox )
+		return luaL_error( L, "find needs a classname, a targetname, near or box" );
+
+	// both regions, players and temp events never; the nearest kept when there is a near
+	for ( region = 0; region < 2; region++ )
+	{
+		int first = region ? MAX_GENTITIES : MAX_CLIENTS;
+		int end = region ? MAX_GENTITIES + level.num_logicalents : level.num_entities;
+
+		for ( i = first; i < end; i++ )
+		{
+			gentity_t *ent = &g_entities[i];
+			float d2 = 0;
+			int k;
+
+			if ( !ent->inuse || ent->s.eType >= ET_EVENTS || i == ENTITYNUM_WORLD || i == ENTITYNUM_NONE )
+				continue;
+			if ( npcs >= 0 && ( ent->client != NULL ) != ( npcs == 1 ) )
+				continue;
+			if ( cn && ( !ent->classname || Q_stricmp( ent->classname, cn ) ) )
+				continue;
+			if ( tn && ( !ent->targetname || Q_stricmp( ent->targetname, tn ) ) )
+				continue;
+			if ( hasBox )
+			{
+				for ( k = 0; k < 3; k++ )
+					if ( ent->r.currentOrigin[k] < mins[k] || ent->r.currentOrigin[k] > maxs[k] )
+						break;
+				if ( k < 3 )
+					continue;
+			}
+			if ( hasNear )
+			{
+				vec3_t d;
+
+				VectorSubtract( ent->r.currentOrigin, near, d );
+				d2 = DotProduct( d, d );
+				if ( d2 > r2 )
+					continue;
+				// keep the picks sorted by distance; the farthest falls off the end
+				for ( k = n; k > 0 && picks[k - 1].d2 > d2; k-- )
+				{
+					if ( k < limit )
+						picks[k] = picks[k - 1];
+				}
+				if ( k >= limit )
+					continue;
+				picks[k].ent = ent;
+				picks[k].d2 = d2;
+				if ( n < limit )
+					n++;
+				continue;
+			}
+			picks[n].ent = ent;
+			picks[n].d2 = 0;
+			if ( ++n >= limit )
+				break;
+		}
+		if ( !hasNear && n >= limit )
+			break;
+	}
+
+	lua_createtable( L, n, 0 );
+	for ( i = 0; i < n; i++ )
+	{
+		RP_LuaApi_PushEntityInfo( L, picks[i].ent );
+		if ( hasNear )
+		{
+			lua_pushnumber( L, sqrt( picks[i].d2 ) );
+			lua_setfield( L, -2, "distance" );
+		}
+		lua_rawseti( L, -2, i + 1 );
+	}
+	return 1;
+}
+
 static int RP_LuaApi_WorldWatch( lua_State *L )
 {
 	rpLuaPlugin_t *p = RP_LUA_PLUGIN( L );
@@ -900,7 +1315,8 @@ static const luaL_Reg rpLuaTimer[] = {
 static const luaL_Reg rpLuaPlayers[] = { { "all", RP_LuaApi_PlayersAll }, { "get", RP_LuaApi_PlayersGet }, { NULL, NULL } };
 static const luaL_Reg rpLuaWorld[] = {
 	{ "players_within", RP_LuaApi_WorldPlayersWithin }, { "time", RP_LuaApi_WorldTime }, { "mapname", RP_LuaApi_WorldMapname },
-	{ "entity", RP_LuaApi_WorldEntity }, { "watch", RP_LuaApi_WorldWatch }, { "unwatch", RP_LuaApi_WorldUnwatch }, { NULL, NULL }
+	{ "entity", RP_LuaApi_WorldEntity }, { "watch", RP_LuaApi_WorldWatch }, { "unwatch", RP_LuaApi_WorldUnwatch },
+	{ "trace", RP_LuaApi_WorldTrace }, { "visible", RP_LuaApi_WorldVisible }, { "contents", RP_LuaApi_WorldContents }, { "find", RP_LuaApi_WorldFind }, { NULL, NULL }
 };
 static const luaL_Reg rpLuaCvar[] = { { "get", RP_LuaApi_CvarGet }, { NULL, NULL } };
 static const luaL_Reg rpLuaLog[] = { { "info", RP_LuaApi_LogInfo }, { NULL, NULL } };

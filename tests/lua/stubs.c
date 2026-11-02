@@ -46,13 +46,26 @@ char *ConcatArgs( int start ) { static char b[1024]; int i; b[0] = 0; for ( i = 
 int RP_AdminBitByTitle( const char *title ) { return Q_stricmp( title, "Scripts" ) ? ( Q_stricmp( title, "Give" ) ? -1 : 3 ) : 29; }
 qboolean RP_IsBuiltInCommand( const char *name ) { return ( !Q_stricmp( name, "say" ) || !Q_stricmp( name, "kill" ) || t_builtin ) ? qtrue : qfalse; }
 
+// GLX_U: [Lua] World.trace / World.contents: a scripted answer and what the engine was asked
+int t_traces; float t_traceFraction = 1.0f; int t_traceEntity = ENTITYNUM_NONE; qboolean t_traceStartSolid;
+vec3_t t_traceFrom, t_traceTo, t_traceMins, t_traceMaxs; int t_tracePass, t_traceMask; qboolean t_traceBoxed; int t_contents;
+static void s_Trace( trace_t *r, const vec3_t start, const vec3_t mins, const vec3_t maxs, const vec3_t end, int passEntityNum, int contentmask, int capsule, int traceFlags, int useLod )
+{
+	(void)capsule; (void)traceFlags; (void)useLod;
+	t_traces++; VectorCopy( start, t_traceFrom ); VectorCopy( end, t_traceTo ); t_tracePass = passEntityNum; t_traceMask = contentmask;
+	t_traceBoxed = ( mins != NULL ); if ( mins ) { VectorCopy( mins, t_traceMins ); VectorCopy( maxs, t_traceMaxs ); }
+	memset( r, 0, sizeof( *r ) ); r->fraction = t_traceFraction; r->entityNum = t_traceEntity; r->startsolid = t_traceStartSolid;
+	VectorSubtract( end, start, r->endpos ); VectorMA( start, t_traceFraction, r->endpos, r->endpos ); r->plane.normal[2] = 1;
+}
+static int s_PointContents( const vec3_t point, int passEntityNum ) { (void)point; (void)passEntityNum; return t_contents; }
+
 void t_init( int maxclients )
 {
 	int i;
 	setvbuf( stdout, NULL, _IONBF, 0 );
 	trap = &imp;
 	imp.Print = s_Print; imp.Error = s_Error; imp.SendServerCommand = s_Send; imp.Milliseconds = s_Ms;
-	imp.LinkEntity = s_Link; imp.UnlinkEntity = s_Link; imp.Argc = s_Argc; imp.Argv = s_Argv; imp.Cvar_VariableStringBuffer = s_CvarStr; imp.Cvar_VariableIntegerValue = s_CvarInt;
+	imp.LinkEntity = s_Link; imp.UnlinkEntity = s_Link; imp.Argc = s_Argc; imp.Argv = s_Argv; imp.Cvar_VariableStringBuffer = s_CvarStr; imp.Cvar_VariableIntegerValue = s_CvarInt; imp.Trace = s_Trace; imp.PointContents = s_PointContents;
 	for ( i = MAX_CLIENTS; i < MAX_ENTITIESTOTAL; i++ ) { if ( g_entities[i].inuse && g_entities[i].client && ( g_entities[i].client < g_clients_store || g_entities[i].client >= g_clients_store + MAX_CLIENTS ) ) free( g_entities[i].client ); if ( g_entities[i].inuse && g_entities[i].m_pVehicle ) free( g_entities[i].m_pVehicle ); if ( g_entities[i].inuse && g_entities[i].NPC ) free( g_entities[i].NPC ); }
 	memset( &level, 0, sizeof( level ) ); memset( g_entities, 0, sizeof( g_entities ) ); memset( g_clients_store, 0, sizeof( g_clients_store ) );
 	level.maxclients = maxclients; level.num_entities = MAX_CLIENTS; level.time = 1000;
@@ -61,6 +74,7 @@ void t_init( int maxclients )
 	for ( i = 0; i < MAX_CLIENTS; i++ ) { g_entities[i].client = &g_clients_store[i]; }
 	rp_lua.integer = 1; rp_lua_memkb.integer = 512; Q_strncpyz( rp_lua_plugins.string, "", sizeof( rp_lua_plugins.string ) );
 	t_logLen = 0; t_log[0] = 0; t_console[0] = 0; memset( t_nsent, 0, sizeof( t_nsent ) );
+	t_traces = 0; t_traceFraction = 1.0f; t_traceEntity = ENTITYNUM_NONE; t_traceStartSolid = qfalse; t_contents = 0;
 	t_payouts = 0; t_musicChanges = 0; memset( t_paidCredits, 0, sizeof( t_paidCredits ) ); memset( t_rewardOnceEach, 0, sizeof( t_rewardOnceEach ) );
 	t_worldReset();
 	RP_Lua_TrapGuardInstall();	// as G_InitGame: the game module's commands go through the guarded copy

@@ -309,6 +309,19 @@ static gentity_t *RP_LuaWorld_Handle( lua_State *L, int idx )
 	return ent;
 }
 
+// GLX_U: [Lua] for the API's World.trace/visible: the value at idx when it is one of this plugin's entity handles
+gentity_t *RP_LuaWorld_HandleAt( lua_State *L, int idx )
+{
+	gentity_t *ent;
+
+	if ( !luaL_testudata( L, idx, RP_LUA_ENTITY_MT ) )
+		return NULL;
+	ent = RP_LuaWorld_Handle( L, idx );
+	if ( !ent )
+		luaL_error( L, "the entity handle is stale" );
+	return ent;
+}
+
 static int RP_LuaWorld_EntityValid( lua_State *L )
 {
 	lua_pushboolean( L, RP_LuaWorld_Handle( L, 1 ) != NULL );

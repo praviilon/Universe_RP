@@ -306,6 +306,28 @@ int main( void )
 	  t_clockFrozen = qfalse; t_tick = 0;
 	  CHECK( t_log_has( "errors in a minute: switched off" ) && ( !p->L || p->disabled ), "overrun: %d of them switch the plugin off (%d errors)", RP_LUA_MAX_ERRORS, p->errorsTotal );
 	  RP_LUA_SHUTDOWN(); }
+	// --- read-only world calls in a loop: find and trace end by the clock or the cap; the entity table is untouched
+	{ rpLuaPlugin_t *p; static gentity_t before[MAX_ENTITIESTOTAL]; int k;
+	  t_init( 8 ); t_player( 0, "Alice", qtrue, 7 );
+	  for ( k = 0; k < 200; k++ ) t_mapEntity( "func_door", "d", NULL );
+	  t_write_plugin( "rd", "Commands.add('findloop', function(p) N = 0 while true do local r = World.find{classname='func_door', near={x=0,y=0,z=0}, radius=8000} N = N + #r end end)\n"
+		"Commands.add('traceloop', function(p) N = 0 while true do local t = World.trace({x=0,y=0,z=0}, {x=N+1,y=0,z=0}) if t then N = N + 1 end end end)\n"
+		"Commands.add('visloop', function(p) N = 0 while true do if World.visible({x=0,y=0,z=50}, p) then N = N + 1 end end end)\n" );
+	  t_start( "rd" ); p = RP_Lua_Find( "rd" );
+	  memcpy( before, g_entities, sizeof( before ) );
+	  t_logLen = 0; t_log[0] = 0; t_clockFrozen = qtrue; t_tick = 1;
+	  t_args( "findloop" ); RP_LUA_COMMAND( &g_entities[0], t_argv[0] );
+	  CHECK( t_log_has( "ran too long" ) && p->L, "a find loop is stopped by the clock, the plugin lives" );
+	  t_clockFrozen = qfalse; t_frame( 100 ); t_clockFrozen = qtrue;	// a fresh frame budget for each loop
+	  t_traces = 0; t_args( "traceloop" ); RP_LUA_COMMAND( &g_entities[0], t_argv[0] );
+	  CHECK( t_log_has( "ran too long" ) && t_traces == RP_LUA_TRACES_PER_CALL, "a trace loop: %d engine traces at most, then refusals until the clock (%d)", RP_LUA_TRACES_PER_CALL, t_traces );
+	  t_clockFrozen = qfalse; t_frame( 100 ); t_clockFrozen = qtrue;
+	  t_traces = 0; t_args( "visloop" ); RP_LUA_COMMAND( &g_entities[0], t_argv[0] );
+	  CHECK( t_traces == RP_LUA_TRACES_PER_CALL, "a visible loop: the same cap (%d)", t_traces );
+	  t_clockFrozen = qfalse; t_tick = 0;
+	  CHECK( memcmp( before, g_entities, sizeof( before ) ) == 0, "the entity table is byte-identical after the loops" );
+	  CHECK( p->tokens == RP_LUA_TOKENS, "no token taken" );
+	  RP_LUA_SHUTDOWN(); }
 	t_init( 8 );	// TEST ONLY: frees what the stubs still hold (spawned strings, NPC clients): valgrind ends with nothing reachable
 	printf( fails ? "%d FAILED\n" : "t_hostile: ALL OK\n", fails );
 	return fails != 0;

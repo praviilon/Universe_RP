@@ -272,6 +272,7 @@ static qboolean RP_Lua_Run( rpLuaPlugin_t *p, int nargs, int nresults, int ms )
 	p->inCall = qtrue;
 	p->killed = qfalse;
 	p->instructions = 0;
+	p->tracesCall = 0;
 	start = trap->Milliseconds();
 	p->deadlineMs = ms;
 	p->deadline = start + ms;
