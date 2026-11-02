@@ -1303,6 +1303,26 @@ void SP_target_deactivate( gentity_t *self )
 	self->use = target_deactivate_use;
 }
 
+// GalaxyRP: [Entity System] a map name as the "map" command takes it: letters, digits, '_', '-', '/'
+// and '.', not starting with '/', no "..", no separators. Bounded by MAX_QPATH, as the file system is.
+static qboolean RP_MapNameSane( const char *name )
+{
+	int i;
+
+	if ( !name || !name[0] || name[0] == '/' || strlen( name ) >= MAX_QPATH || strstr( name, ".." ) )
+		return qfalse;
+
+	for ( i = 0; name[i]; i++ )
+	{
+		char c = name[i];
+
+		if ( !( ( c >= 'a' && c <= 'z' ) || ( c >= 'A' && c <= 'Z' ) || ( c >= '0' && c <= '9' ) || c == '_' || c == '-' || c == '/' || c == '.' ) )
+			return qfalse;
+	}
+
+	return qtrue;
+}
+
 void target_level_change_use(gentity_t *self, gentity_t *other, gentity_t *activator)
 {
 	G_ActivateBehavior(self,BSET_USE);
@@ -1332,6 +1352,18 @@ void target_level_change_use(gentity_t *self, gentity_t *other, gentity_t *activ
 			( activator && activator->client ) ? activator->client->pers.netname : "the map" );
 		return;
 	}
+
+	// GLX_U fix: [Entity System] a map this server cannot load must not take that one change. The flag above is
+	// cleared by the map change itself, so when the queued "map" failed (SV_Map_f: "Can't find map", and on it goes)
+	// it stayed set, and every other level change on the map was "already queued" until the next map. The Entity
+	// System's own are checked at spawn (below); a map's own entity -- a typo, a next map not installed here -- was
+	// not. Checked as the map command will see it: a plain name, and maps/<name>.bsp on this server's search path.
+	if ( !RP_MapNameSane( self->message ) || !RP_FileExists( va( "maps/%s.bsp", self->message ) ) )
+	{
+		G_LogPrintf( "target_level_change at %s used by %s: this server has no map \"%s\" (maps/%s.bsp), ignored\n", vtos( self->s.origin ),
+			( activator && activator->client ) ? activator->client->pers.netname : "the map", self->message, self->message );
+		return;
+	}
 	level.rpMapChangeQueued = qtrue;
 
 	// GalaxyRP: [Entity System] who tripped it goes to the log before the map goes
@@ -1342,26 +1374,6 @@ void target_level_change_use(gentity_t *self, gentity_t *other, gentity_t *activ
 		trap->SendConsoleCommand(EXEC_APPEND, va("devmap %s\n", self->message));
 	else
 		trap->SendConsoleCommand(EXEC_APPEND, va("map %s\n", self->message));
-}
-
-// GalaxyRP: [Entity System] a map name as the "map" command takes it: letters, digits, '_', '-', '/'
-// and '.', not starting with '/', no "..", no separators. Bounded by MAX_QPATH, as the file system is.
-static qboolean RP_MapNameSane( const char *name )
-{
-	int i;
-
-	if ( !name || !name[0] || name[0] == '/' || strlen( name ) >= MAX_QPATH || strstr( name, ".." ) )
-		return qfalse;
-
-	for ( i = 0; name[i]; i++ )
-	{
-		char c = name[i];
-
-		if ( !( ( c >= 'a' && c <= 'z' ) || ( c >= 'A' && c <= 'Z' ) || ( c >= '0' && c <= '9' ) || c == '_' || c == '-' || c == '/' || c == '.' ) )
-			return qfalse;
-	}
-
-	return qtrue;
 }
 
 /*QUAKED target_level_change (1 0 0) (-4 -4 -4) (4 4 4)
