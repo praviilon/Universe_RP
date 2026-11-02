@@ -50,6 +50,38 @@ void G_VehicleTrace( trace_t *results, const vec3_t start, const vec3_t tMins, c
 	trap->Trace(results, start, tMins, tMaxs, end, passEntityNum, contentmask, qfalse, 0, 0);
 }
 
+/*
+GLX_U fix: [Vehicles] a fighter resting on the ground is sent with no downward speed. Called by ClientThink_real()
+(g_active.c) straight after the vehicle's s is rebuilt from its ps after the move.
+
+A stopped fighter with an idle speed is pulled down by (speedIdle - speed) / 4 (FighterNPC.c, ProcessMoveCommands).
+On the ground, PM_FlyVehicleMove() (bg_pmove.c) zeroes a downward speed before the move, but the slide move then
+applies one frame of that gravity and keeps its end speed: the ship does not move, yet ps.velocity[2] is left at
+-gravity * frame time (-4 to -6 for a speedIdle 500 ship). That went out as s.pos.trDelta, and with g_smoothClients
+an NPC is sent TR_LINEAR_STOP, which a client carries on for up to 50 ms past the last move -- and an NPC's commands
+run at level.time - 50, so always the full 50 ms. Every client drew and clipped the parked ship that much lower than
+the server had it (0.2 for raider_new, measured with cg_showMiss). A player standing on it is kept 0.125 above the
+real top; his client saw over 0.25, took him off the ground, and each snapshot put him back -- the twitch and camera
+bob of standing on such a ship.
+
+Only what is sent changes: ps.velocity is left as it is, and the next move zeroes that downward speed on the ground
+anyway. Fighters only (the type whose move leaves it), only on the ground, only downward -- one taking off or flying
+is sent as before.
+*/
+void G_VehicleRestingDelta( gentity_t *ent )
+{
+	if ( !ent || !ent->client || ent->client->NPC_class != CLASS_VEHICLE || !ent->m_pVehicle
+		|| !ent->m_pVehicle->m_pVehicleInfo || ent->m_pVehicle->m_pVehicleInfo->type != VH_FIGHTER )
+	{
+		return;
+	}
+
+	if ( ent->client->ps.groundEntityNum != ENTITYNUM_NONE && ent->s.pos.trDelta[2] < 0.0f )
+	{
+		ent->s.pos.trDelta[2] = 0.0f;
+	}
+}
+
 Vehicle_t *G_IsRidingVehicle( gentity_t *pEnt )
 {
 	gentity_t *ent = (gentity_t *)pEnt;

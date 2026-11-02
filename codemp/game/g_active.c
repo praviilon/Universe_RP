@@ -5096,6 +5096,9 @@ void ClientThink_real( gentity_t *ent ) {
 		BG_PlayerStateToEntityState( &ent->client->ps, &ent->s, qfalse );
 	}
 
+	// GLX_U fix: [Vehicles] a fighter resting on the ground is sent with no downward speed (see the function)
+	G_VehicleRestingDelta( ent );
+
 	if (isNPC)
 	{
 		ent->s.eType = ET_NPC;

@@ -3393,6 +3393,7 @@ void RP_NpcSaberClear( int entNum );
 // -- g_utils.c; and a teleported vehicle's riders seated with it at once -- g_misc.c
 int RP_VehicleOf( const gentity_t *ent );
 qboolean RP_IsVehicleRider( const gentity_t *ent );
+void G_VehicleRestingDelta( gentity_t *ent );	// GLX_U: [Vehicles] a grounded fighter sent with no downward speed -- g_vehicles.c
 
 // DAJ_RP: [Melee Battle] the ring (the catwalk Cmd_MeleeMode_f() spawns at level.melee_mode_origin). Its solid box is
 // z 0 to RP_MELEE_RING_TOP over that origin, matching the drawn model: catw2_b.md3 at 400% has its bottom at the origin
