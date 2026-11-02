@@ -527,6 +527,18 @@ int main( void )
 	  CHECK( p->tokens == RP_LUA_TOKENS - 1, "no token spent on finds (the prop's one only): %d", p->tokens ); }
 	RP_LUA_SHUTDOWN();
 
+	// --- (audit 5 B) World.find / World.trace read their tables with lua_getfield, so an __index metamethod runs script code
+	//     inside them: nesting them through it must stop with Lua's C-stack error (LUAI_MAXCCALLS), never a crash
+	t_init( 8 ); t_player( 0, "Alice", qtrue, 7 );
+	t_write_plugin( "nest",
+		"Commands.add('nestf', function(p) D = 0 local mt = {} mt.__index = function(t, k) if k == 'classname' then D = D + 1 World.find(setmetatable({}, mt)) end end OK, E = pcall(World.find, setmetatable({}, mt)) E = tostring(E) end)\n"
+		"Commands.add('nestt', function(p) D = 0 local mt = {} mt.__index = function(t, k) D = D + 1 World.trace(setmetatable({}, mt), {x=1,y=1,z=1}) return 0 end OK, E = pcall(World.trace, setmetatable({}, mt), {x=1,y=1,z=1}) E = tostring(E) end)\n" );
+	t_start( "nest" ); p = RP_Lua_Find( "nest" ); CHECK( p && p->L, "nest loaded" );
+	t_traces = 0;
+	run( p, "nestf" ); CHECK( get_int( p, "OK" ) == 0 && strstr( get_str( p, "E" ), "stack overflow" ) && get_int( p, "D" ) < 200, "find nested through __index stops: %d deep, %s", get_int( p, "D" ), get_str( p, "E" ) );
+	run( p, "nestt" ); CHECK( get_int( p, "OK" ) == 0 && strstr( get_str( p, "E" ), "stack overflow" ) && t_traces == 0, "trace nested through __index stops before any trace: %d deep, %s", get_int( p, "D" ), get_str( p, "E" ) );
+	RP_LUA_SHUTDOWN();
+
 	printf( fails ? "%d FAILED\n" : "t_world: ALL OK\n", fails );
 	return fails ? 1 : 0;
 }
