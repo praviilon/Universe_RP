@@ -25,6 +25,7 @@
 
 #include <math.h>
 #include <limits.h>
+#include <string.h>  /* GLX_U: glxu_hashfloat */
 
 #include "lua.h"
 
@@ -141,33 +142,22 @@ static Node *hashint (const Table *t, lua_Integer i) {
 
 
 /*
-** Hash for floating-point numbers.
-** The main computation should be just
-**     n = frexp(n, &i); return (n * INT_MAX) + i
-** but there are some numerical subtleties.
-** In a two-complement representation, INT_MAX does not has an exact
-** representation as a float, but INT_MIN does; because the absolute
-** value of 'frexp' is smaller than 1 (unless 'n' is inf/NaN), the
-** absolute value of the product 'frexp * -INT_MIN' is smaller or equal
-** to INT_MAX. Next, the use of 'unsigned int' avoids overflows when
-** adding 'i'; the use of '~u' (instead of '-u') avoids problems with
-** INT_MIN.
+** Hash for floating-point numbers (GLX_U fix: [Lua] audit 5 X1). Stock
+** Lua reduced the double to its exponent plus the top 31 mantissa bits
+** (l_hashfloat) BEFORE the seeded mix above, so keys that differ only in
+** the low 22 mantissa bits (1 + j * 2^-52) shared one main position for
+** every seed: the integer fix did not cover them, and a rehash over such
+** a set was quadratic again (10-40 ms a call, under the overrun check).
+** Every bit of the double now reaches the mix. Only non-integral floats
+** get here (an integral float, -0.0 included, becomes an integer key in
+** luaH_get/luaH_newkey); inf has a fixed bit pattern; NaN is refused as a
+** key before any hashing.
 */
-#if !defined(l_hashfloat)
-static int l_hashfloat (lua_Number n) {
-  int i;
-  lua_Integer ni;
-  n = l_mathop(frexp)(n, &i) * -cast_num(INT_MIN);
-  if (!lua_numbertointeger(n, &ni)) {  /* is 'n' inf/-inf/NaN? */
-    lua_assert(luai_numisnan(n) || l_mathop(fabs)(n) == cast_num(HUGE_VAL));
-    return 0;
-  }
-  else {  /* normal case */
-    unsigned int u = cast_uint(i) + cast_uint(ni);
-    return cast_int(u <= cast_uint(INT_MAX) ? u : ~u);
-  }
+static unsigned int glxu_hashfloat (lua_Number n) {
+  lua_Unsigned u = 0;
+  memcpy(&u, &n, sizeof(n) < sizeof(u) ? sizeof(n) : sizeof(u));
+  return glxu_mixint(u);
 }
-#endif
 
 
 /*
@@ -182,7 +172,7 @@ static Node *mainpositionTV (const Table *t, const TValue *key) {
     }
     case LUA_VNUMFLT: {
       lua_Number n = fltvalue(key);
-      return hashmod(t, glxu_mixint(cast_uint(l_hashfloat(n))));  /* GLX_U */
+      return hashmod(t, glxu_hashfloat(n));  /* GLX_U */
     }
     case LUA_VSHRSTR: {
       TString *ts = tsvalue(key);

@@ -245,6 +245,10 @@ int main( void )
 	    { "collidef", "Events.on('init', function() T = {} for j = 1, 4096 do T[1 + j * 4095 / 1073741824] = true end for j = 4097, 4101 do T[1 + (j - 4096) * 4095 / 1073741824] = nil T[1 + j * 4095 / 1073741824] = true end DONE = true end)\n" },
 	    // t | t << 32: the two halves cancel in a fold that only XORs (whatever the seed); the multiply first spreads them
 	    { "colfold",  "Events.on('init', function() T = {} for k = 1, 4096 do T[k * 4294967297] = true end DONE = true end)\n" },
+	    // AUDIT 5 X1: floats apart by 2^-52 kept one l_hashfloat value (the low 22 mantissa bits were dropped before the
+	    // seed), so they collided for every seed; now every bit of the double is mixed. The same set in another exponent
+	    { "collidefl", "Events.on('init', function() T = {} for j = 1, 4096 do T[1 + j * 2^-52] = true end for j = 4097, 4101 do T[1 + (j - 4096) * 2^-52] = nil T[1 + j * 2^-52] = true end DONE = true end)\n" },
+	    { "collidefl2", "Events.on('init', function() T = {} for j = 1, 4096 do T[1024 + j * 2^-42] = true end for j = 4097, 4101 do T[1024 + (j - 4096) * 2^-42] = nil T[1024 + j * 2^-42] = true end DONE = true end)\n" },
 	    { NULL, NULL } };
 	  int i;
 	  for ( i = 0; col[i][0]; i++ )
@@ -283,6 +287,32 @@ int main( void )
 		lua_getglobal( p->L, "DONE" ); CHECK( lua_toboolean( p->L, -1 ) && !t_log_has( "error" ), "seeded: a set made for the unseeded mix spreads (%s)", strstr( t_log, "error" ) ? strstr( t_log, "error" ) : "-" ); lua_pop( p->L, 1 );
 	  }
 	  RP_LUA_SHUTDOWN(); }
+	// AUDIT 5 X1: the same for floats: 4096 non-integral doubles whose 64 bits share a main position under the unseeded
+	// mix (worked out here, bit patterns 1.0 < x < 2.0); with the seed they spread
+	{ rpLuaPlugin_t *p;
+	  unsigned long long u;
+	  int n = 0;
+	  t_init( 8 ); t_player( 0, "Alice", qtrue, 7 );
+	  t_write_plugin( "seedf", "K = {} Commands.add('fill', function() T = {} for i = 1, #K do T[K[i]] = true end DONE = true end)\n" );
+	  t_start( "seedf" ); p = RP_Lua_Find( "seedf" );
+	  CHECK( p && p->L, "seededf: loaded" );
+	  if ( p && p->L )
+	  {
+		lua_getglobal( p->L, "K" );
+		for ( u = 0x3FF0000000000001ULL; n < 4096 && u < 0x4000000000000000ULL; u++ )
+		{
+			unsigned long long h = u * 0x9E3779B97F4A7C15ULL;
+			h ^= h >> 32;
+			if ( (unsigned int)h % 4095u == 0 ) { double d; memcpy( &d, &u, sizeof( d ) ); lua_pushnumber( p->L, d ); lua_rawseti( p->L, -2, ++n ); }
+		}
+		lua_pop( p->L, 1 );
+		CHECK( n == 4096, "seededf: %d colliding floats found", n );
+		t_logLen = 0; t_log[0] = 0; t_frame( 100 );
+		t_args( "fill" ); RP_LUA_COMMAND( &g_entities[0], t_argv[0] );
+		lua_getglobal( p->L, "DONE" ); CHECK( lua_toboolean( p->L, -1 ) && !t_log_has( "error" ), "seededf: a float set made for the unseeded mix spreads (%s)", strstr( t_log, "error" ) ? strstr( t_log, "error" ) : "-" ); lua_pop( p->L, 1 );
+		lua_getglobal( p->L, "T" ); lua_pushnil( p->L ); { int c = 0; while ( lua_next( p->L, -2 ) ) { c++; lua_pop( p->L, 1 ); } CHECK( c == 4096, "seededf: all %d keys distinct and found again", c ); } lua_pop( p->L, 1 );
+	  }
+	  RP_LUA_SHUTDOWN(); }
 	// AUDIT 4 A1, deterministic: a call that returns before the hook or a library loop reads the clock, yet took
 	// RP_LUA_OVERRUN_MS, is an error (frozen clock: every read is t_tick ms, and a two-instruction function reads it
 	// only at its start and end); 20 of them switch the plugin off. A short one says nothing
@@ -298,6 +328,9 @@ int main( void )
 	  t_logLen = 0; t_log[0] = 0; t_clockFrozen = qtrue; t_tick = 1;
 	  t_args( "quick" ); RP_LUA_COMMAND( &g_entities[0], t_argv[0] );
 	  CHECK( !t_log_has( "error" ), "overrun: a 1 ms call says nothing (%s)", t_log );
+	  t_tick = RP_LUA_OVERRUN_MS - 1;
+	  t_args( "quick" ); RP_LUA_COMMAND( &g_entities[0], t_argv[0] );
+	  CHECK( !t_log_has( "error" ), "overrun: a %d ms call says nothing (%s)", RP_LUA_OVERRUN_MS - 1, t_log );
 	  t_tick = RP_LUA_OVERRUN_MS;
 	  t_args( "quick" ); RP_LUA_COMMAND( &g_entities[0], t_argv[0] );
 	  CHECK( t_log_has( va( "ran too long (%d ms, between the clock's checks)", RP_LUA_OVERRUN_MS ) ) && p->errorsTotal == 1, "overrun: a %d ms call is an error (%d errors; %s)", RP_LUA_OVERRUN_MS, p->errorsTotal, t_log );
