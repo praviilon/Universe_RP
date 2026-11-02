@@ -11,9 +11,9 @@ GalaxyRP: [Entity System] picking entities up, turning them and putting them dow
                    exactly those angles.
   /entcancel       lets go: a copy is simply not made, a cut entity goes back where it was, a copy of a
                    static model is deleted.
-  /entcopystatic [#N]  DAJ_RP: [Static Models] picks up a solid misc_model_breakable copy of the map's
-                   misc_model_static aimed at (or that number -- g_statics.c); /entcopystatic again drops
-                   it where the admin is aiming. The static model itself stays: each client draws it.
+  /entcopystatic [#N]  DAJ_RP: [Static Models] picks up a solid, unbreakable misc_model_breakable copy of
+                   the map's misc_model_static aimed at (or that number -- g_statics.c); /entcopystatic again
+                   drops it where the admin is aiming. The static model itself stays: each client draws it.
   /entaddaim       is /entadd placing the new entity on the surface aimed at (Cmd_EntAddAim_f, g_cmds.c,
                    through RP_EntAddAimPoint() and RP_EntGrabPlace() below).
   /entaddgrab <classname> <key> <value>...  DAJ_RP: /entadd's arguments and checks (aimoffset as /entaddaim
@@ -2269,13 +2269,13 @@ static void RP_ShortVectorText( const vec3_t v, char *buf, int size )
 Cmd_EntCopyStatic_f
 
 DAJ_RP: [Static Models] /entcopystatic [#N]: picks up a copy of one of the map's misc_model_static -- the
-one aimed at, as Entity Bounds shows it in red (RP_EntBoundsAimStatic), or that number -- as a solid
-misc_model_breakable with its model, origin, angles and scale (g_statics.c). The copy is made at once,
-through the Entity System's spawn and its checks (the model file, the model and entity slots), and held
-hidden where the static model is, a red preview following the aim; /entcopystatic again drops it there
-(RP_GrabDrop), /entcancel deletes it (RP_EntGrabCancel), and /entcopy and /entcut are refused while it is
-held. The static model itself stays as it is: each client draws it from its own copy of the map file.
-Refused while holding anything else (RP_EntRefuseWhileHolding).
+one aimed at, as Entity Bounds shows it in red (RP_EntBoundsAimStatic), or that number -- as a solid,
+unbreakable (spawnflags 65) misc_model_breakable with its model, origin, angles and scale (g_statics.c).
+The copy is made at once, through the Entity System's spawn and its checks (the model file, the model and
+entity slots), and held hidden where the static model is, a red preview following the aim; /entcopystatic
+again drops it there (RP_GrabDrop), /entcancel deletes it (RP_EntGrabCancel), and /entcopy and /entcut
+are refused while it is held. The static model itself stays as it is: each client draws it from its own
+copy of the map file. Refused while holding anything else (RP_EntRefuseWhileHolding).
 ==================
 */
 void Cmd_EntCopyStatic_f( gentity_t *ent )
@@ -2422,7 +2422,10 @@ void Cmd_EntCopyStatic_f( gentity_t *ent )
 			pairs[count][0] = ( scale[0] == scale[1] && scale[1] == scale[2] ) ? "modelscale" : "modelscale_vec";
 			pairs[count++][1] = scaleText;
 		}
-		pairs[count][0] = "spawnflags"; pairs[count++][1] = "1";	// solid, as most props are
+		// GLX_U fix: [Static Models] solid, as most props are, and never broken, not even by being used
+		// (USE_NOT_BREAK): it has no health, so nothing can damage it, but a use (a trigger aimed at it,
+		// /entuse, /enttrigger, a script's World.use) broke it -- its _d1 model or, without one, gone
+		pairs[count][0] = "spawnflags"; pairs[count++][1] = "65";
 
 		RP_SpawnRouteInit( &route );
 		for ( i = 0; i < count; i++ )
