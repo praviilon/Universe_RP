@@ -1303,20 +1303,33 @@ void SP_target_deactivate( gentity_t *self )
 	self->use = target_deactivate_use;
 }
 
-// GalaxyRP: [Entity System] a map name as the "map" command takes it: letters, digits, '_', '-', '/'
-// and '.', not starting with '/', no "..", no separators. Bounded by MAX_QPATH, as the file system is.
+// GalaxyRP: [Entity System] a map name the engine's "map" command takes exactly as given. GLX_U fix: was letters,
+// digits and "_-/." only, which refused real maps such as Jedi'sHomeJL_II. The name reaches the engine as
+// "map <name>\n" through the command buffer (qcommon/cmd.cpp): Cbuf_Execute() ends a command at ';' and at a line
+// break, "//" comments out the rest of the line and "/*" everything up to a "*/", the commands queued after it
+// included; Cmd_TokenizeString2() splits at any byte up to a space and at '"'. SV_Map_f() refuses '\\' and builds
+// "maps/<name>.bsp" in a MAX_QPATH buffer, which a longer name overflows into "Can't find map" (the test /admmap
+// uses). The file system refuses a path with ".." or "::" in it (a name ending in '.' makes "<name>..bsp"), and no
+// map starts with '/'. Anything else (' + ! ( ) & %, bytes past 127) the map command keeps in the name; whether the
+// map is there, RP_FileExists() is asked next.
 static qboolean RP_MapNameSane( const char *name )
 {
-	int i;
+	const unsigned char *c;
+	size_t len;
 
-	if ( !name || !name[0] || name[0] == '/' || strlen( name ) >= MAX_QPATH || strstr( name, ".." ) )
+	if ( !name || !name[0] || name[0] == '/' )
 		return qfalse;
 
-	for ( i = 0; name[i]; i++ )
-	{
-		char c = name[i];
+	len = strlen( name );
+	if ( len + strlen( "maps/.bsp" ) >= MAX_QPATH || name[len - 1] == '.' )
+		return qfalse;
 
-		if ( !( ( c >= 'a' && c <= 'z' ) || ( c >= 'A' && c <= 'Z' ) || ( c >= '0' && c <= '9' ) || c == '_' || c == '-' || c == '/' || c == '.' ) )
+	if ( strstr( name, ".." ) || strstr( name, "::" ) || strstr( name, "//" ) || strstr( name, "/*" ) )
+		return qfalse;
+
+	for ( c = (const unsigned char *)name; *c; c++ )
+	{
+		if ( *c <= ' ' || *c == '"' || *c == '\\' || *c == ';' )
 			return qfalse;
 	}
 
@@ -1357,8 +1370,15 @@ void target_level_change_use(gentity_t *self, gentity_t *other, gentity_t *activ
 	// cleared by the map change itself, so when the queued "map" failed (SV_Map_f: "Can't find map", and on it goes)
 	// it stayed set, and every other level change on the map was "already queued" until the next map. The Entity
 	// System's own are checked at spawn (below); a map's own entity -- a typo, a next map not installed here -- was
-	// not. Checked as the map command will see it: a plain name, and maps/<name>.bsp on this server's search path.
-	if ( !RP_MapNameSane( self->message ) || !RP_FileExists( va( "maps/%s.bsp", self->message ) ) )
+	// not. Checked as the map command will see it: a name it takes as given, and maps/<name>.bsp on this server's
+	// search path.
+	if ( !RP_MapNameSane( self->message ) )
+	{
+		G_LogPrintf( "target_level_change at %s used by %s: \"%s\" can't be a map name, ignored\n", vtos( self->s.origin ),
+			( activator && activator->client ) ? activator->client->pers.netname : "the map", self->message );
+		return;
+	}
+	if ( !RP_FileExists( va( "maps/%s.bsp", self->message ) ) )
 	{
 		G_LogPrintf( "target_level_change at %s used by %s: this server has no map \"%s\" (maps/%s.bsp), ignored\n", vtos( self->s.origin ),
 			( activator && activator->client ) ? activator->client->pers.netname : "the map", self->message, self->message );
@@ -1397,19 +1417,21 @@ void SP_target_level_change( gentity_t *self )
 	}
 
 	// GalaxyRP fix: [Entity System] one the entity commands place changes the map for everyone the
-	// moment a player trips it, so its mapname is checked now: a plain map name, and a map this server
-	// has (maps/<name>.bsp, the pk3s included). A typo would otherwise end the map with "map not found";
-	// the map's own are left as they are.
+	// moment a player trips it, so its mapname is checked now: a name the map command takes as given
+	// (RP_MapNameSane), and a map this server has (maps/<name>.bsp, the pk3s included). A typo would
+	// otherwise end the map with "map not found"; the map's own are left as they are (checked when used).
 	if ( RP_EntitySystemMade( self ) )
 	{
 		if ( !RP_MapNameSane( self->message ) )
 		{
-			if ( RP_RefuseAtRuntime( self, va( "\"%s\" is not a plain map name", self->message ) ) )
+			// GLX_U: [Entity System] the text says what the map command can't take. Both texts show the name without
+			// double quotes, as the other refusals do: the player's game cut the quoted print at the first one inside it.
+			if ( RP_RefuseAtRuntime( self, va( "%s can't be a map name (no spaces, quotes, backslashes, semicolons, comment marks, .. or ::, not starting with / or ending with ., at most 54 characters)", self->message ) ) )
 				return;
 		}
 		else if ( !RP_FileExists( va( "maps/%s.bsp", self->message ) ) )
 		{
-			if ( RP_RefuseAtRuntime( self, va( "this server has no map \"%s\" (maps/%s.bsp)", self->message, self->message ) ) )
+			if ( RP_RefuseAtRuntime( self, va( "this server has no map %s (maps/%s.bsp)", self->message, self->message ) ) )
 				return;
 		}
 	}
