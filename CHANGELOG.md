@@ -9,6 +9,7 @@
 
 ### Fixed
 - A player who goes AFK (`/away` or idle) now has their open dialogue closed, and no dialogue opens for a player who is dead, downed, paralyzed, spectating or AFK. Before, it stayed open until its timeout, or was shown and closed again at once.
+- Minor fixes to vehicles (fighters, animal boarding) and widescreen loading screens.
 
 ## [3.9.0]
 
