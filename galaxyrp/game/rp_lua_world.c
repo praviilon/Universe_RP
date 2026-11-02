@@ -1243,6 +1243,6 @@ void RP_LuaWorld_OpenLib( rpLuaPlugin_t *p )
 	lua_newtable( L );
 	luaL_setfuncs( L, rpLuaSound, 0 );
 	lua_setglobal( L, "Sound" );
-	lua_pushinteger( L, 2 );
+	lua_pushinteger( L, 3 );	// GLX_U: 3: World.find, trace, visible, contents
 	lua_setglobal( L, "API_VERSION" );
 }

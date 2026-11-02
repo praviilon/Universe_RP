@@ -1,5 +1,5 @@
 -- quest: a guard, a crate, a swoop, a button and the quest-giver's dialogue with its own reward. Shows every
--- P2 call: World.npc, World.prop (props and the quest entities), World.vehicle, World.watch + entity_used,
+-- world call: World.npc, World.prop (props and the quest entities), World.vehicle, World.watch + entity_used,
 -- Effect.play, Sound.play, World.use, World.remove, the npc_death and dialog_answer events, Storage.char.
 -- Edit the table for your map. Enable with: rp_lua_plugins "quest"  (or /scripts load quest)
 

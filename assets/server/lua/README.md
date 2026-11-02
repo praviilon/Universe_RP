@@ -1,9 +1,9 @@
-# Server-side Lua plugins (P1 + P2)
+# Server-side Lua plugins
 
 Universe RP's server can run small Lua 5.4 scripts called plugins. A plugin
 is told what happens on the server and can answer with messages, chat
-commands, timers and stored data (P1), and act on the world the way a
-player would (P2): use a named entity as a button would, place props,
+commands, timers and stored data, and act on the world the way a
+player would: use a named entity as a button would, place props,
 NPCs and vehicles of its own, play effects and sounds the map already has. It never
 reaches past that: no accounts, no kicking, renaming or damaging anyone, no
 giving or taking from a player directly — what a script wants done to a
@@ -24,9 +24,9 @@ the server.
 
 A plugin is one file: `<fs_homepath>/<mod folder>/lua/plugins/<name>/plugin.lua`,
 a loose file (never inside a pk3), read as text (bytecode is refused).
-`<name>` is letters, digits, `_` and `-`, up to 32 characters. The
-shipped examples are `greeter`, `events` and `quest`: copy `lua/` from
-`assets/server/` next to the mod's `database/` folder and set
+`<name>` is letters, digits, `_` and `-`, up to 32 characters. The server
+package installs this guide and three examples (`greeter`, `events`, `quest`)
+in `lua/`; none runs until it is named in `rp_lua_plugins`, for example
 `rp_lua_plugins "greeter events"` (`quest` needs its table edited for your
 map first).
 
@@ -39,7 +39,7 @@ Stored data goes to `<mod folder>/database/lua.db`, beside `accounts.db`.
 | Command | Does |
 |---|---|
 | `/scripts` or `/scripts list` | each plugin: running or off, memory, errors, timers, commands, watches |
-| `/scripts stats [name]` | calls, time, messages sent and refused, deferred timers, stored bytes; props, NPCs and vehicles alive, uses, effects, sounds; what the guards held back |
+| `/scripts stats [name]` | calls, time, messages sent and refused, deferred timers, stored bytes; props, NPCs and vehicles alive, uses, effects, sounds, traces; what the guards held back |
 | `/scripts help` | every command the plugins add, with its help text |
 | `/scripts load <name>` | load a plugin (for this map; `rp_lua_plugins` is not changed) |
 | `/scripts unload <name>` | stop it and free its slot |
@@ -85,6 +85,7 @@ however written, costs the server a bounded amount.
 | commands a script call sets off, to one client (what a `World.use`'s chain prints, a dialogue, `Msg.*`) | 32 a second across all plugins | not sent; one log line a second |
 | a music change a script call sets off (`target_play_music`: one command to everyone) | needs room in every client's 32 | the music is not changed; one log line |
 | rewards a script call sets off (each is a database write) | 4 a server frame across all plugins | not paid, and the reward does not fire its target; one log line a frame |
+| traces (`World.trace`, `World.visible`) | 32 per call | `false, "too many traces in one call"` |
 | timers | 32 live, 50 ms minimum | `false, "too many timers"` |
 | commands | 16, names of 3–24 characters | `false, "..."` |
 | watched targetnames | 32 (256 for all plugins) | `false, "..."` |
@@ -175,7 +176,7 @@ lists them.
 local h = Timer.every(60000, fn)   -- also Timer.after(ms, fn); Timer.cancel(h)
 ```
 
-### The world (P2)
+### The world
 
 ```lua
 World.use("door1", p)            -- every entity named door1, used as a button would with p as activator
@@ -234,9 +235,10 @@ local done = World.prop("target_flag",   o, nil, {flag="quest_done", target="pay
 local talk = World.prop("target_dialog", o, nil, {message="Did you do it?", option1="Yes", need1="quest_done", go1="done",
                                                    option2="Not yet"}, {name="talk"})
 World.use("lua.quest.talk", p)           -- opens the dialogue for p; "Yes" sets the flag and pays, as p's own action
-``` `/entsave` leaves script entities out; `/entremove`,
-`/entedit` and `/entload` treat them as any other, and the handle goes
-stale then. A dead NPC counts as alive until its body is gone or removed.
+```
+
+`/entsave` leaves script entities out; `/entremove`, `/entedit` and
+`/entload` treat them as any other, and the handle goes stale then. A dead NPC counts as alive until its body is gone or removed.
 
 `World.npc` and `World.vehicle` take the options an admin's spawner takes,
 set when the NPC or vehicle spawns (not changed afterwards: admins keep
@@ -284,30 +286,21 @@ until then.
 map (by the map, the Entity System or `/playsound`); a script never
 registers one.
 
-### World, Cvar, Log, Storage
+### Reading the world
+
+Nothing here creates or changes anything, and no token is spent.
 
 ```lua
-World.players_within({x=0, y=0, z=0}, 512)   -- radius up to 8192
-World.time()                                 -- the server's level time, ms
-World.mapname()
-World.entity("door1")                        -- {number, classname, origin} of the first match, or nil
-World.find{classname="func_door", near=p.origin, radius=512}   -- see below
-World.trace(from, to, {mask="opaque"})        -- see below
+World.players_within({x=0, y=0, z=0}, 512)   -- the players within a radius (up to 8192)
+World.entity("door1")                        -- {number, classname, origin} of the first entity with that name, or nil
+World.find{classname="func_door", near=p.origin, radius=512}   -- every match, see below
+World.trace(from, to, {mask="opaque"})        -- what lies between two points
 World.visible(a, b)                          -- nothing opaque between two points, players or own entities
 World.contents(pos)                          -- {solid=, water=, lava=, slime=, trigger=, playerclip=, empty=}
+World.time()                                 -- the server's level time, ms
+World.mapname()
 World.watch("door1")  World.unwatch("door1") -- for entity_used
-Cvar.get("g_gametype")                       -- rp_, g_ and sv_ cvars only, as strings
-Log.info("text")                             -- the server log, as [lua:<name>] text; so does print()
-Storage.get(key)  Storage.set(key, value)  Storage.del(key)              -- per plugin
-Storage.char.get(p, key)  Storage.char.set(p, key, value)  Storage.char.del(p, key)   -- per character
 ```
-
-Stored values are strings (numbers are stored as their text; use
-`tonumber`), kept byte for byte: any string, `string.pack` output
-included. Keys are text, 1 to 64 bytes, without a zero byte. Writes are kept in memory and written every 30 s and at map
-end. Rows of a deleted character are removed with it.
-
-**Reading the world** (nothing is created or changed, no token is spent):
 
 - `World.find(spec)` lists entities as plain tables `{number, classname,
   targetname, origin, npc_type}` (`npc_type` for NPCs and vehicles, `mine =
@@ -318,6 +311,7 @@ end. Rows of a deleted character are removed with it.
   NPCs and vehicles, `false`: none) and `limit` (1–64, default 64). At
   least one of `classname`, `targetname`, `near` or `box` is required. Players
   and temp events are never listed (`Players.all`, `World.players_within`).
+  `World.entity` is the first match by name only.
 - `World.trace(from, to [, opts])` runs one engine trace and returns
   `{fraction, hit, endpos, startsolid, normal, entity}`: `entity` is a
   player handle, a table as `find` gives (the world as `worldspawn`), or
@@ -335,9 +329,29 @@ end. Rows of a deleted character are removed with it.
 - `World.contents(pos)`: what is at a point, as booleans, for refusing a
   spawn spot inside a wall or under water.
 
+### Cvar, Log, Storage
+
+```lua
+Cvar.get("g_gametype")                       -- rp_, g_ and sv_ cvars only, as strings
+Log.info("text")                             -- the server log, as [lua:<name>] text; so does print()
+Storage.get(key)  Storage.set(key, value)  Storage.del(key)              -- per plugin
+Storage.char.get(p, key)  Storage.char.set(p, key, value)  Storage.char.del(p, key)   -- per character
+```
+
+Stored values are strings (numbers are stored as their text; use
+`tonumber`), kept byte for byte: any string, `string.pack` output
+included. Keys are text, 1 to 64 bytes, without a zero byte. Writes are
+kept in memory and written every 30 s and at map end. Rows of a deleted
+character are removed with it.
+
+Two globals: `PLUGIN_NAME`, the plugin's folder name, and `API_VERSION`,
+`3` on this server (it goes up when functions are added: `3` brought
+`World.find`, `trace`, `visible` and `contents`).
+
 ### What is not there
 
-No `io`, `os`, `package`, `debug` or `coroutine`; no `require`, `dofile`
+The Lua libraries are the base functions, `string`, `table`, `math` and
+`utf8`. No `io`, `os`, `package`, `debug` or `coroutine`; no `require`, `dofile`
 or `loadfile`; `load` takes text only; `collectgarbage` only answers
 `"count"`; `setmetatable` refuses a metatable with `__gc` (a finalizer would
 run outside any call and its budget); `xpcall` calls its handler after the
@@ -345,7 +359,7 @@ error unwound, not at the point it was raised. Plugins cannot call each other, t
 damage, teleport, pay or give to a player directly (only through the map's
 entities and their own NPCs' kill rewards), spawn anything outside the
 exempt classes, link their entities to the map's, give NPCs orders, or
-change cvars. That is by design for this stage.
+change cvars. That is by design.
 
 ## Writing a plugin
 
