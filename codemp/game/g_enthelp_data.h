@@ -1981,11 +1981,11 @@ static const rpEntHelp_t rp_ent_help[] = {
 		NULL,
 		"common target" },
 	{ "target_flag", 0, NULL,
-		"Sets a named flag on the player who started the chain that used it, or clears it with CLEAR. A player's flags last for this connection on this map, 16 at most, and are gone on a reconnect or a map change. A target_dialog's need<n> keys read them: a quest's last step fires a target_flag, and the quest-giver offers 'I finished the job' only to a player holding it. /entflags <player> lists a player's flags.",
+		"Sets a named flag on the player who started the chain that used it, or clears it with CLEAR. A player's flags last for this connection on this map, 16 at most, and are gone on a reconnect or a map change. A target_flag that can't set a 17th fires nothing and tells the player. A target_dialog's need<n> keys read the flags: a quest's last step fires a target_flag, and the quest-giver offers 'I finished the job' only to a player holding it. Make that answer pay once (a ONCE_EACH target_reward, or a target_flag CLEAR fired with the payment). /entflags <player> lists a player's flags.",
 		"1|CLEAR|Clears the flag instead of setting it.\n"
 		"128|INACTIVE|Starts inactive: it ignores every use, /entuse included, until a target_activate names it.",
 		"flag||Required: the flag's name, letters, digits and '_', up to 31 characters.\n"
-		"target||Fired after the flag is set or cleared, with the same activator.\n"
+		"target||Fired after the flag is set or cleared, with the same activator. Not fired when the flag can't be set (the player holds 16).\n"
 		"targetname||Using it sets (or clears) the flag on the activator.",
 		"target_flag targetname quest1_done_set flag quest1_done",
 		"common target target_dialog" },

@@ -121,8 +121,9 @@ int main( void )
 	clear_sent(); GlobalUse( &g_entities[d2], &g_entities[0], &g_entities[0] ); CHECK( level.rpDialog[0].numShown == 2 && strstr( last_sent( 0 ), "^31.^7 I finished" ) && strstr( last_sent( 0 ), "^32.^7 Bye" ), "with the flag: 'I finished' is 1" );
 	dialog_cmd( 0, "dialog 1" ); CHECK( t_usedCount[pay] == 1 && t_usedActivator[pay] == &g_entities[0], "the reward used with Alice" );
 	GlobalUse( &g_entities[f], &g_entities[0], &g_entities[0] ); CHECK( !RP_FlagHas( &g_entities[0], "quest_done" ), "CLEAR" );
-	{ int i; for ( i = 0; i < 20; i++ ) { t_key( "flag", va( "f%d", i ) ); { int e = spawn_flag( va( "sf%d", i ), va( "f%d", i ), 0 ); GlobalUse( &g_entities[e], &g_entities[0], &g_entities[0] ); } }
-	  CHECK( RP_FlagHas( &g_entities[0], "f15" ) && !RP_FlagHas( &g_entities[0], "f16" ) && t_log_has( "has 16 flags already" ), "16 flags, the 17th refused" ); }
+	{ int i, after = t_mapEntity( "func_door", "after17", NULL ); for ( i = 0; i < 20; i++ ) { t_key( "flag", va( "f%d", i ) ); { int e = spawn_flag( va( "sf%d", i ), va( "f%d", i ), 0 ); if ( i == 16 ) g_entities[e].target = "after17"; GlobalUse( &g_entities[e], &g_entities[0], &g_entities[0] ); } }
+	  CHECK( RP_FlagHas( &g_entities[0], "f15" ) && !RP_FlagHas( &g_entities[0], "f16" ) && t_log_has( "has 16 flags already, 'f16' not set, its targets not fired" ), "16 flags, the 17th refused" );
+	  CHECK( t_usedCount[after] == 0, "the refused 17th fired nothing (its target used %d)", t_usedCount[after] ); }
 	g_entities[0].client->pers.bitvalue = 1 << ADM_ENTITYSYSTEM; clear_sent(); t_args( "entflags 0" ); Cmd_EntFlags_f( &g_entities[0] ); CHECK( strstr( last_sent( 0 ), "holds 16 flags: f0, f1" ), "/entflags: %s", last_sent( 0 ) );
 
 	// --- ONCE_EACH: once per connection
@@ -272,6 +273,49 @@ int main( void )
 	  t_key( "message", "V?" ); t_key( "option1", "VIP" ); t_key( "need1", "key" ); { int dv = spawn_dialog( "vd", NULL, 0 );
 	    GlobalUse( &g_entities[fset], &g_entities[0], &g_entities[0] ); GlobalUse( &g_entities[dv], &g_entities[0], &g_entities[0] ); GlobalUse( &g_entities[fclr], &g_entities[0], &g_entities[0] );
 	    dialog_cmd( 0, "dialog 1" ); CHECK( level.rpDialog[0].id == 0 && t_log_has( ": gone" ), "nothing left to say: closed" ); } }
+
+	// --- AUDIT5 M1: a target_flag that can't set its flag (16 held) fires nothing and tells the player, once per 5 s;
+	// the "flag, then reward" quest (need1 !quest_done -> target_flag quest_done -> reward) pays once, never more
+	t_init( 8 ); t_player( 0, "Alice", qtrue, 7 ); g_entities[0].client->pers.connectTime = 100;
+	{ int k, f, pay, done, dq, clr, gone, notes = 0; static char nm[RP_FLAGS_PER_PLAYER][16];
+	  for ( k = 0; k < RP_FLAGS_PER_PLAYER; k++ ) { Com_sprintf( nm[k], 16, "o%d", k ); f = spawn_flag( nm[k], nm[k], 0 ); GlobalUse( &g_entities[f], &g_entities[0], &g_entities[0] ); }
+	  CHECK( RP_FlagHas( &g_entities[0], "o15" ), "16 flags held" );
+	  pay = t_rewardEntity( "m1pay", NULL, 50, 0 ); done = spawn_flag( "m1done", "quest_done", 0 ); g_entities[done].target = "m1pay";
+	  t_key( "message", "Pay me?" ); t_key( "option1", "Yes, pay me" ); t_key( "need1", "!quest_done" ); t_key( "go1", "m1done" ); t_key( "option2", "Bye" ); dq = spawn_dialog( "m1talk", NULL, 0 );
+	  clear_sent(); t_logLen = 0; t_log[0] = 0;
+	  for ( k = 0; k < 5; k++ ) { GlobalUse( &g_entities[dq], &g_entities[0], &g_entities[0] ); CHECK( level.rpDialog[0].numShown == 2, "round %d: 'Yes, pay me' offered", k ); dialog_cmd( 0, "dialog 1" ); frames( 1000 ); }
+	  for ( k = 0; k < t_nsent[0]; k++ ) if ( strstr( t_sent[0][k], "holding 16 quest flags" ) ) notes++;
+	  CHECK( t_payouts == 0 && t_usedCount[pay] == 0 && !RP_FlagHas( &g_entities[0], "quest_done" ), "5 answers at the cap: paid %d, flag held %d", t_payouts, RP_FlagHas( &g_entities[0], "quest_done" ) );
+	  CHECK( notes == 1 && t_log_has( "'quest_done' not set, its targets not fired" ), "the player told once in 5 s (%d), every refusal logged", notes );
+	  CHECK( !strcmp( sent_with( 0, "quest flags" ), "print \"^3You can't do this step now: you are holding 16 quest flags, the most at once. They are cleared on a map change or a reconnect.\n\"" ), "the notice, one whole print: %s", sent_with( 0, "quest flags" ) );
+	  clear_sent(); frames( 1000 ); GlobalUse( &g_entities[done], &g_entities[0], &g_entities[0] ); CHECK( strstr( sent_with( 0, "quest flags" ), "holding 16" ), "told again after 5 s" );
+	  // a CLEAR frees a slot: the same answer now sets the flag and pays, once; then it is hidden
+	  clr = spawn_flag( "clr_o3", "o3", 1 ); gone = t_mapEntity( "func_door", "afterclear", NULL ); g_entities[clr].target = "afterclear"; GlobalUse( &g_entities[clr], &g_entities[0], &g_entities[0] );
+	  CHECK( !RP_FlagHas( &g_entities[0], "o3" ) && t_usedCount[gone] == 1, "CLEAR clears and fires its target" );
+	  GlobalUse( &g_entities[dq], &g_entities[0], &g_entities[0] ); dialog_cmd( 0, "dialog 1" );
+	  CHECK( t_payouts == 1 && t_paidCredits[0] == 50 && RP_FlagHas( &g_entities[0], "quest_done" ), "with a free slot: the flag set and paid once (%d)", t_payouts );
+	  GlobalUse( &g_entities[dq], &g_entities[0], &g_entities[0] ); CHECK( level.rpDialog[0].numShown == 1, "then 'Yes, pay me' is hidden (%d shown)", level.rpDialog[0].numShown ); dialog_cmd( 0, "dialog 1" );
+	  CHECK( t_payouts == 1, "'Bye' pays nothing" );
+	  // a flag already held: still fires its target (one slot, as before), even with all 16 slots taken
+	  GlobalUse( &g_entities[done], &g_entities[0], &g_entities[0] ); CHECK( t_payouts == 2, "a flag already held fires its target (%d)", t_payouts );
+	  // a non-player activator: nothing
+	  { int npc = t_mapEntity( "info_null", "notplayer", NULL ); GlobalUse( &g_entities[done], &g_entities[npc], &g_entities[npc] ); CHECK( t_payouts == 2, "a non-player activator: nothing (%d)", t_payouts ); } }
+
+	// --- the README's quest example, as written there, in a plugin: "Yes" offered until the flag is held, paid once
+	t_init( 8 ); t_player( 0, "Alice", qtrue, 7 ); g_entities[0].client->pers.connectTime = 100;
+	t_write_plugin( "quest", "Events.on('init', function() local o = {x=0,y=0,z=0}\n"
+		"local pay  = World.prop(\"target_reward\", o, nil, {credits=50, xp=5, message=\"Quest done\"}, {name=\"pay\"})\n"
+		"local done = World.prop(\"target_flag\",   o, nil, {flag=\"quest_done\", target=\"pay\"}, {name=\"done\"})\n"
+		"local talk = World.prop(\"target_dialog\", o, nil, {message=\"Did you do it?\", option1=\"Yes\", need1=\"!quest_done\", go1=\"done\",\n"
+		"                                                   option2=\"Not yet\"}, {name=\"talk\"})\n"
+		"end)\nCommands.add('talk', function(p) World.use(\"lua.quest.talk\", p) end)\n" );
+	t_start( "quest" ); { rpLuaPlugin_t *pl = RP_Lua_Find( "quest" );
+	  CHECK( pl && pl->L && pl->errorsTotal == 0, "the README example loads" );
+	  pl->tokens = RP_LUA_TOKENS; t_args( "talk" ); RP_LUA_COMMAND( &g_entities[0], "talk" ); CHECK( level.rpDialog[0].id > 0 && level.rpDialog[0].numShown == 2, "'Yes' and 'Not yet' offered (%d)", level.rpDialog[0].numShown );
+	  dialog_cmd( 0, "dialog 1" ); CHECK( t_payouts == 1 && t_paidCredits[0] == 50 && RP_FlagHas( &g_entities[0], "quest_done" ), "'Yes' set the flag and paid (%d)", t_payouts );
+	  pl->tokens = RP_LUA_TOKENS; t_args( "talk" ); RP_LUA_COMMAND( &g_entities[0], "talk" ); CHECK( level.rpDialog[0].numShown == 1, "then only 'Not yet' (%d)", level.rpDialog[0].numShown );
+	  dialog_cmd( 0, "dialog 1" ); CHECK( t_payouts == 1, "paid once (%d)", t_payouts );
+	  RP_LUA_SHUTDOWN(); }
 
 	t_init( 8 );	// TEST ONLY: frees what the stubs still hold (spawned strings, NPC clients): valgrind ends with nothing reachable
 	printf( fails ? "%d FAILED\n" : "t_dialog: ALL OK\n", fails );

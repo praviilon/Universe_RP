@@ -15,6 +15,7 @@ those states.
 target_flag sets or clears a named flag on its activator, kept per player for this connection and map
 (clientPersistant_t::rpFlags): a dialogue's "need<n>" offers an option only to players with (or, with
 "!", without) that flag. That is how a map keeps quest state per player without a script or a database.
+A target_flag that can't set its flag (the player holds 16) fires nothing and tells the player.
 
 A plugin's World.use (rp_lua_world.c) may open one for its player, when that player's command budget for
 script calls has room (RP_LUA_CMD_ROOM, rp_lua_api.c); the answer still comes from the player's own /dialog.
@@ -35,6 +36,7 @@ qboolean BG_InKnockDown( int anim );	// bg_pmove.c
 #define RP_DLG_TIMEOUT_MAX		600
 #define RP_DLG_RANGE_DEFAULT	256.0f
 #define RP_DLG_CHECK_MS			500		// how often an open dialogue's timeout, range and player are looked at
+#define RP_FLAG_FULL_MSG_MS		5000	// a player told "16 quest flags" at most this often (target_flag)
 #define RP_DLG_ONCE_EACH		1		// spawnflags
 #define RP_DLG_NO_CANCEL_TEXT	4
 
@@ -178,7 +180,17 @@ void target_flag_use( gentity_t *self, gentity_t *other, gentity_t *activator )
 	if ( self->spawnflags & 1 )
 		RP_FlagClear( activator, self->message );
 	else if ( !RP_FlagSet( activator, self->message ) )
-		G_LogPrintf( "target_flag %d: %s^7 has %d flags already, '%s' not set\n", self->s.number, activator->client->pers.netname, RP_FLAGS_PER_PLAYER, self->message );
+	{
+		// GLX_U: the flag could not be set (16 held): the chain stops here, so a "flag, then reward" step
+		// can't pay while the flag that gates it stays unset (it used to fire its targets anyway)
+		G_LogPrintf( "target_flag %d: %s^7 has %d flags already, '%s' not set, its targets not fired\n", self->s.number, activator->client->pers.netname, RP_FLAGS_PER_PLAYER, self->message );
+		if ( activator->client->pers.rpFlagFullMsgTime <= level.time )
+		{
+			activator->client->pers.rpFlagFullMsgTime = level.time + RP_FLAG_FULL_MSG_MS;
+			trap->SendServerCommand( activator->s.number, va( "print \"^3You can't do this step now: you are holding %d quest flags, the most at once. They are cleared on a map change or a reconnect.\n\"", RP_FLAGS_PER_PLAYER ) );
+		}
+		return;
+	}
 	G_UseTargets( self, activator );
 }
 

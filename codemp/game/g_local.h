@@ -1405,6 +1405,7 @@ typedef struct clientPersistant_s {
 	// (g_dialog.c). Both live in pers, so they survive a respawn and go with a disconnect.
 	qboolean		rpDialogMenu;
 	char			rpFlags[RP_FLAGS_PER_PLAYER][RP_FLAG_NAME_MAX + 1];
+	int				rpFlagFullMsgTime;	// GLX_U: [Dialogues] level.time of the next "16 quest flags" notice allowed
 
 	int				rpVoiceCmdTime;		// GLX_U: [Voice] level.time of the next /voice_cmd allowed
 

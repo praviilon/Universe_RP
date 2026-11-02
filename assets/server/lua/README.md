@@ -225,17 +225,19 @@ plugin's own entities and is stored as `lua.<plugin>.<name>`:
 own reward, set its own flags, play its own music or open its next
 dialogue, but never a map door, a map `target_kill` or another plugin's
 entity. (Flag names, `flag` and `need<n>`, are per-player state, not links,
-and stay as given.) A dialogue's options fire when the player answers, as
-their own action. A plugin may spawn 16 dialogues per map (each keeps its
-text in the level's memory until the map ends); the other classes count
-within the 128 props.
+and stay as given. A player holds 16 flags at most; a `target_flag` that
+can't set one fires nothing and tells the player.) A dialogue's options
+fire when the player answers, as their own action. A plugin may spawn 16
+dialogues per map (each keeps its text in the level's memory until the map
+ends); the other classes count within the 128 props.
 
 ```lua
 local pay  = World.prop("target_reward", o, nil, {credits=50, xp=5, message="Quest done"}, {name="pay"})
 local done = World.prop("target_flag",   o, nil, {flag="quest_done", target="pay"}, {name="done"})
-local talk = World.prop("target_dialog", o, nil, {message="Did you do it?", option1="Yes", need1="quest_done", go1="done",
+local talk = World.prop("target_dialog", o, nil, {message="Did you do it?", option1="Yes", need1="!quest_done", go1="done",
                                                    option2="Not yet"}, {name="talk"})
-World.use("lua.quest.talk", p)           -- opens the dialogue for p; "Yes" sets the flag and pays, as p's own action
+World.use("lua.quest.talk", p)           -- opens the dialogue for p; "Yes" is offered until p holds quest_done:
+                                         -- answering sets it and pays, once per connection and map, as p's own action
 ```
 
 `/entsave` leaves script entities out; `/entremove`, `/entedit` and
