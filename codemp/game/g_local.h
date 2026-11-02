@@ -2617,6 +2617,7 @@ const char	*RP_ShownText( const char *text );
 void		RP_PayNpcKillReward( gentity_t *npc, gentity_t *killer );
 // GLX_U: [Dialogues] g_dialog.c
 void		RP_DialogFrame( void );						// every frame, after the thinks: timeouts, range, the player's state
+qboolean	RP_DialogIsOpen( int clientNum );			// GLX_U: whether the player has a dialogue open (RP_AfkTick, g_active.c)
 void		RP_DialogPlayerGone( int clientNum, qboolean disconnected );	// ClientDisconnect (qtrue), ClientSpawn (qfalse)
 qboolean	RP_FlagHas( const gentity_t *ent, const char *name );
 void		Cmd_Dialog_f( gentity_t *ent );

@@ -8,8 +8,9 @@ its userinfo. The player answers with /dialog <n> (the menu sends "dialog <n> <i
 "go<n>" targetname is fired with the player as activator through G_UseTargets2(): exactly what a button
 press does, so another target_dialog, a target_reward, a target_level_change, a target_kill or a door
 behave as they do behind a button. A dialogue closes by itself on a timeout, when the player walks away
-from its speaker, dies, is knocked down, goes spectator, goes AFK, leaves, or opens another; it does not open for
-a player in one of those states.
+from its speaker, dies, is knocked down, goes spectator, goes AFK with /away (the idle AFK timer does not run while
+a dialogue is open: RP_DialogIsOpen, RP_AfkTick), leaves, or opens another; it does not open for a player in one of
+those states.
 
 target_flag sets or clears a named flag on its activator, kept per player for this connection and map
 (clientPersistant_t::rpFlags): a dialogue's "need<n>" offers an option only to players with (or, with
@@ -39,7 +40,7 @@ qboolean BG_InKnockDown( int anim );	// bg_pmove.c
 
 typedef enum {
 	RPDLG_ANSWERED, RPDLG_CANCELLED, RPDLG_TIMEOUT, RPDLG_AWAY, RPDLG_DIED, RPDLG_LEFT, RPDLG_REPLACED, RPDLG_GONE,
-	RPDLG_AFK	// GLX_U: the player went AFK (/away or the idle timer): like died, the walk-away target does not fire
+	RPDLG_AFK	// GLX_U: the player went AFK (/away; the idle timer does not run while a dialogue is open): like died, the walk-away target does not fire
 } rpDialogReason_t;
 
 static const char *rpDialogReasonText[] = {
@@ -293,6 +294,15 @@ static rpDialogOpen_t *RP_DialogOf( int clientNum )
 	if ( clientNum < 0 || clientNum >= MAX_CLIENTS )
 		return NULL;
 	return &level.rpDialog[clientNum];
+}
+
+// GLX_U: [Dialogues] whether this player has a dialogue open -- RP_AfkTick (g_active.c) keeps the idle AFK clock
+// from running while one is: reading and answering one is not idle
+qboolean RP_DialogIsOpen( int clientNum )
+{
+	const rpDialogOpen_t *o = RP_DialogOf( clientNum );
+
+	return ( o && o->id ) ? qtrue : qfalse;
 }
 
 // the entity behind an open dialogue, while it is still the same one

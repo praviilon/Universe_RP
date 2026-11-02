@@ -1637,6 +1637,14 @@ static void RP_AfkTick( gentity_t *ent ) {
 		return;
 	}
 
+	// GLX_U fix: [Dialogues] time with a dialogue open is not idle time. The dialogue menu holds the keys and the
+	// mouse, so its usercmds carry only BUTTON_TALK and its answers are /dialog commands: none of that is input
+	// above, and a player reading or answering one (or working through a chain of them) went AFK after
+	// rp_afk_time and had it closed as "afk" -- no walk-away target, a ONCE_EACH dialogue used up, a quest
+	// conversation cut. The clock restarts when the dialogue closes. A pending /away still goes off below.
+	if ( RP_DialogIsOpen( ent->s.number ) )
+		cl->pers.afkLastActive = level.time;
+
 	if ( cl->pers.afkRequestAt && level.time >= cl->pers.afkRequestAt )
 		RP_AfkEnter( ent, qtrue );
 	else if ( level.time - cl->pers.afkLastActive >= rp_afk_time.integer * 1000 )

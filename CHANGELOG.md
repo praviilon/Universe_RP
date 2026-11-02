@@ -8,7 +8,7 @@
 - Lua plugins can read the world: `World.trace` (what lies between two points), `World.visible` (whether two points, players or the plugin's own entities can see each other), `World.contents` (whether a point is in a wall, water, lava and so on) and `World.find` (entities by classname, name, distance or area). They only read: nothing is created or changed, at most 32 traces per call. See `assets/server/lua/README.md`.
 
 ### Fixed
-- A player who goes AFK (`/away` or idle) now has their open dialogue closed, and no dialogue opens for a player who is dead, downed, paralyzed, spectating or AFK. Before, it stayed open until its timeout, or was shown and closed again at once.
+- A player who goes AFK with `/away` now has their open dialogue closed (the idle timer doesn't run while one is open), and no dialogue opens for a player who is dead, downed, paralyzed, spectating or AFK. Before, it stayed open until its timeout, or was shown and closed again at once.
 - Minor fixes to vehicles (fighters, animal boarding) and widescreen loading screens.
 
 ## [3.9.0]

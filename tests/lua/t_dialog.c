@@ -73,11 +73,19 @@ int main( void )
 	GlobalUse( &g_entities[d], &g_entities[0], &g_entities[0] ); g_entities[0].client->ps.legsAnim = 999; frames( 500 ); CHECK( level.rpDialog[0].id == 0, "knockdown closes" ); g_entities[0].client->ps.legsAnim = 0;
 	GlobalUse( &g_entities[d], &g_entities[0], &g_entities[0] ); g_entities[0].client->sess.sessionTeam = TEAM_SPECTATOR; frames( 500 ); CHECK( level.rpDialog[0].id == 0, "spectator closes" ); g_entities[0].client->sess.sessionTeam = TEAM_FREE;
 	GlobalUse( &g_entities[d], &g_entities[0], &g_entities[0] ); RP_DialogPlayerGone( 0, qtrue ); CHECK( level.rpDialog[0].id == 0 && t_log_has( ": left" ), "disconnect closes" );
-	// AFK (/away or the idle timer set the same bit): closes with "afk", the walk-away target not fired, the menu and the over line
+	// RP_DialogIsOpen (the idle AFK clock does not run while it is true, RP_AfkTick): open, then each way of closing
+	CHECK( !RP_DialogIsOpen( 0 ) && !RP_DialogIsOpen( -1 ) && !RP_DialogIsOpen( MAX_CLIENTS ), "RP_DialogIsOpen: closed, and out-of-range numbers" );
+	GlobalUse( &g_entities[d], &g_entities[0], &g_entities[0] ); CHECK( RP_DialogIsOpen( 0 ) && !RP_DialogIsOpen( 1 ), "RP_DialogIsOpen: open for its player only" );
+	dialog_cmd( 0, "dialog 2" ); CHECK( !RP_DialogIsOpen( 0 ), "RP_DialogIsOpen: false after an answer" );
+	GlobalUse( &g_entities[d], &g_entities[0], &g_entities[0] ); dialog_cmd( 0, "dialog 0" ); CHECK( !RP_DialogIsOpen( 0 ), "RP_DialogIsOpen: false after a walk-away" );
+	GlobalUse( &g_entities[d], &g_entities[0], &g_entities[0] ); frames( 10500 ); CHECK( !RP_DialogIsOpen( 0 ), "RP_DialogIsOpen: false after the timeout" );
+	GlobalUse( &g_entities[d], &g_entities[0], &g_entities[0] ); RP_DialogPlayerGone( 0, qtrue ); CHECK( !RP_DialogIsOpen( 0 ), "RP_DialogIsOpen: false after a disconnect" );
+	// AFK (/away; the idle timer does not run while a dialogue is open): closes with "afk", the walk-away target not fired, the menu and the over line
 	{ int bye = t_mapEntity( "target_print", "bye_afk", NULL ), da; t_key( "message", "Hello?" ); t_key( "option1", "Hi" ); da = spawn_dialog( "afkdlg", "bye_afk", 0 );
 	  g_entities[0].client->pers.rpDialogMenu = qtrue; clear_sent(); GlobalUse( &g_entities[da], &g_entities[0], &g_entities[0] ); { int id = level.rpDialog[0].id; CHECK( id, "opened for the AFK test" );
 	  clear_sent(); g_entities[0].client->pers.player_statuses |= ( 1 << PLAYER_STATUS_AFK ); frames( 500 );
 	  CHECK( level.rpDialog[0].id == 0 && t_log_has( ": afk" ), "AFK closes: afk" );
+	  CHECK( !RP_DialogIsOpen( 0 ), "RP_DialogIsOpen: false after the AFK close" );
 	  CHECK( t_usedCount[bye] == 0, "AFK: the walk-away target not fired" );
 	  CHECK( t_nsent[0] == 2 && !strcmp( t_sent[0][0], va( "rpdlgclose %d", id ) ) && strstr( t_sent[0][1], "conversation is over" ), "AFK: rpdlgclose and the over line (%d sent)", t_nsent[0] ); }
 	  // while AFK nothing opens and nothing is sent; back, it opens
