@@ -76,6 +76,13 @@ int main( void )
 	for ( i = 0; i < 5; i++ ) t_frame( 1000 ); t_clear_sent();
 	t_write_plugin( "tx", "Commands.add('txt', function(p) OK = pcall(Msg.print, p, ('a'):rep(901)) R, W = Msg.print(p, 'say \"hi\"') end)\n" ); RP_Lua_QueueLoad( "tx" ); t_frame( 10 );
 	t_args( "txt" ); RP_LUA_COMMAND( &g_entities[0], "txt" ); { rpLuaPlugin_t *x = RP_Lua_Find( "tx" ); lua_getglobal( x->L, "OK" ); CHECK( !lua_toboolean( x->L, -1 ), "901 bytes raise" ); lua_pop( x->L, 1 ); } CHECK( t_sent_count( 0 ) == 1 && strstr( t_sent[0][0], "say 'hi'" ) != NULL, "quotes swapped: count %d first %s why %s", t_sent_count( 0 ), t_sent[0][0], ( lua_getglobal( RP_Lua_Find( "tx" )->L, "W" ), lua_tostring( RP_Lua_Find( "tx" )->L, -1 ) ) );
+	// GLX_U: a command's help text is cleaned as messages are ('"' -> '\'', line breaks -> spaces): /scripts help shows it inside a quoted print
+	t_write_plugin( "hq", "Commands.add('hq1', function() end, 'say \"hi\"\\nthere\\r!') Commands.add('hq2', function() end, 'plain') Commands.add('hq2', function() end, 'new \"help\"')\n" ); RP_Lua_QueueLoad( "hq" ); t_frame( 10 );
+	{ rpLuaPlugin_t *h = RP_Lua_Find( "hq" ); int k, ok1 = 0, ok2 = 0;
+	  for ( k = 0; h && h->L && k < h->numCommands; k++ ) { if ( !strcmp( h->cmdNames[k], "hq1" ) ) ok1 = !strcmp( h->cmdHelp[k], "say 'hi' there !" ); if ( !strcmp( h->cmdNames[k], "hq2" ) ) ok2 = !strcmp( h->cmdHelp[k], "new 'help'" ); }
+	  CHECK( h && h->L && ok1, "a command's help: quotes and line breaks cleaned" ); CHECK( ok2, "a plugin's own command replaced: its new help cleaned too" ); }
+	for ( i = 0; i < 5; i++ ) t_frame( 1000 ); t_clear_sent(); t_args( "scripts help" ); Cmd_Scripts_f( &g_entities[0] );
+	{ int k, found = 0; for ( k = 0; k < t_sent_count( 0 ); k++ ) if ( strstr( t_sent[0][k], "^3/hq1^7: say 'hi' there ! ^9(hq)" ) ) found = 1; CHECK( found, "/scripts help shows the cleaned help (%d lines)", t_sent_count( 0 ) ); }
 	// /scripts needs the power; lists
 	for ( i = 0; i < 5; i++ ) t_frame( 1000 ); t_clear_sent(); t_args( "scripts list" ); Cmd_Scripts_f( &g_entities[0] ); CHECK( t_sent_count( 0 ) >= 2 && strstr( t_sent[0][1], "^3ev^7: running" ) != NULL, "scripts list: %s", t_sent[0][1] );
 	t_clear_sent(); Cmd_Scripts_f( &g_entities[1] ); CHECK( t_sent_count( 1 ) == 0, "no power: nothing (check_admin_command stub is silent)" );
@@ -113,7 +120,7 @@ int main( void )
 	  t_keysClear(); e = &g_entities[t_mapEntity( "target_lua", "nolua", NULL )]; SP_target_lua( e ); CHECK( !e->inuse && strstr( level.rp_spawn_refusal, "plugin name" ), "no plugin key: refused (%s)", level.rp_spawn_refusal );
 	  t_keysClear(); t_key( "plugin", "../x" ); e = &g_entities[t_mapEntity( "target_lua", "badlua", NULL )]; SP_target_lua( e ); CHECK( !e->inuse, "a bad plugin name refused" );
 	  t_keysClear(); t_key( "plugin", "qst" ); t_key( "action", "explode" ); e = &g_entities[t_mapEntity( "target_lua", "badact", NULL )]; SP_target_lua( e ); CHECK( !e->inuse && strstr( level.rp_spawn_refusal, "action" ), "a bad action refused (%s)", level.rp_spawn_refusal );
-	  t_esMade = qtrue; t_keysClear(); t_key( "plugin", "nosuch" ); e = &g_entities[t_mapEntity( "target_lua", "nofile", NULL )]; SP_target_lua( e ); CHECK( !e->inuse && strstr( level.rp_spawn_refusal, "no plugin" ), "entity commands: a missing file refused (%s)", level.rp_spawn_refusal ); t_esMade = qfalse;
+	  t_esMade = qtrue; t_keysClear(); t_key( "plugin", "nosuch" ); e = &g_entities[t_mapEntity( "target_lua", "nofile", NULL )]; SP_target_lua( e ); CHECK( !e->inuse && strstr( level.rp_spawn_refusal, "no plugin nosuch (" ) && !strchr( level.rp_spawn_refusal, '"' ), "entity commands: a missing file refused, the name unquoted (%s)", level.rp_spawn_refusal ); t_esMade = qfalse;
 	  t_keysClear(); t_key( "plugin", "nosuch" ); e = &g_entities[t_mapEntity( "target_lua", "mapnofile", NULL )]; SP_target_lua( e ); CHECK( e->inuse && e->use == target_lua_use, "the map's own with a missing file spawns (logged at use)" );
 	  // the real one
 	  t_keysClear(); t_key( "plugin", "qst" ); tl = t_mapEntity( "target_lua", "ql", NULL ); e = &g_entities[tl]; e->use = NULL; SP_target_lua( e ); CHECK( e->inuse && e->use == target_lua_use && e->count == 0 && !strcmp( e->message, "qst" ), "target_lua ql spawned (load qst)" );

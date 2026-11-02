@@ -168,7 +168,8 @@ Commands.add("events", function(p, args) ... end, "the next announcements")
 
 `args` is a table of the words after the command (at most 16). A name a
 built-in command has, or another plugin took, is refused. `/scripts help`
-lists them.
+lists them. The help text is cut at 96 characters; newlines become spaces
+and `"` becomes `'`, as in messages.
 
 ### Timers
 

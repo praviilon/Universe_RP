@@ -455,23 +455,32 @@ qboolean RP_Lua_ScriptDbWrite( void )
 	return qtrue;
 }
 
+// GLX_U: [Lua] a script's text made fit for one engine command argument, in place: '"' would end the argument
+// (the player's game shows the part before it), so it becomes '\''; a line break becomes a space. Script texts a
+// player or an admin is shown pass here, or through RP_LuaAdmin_Notice's own loop (tests/textlint checks it).
+static void RP_LuaApi_Clean( char *s )
+{
+	int i;
+
+	for ( i = 0; s[i]; i++ )
+	{
+		if ( s[i] == '"' )
+			s[i] = '\'';
+		else if ( s[i] == '\n' || s[i] == '\r' )
+			s[i] = ' ';
+	}
+}
+
 // the text as one engine command argument: at most RP_LUA_TEXT_MAX bytes, no '"' (it would end the argument)
 static const char *RP_LuaApi_Text( lua_State *L, int idx, char *out, int outSize )
 {
 	size_t len;
 	const char *s = luaL_checklstring( L, idx, &len );
-	int i;
 
 	if ( len > RP_LUA_TEXT_MAX )
 		luaL_error( L, "text longer than %d bytes", RP_LUA_TEXT_MAX );
 	Q_strncpyz( out, s, outSize );
-	for ( i = 0; out[i]; i++ )
-	{
-		if ( out[i] == '"' )
-			out[i] = '\'';
-		else if ( out[i] == '\n' || out[i] == '\r' )
-			out[i] = ' ';
-	}
+	RP_LuaApi_Clean( out );
 	return out;
 }
 
@@ -608,6 +617,7 @@ static int RP_LuaApi_CommandsAdd( lua_State *L )
 					lua_pushvalue( L, 2 );
 					p->cmdRefs[k] = luaL_ref( L, LUA_REGISTRYINDEX );
 					Q_strncpyz( p->cmdHelp[k], help, sizeof( p->cmdHelp[k] ) );
+					RP_LuaApi_Clean( p->cmdHelp[k] );	// GLX_U fix: [Lua] shown in /scripts help inside a quoted print
 					lua_pushboolean( L, 1 );
 					return 1;
 				}
@@ -619,6 +629,7 @@ static int RP_LuaApi_CommandsAdd( lua_State *L )
 		return RP_LuaApi_Refuse( L, "too many commands" );
 	Q_strncpyz( p->cmdNames[p->numCommands], name, sizeof( p->cmdNames[0] ) );
 	Q_strncpyz( p->cmdHelp[p->numCommands], help, sizeof( p->cmdHelp[0] ) );
+	RP_LuaApi_Clean( p->cmdHelp[p->numCommands] );	// GLX_U fix: [Lua] a '"' cut its /scripts help line short
 	lua_pushvalue( L, 2 );
 	p->cmdRefs[p->numCommands] = luaL_ref( L, LUA_REGISTRYINDEX );
 	p->numCommands++;

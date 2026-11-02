@@ -377,7 +377,8 @@ void SP_target_lua( gentity_t *self )
 	self->count = i;
 	if ( RP_EntitySystemMade( self ) && i == 0 && !RP_Lua_PluginFileExists( self->message ) )
 	{ // one the entity commands place: the file now, as a target_level_change's map is checked; the map's own is logged at load
-		if ( RP_RefuseAtRuntime( self, va( "this server has no plugin \"%s\" (lua/plugins/%s/plugin.lua)", self->message, self->message ) ) )
+		// (GLX_U fix: the name unquoted, as in the other refusals: the player's game cut the quoted print at a '"')
+		if ( RP_RefuseAtRuntime( self, va( "this server has no plugin %s (lua/plugins/%s/plugin.lua)", self->message, self->message ) ) )
 			return;
 	}
 	self->genericValue1 = 0;
