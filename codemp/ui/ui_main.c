@@ -2057,6 +2057,11 @@ static void UI_DrawTeamMember(rectDef_t *rect, float scale, vec4_t color, qboole
 	Text_Paint(rect->x, rect->y, scale, finalColor, text, 0, 0, textStyle, iMenuFont);
 }
 
+// DAJ_RP: [Menus] 16:9 (0.75) and wider gets the 16:9 art; 16:10 (0.83) keeps the 4:3 one, as in TaystJK (the
+// cgame's loading screen uses the same value, cg_info.c)
+#define UI_WIDESCREEN_RATIO		0.76f
+static float UI_WidthRatioCoef( void );
+
 static void UI_DrawMapPreview(rectDef_t *rect, float scale, vec4_t color, qboolean net) {
 	int map = (net) ? ui_currentNetMap.integer : ui_currentMap.integer;
 	if (map < 0 || map > uiInfo.mapCount) {
@@ -2070,14 +2075,32 @@ static void UI_DrawMapPreview(rectDef_t *rect, float scale, vec4_t color, qboole
 		map = 0;
 	}
 
+	// GLX_U fix: [Widescreen] on a 16:9 or wider screen the box is stretched sideways with the rest of the menu, so
+	// the 16:9 pictures go in it, as in TaystJK: the map's levelshots_16_9 shot first, then its own levelshot, and
+	// unknownmap_mp_16_9 for a map with neither -- the art the connect and loading screens show there. The handle
+	// is chosen at the first draw and kept (a cl_ratioFix change shows from the next ui restart).
 	if (uiInfo.mapList[map].levelShot == -1) {
-		uiInfo.mapList[map].levelShot = trap->R_RegisterShaderNoMip(uiInfo.mapList[map].imageName);
+		uiInfo.mapList[map].levelShot = 0;
+		if ( UI_WidthRatioCoef() <= UI_WIDESCREEN_RATIO ) {
+			uiInfo.mapList[map].levelShot = trap->R_RegisterShaderNoMip(va("levelshots_16_9/%s", uiInfo.mapList[map].mapLoadName));
+		}
+		if (uiInfo.mapList[map].levelShot <= 0) {
+			uiInfo.mapList[map].levelShot = trap->R_RegisterShaderNoMip(uiInfo.mapList[map].imageName);
+		}
 	}
 
 	if (uiInfo.mapList[map].levelShot > 0) {
 		UI_DrawHandlePic( rect->x, rect->y, rect->w, rect->h, uiInfo.mapList[map].levelShot);
 	} else {
-		UI_DrawHandlePic( rect->x, rect->y, rect->w, rect->h, trap->R_RegisterShaderNoMip("menu/art/unknownmap_mp"));
+		qhandle_t unknownMap = 0;
+
+		if ( UI_WidthRatioCoef() <= UI_WIDESCREEN_RATIO ) {
+			unknownMap = trap->R_RegisterShaderNoMip("menu/art/unknownmap_mp_16_9");
+		}
+		if ( !unknownMap ) {
+			unknownMap = trap->R_RegisterShaderNoMip("menu/art/unknownmap_mp");
+		}
+		UI_DrawHandlePic( rect->x, rect->y, rect->w, rect->h, unknownMap);
 	}
 }
 
@@ -10529,9 +10552,6 @@ static float UI_WidthRatioCoef( void )
 
 	return (float)( SCREEN_WIDTH * gl->vidHeight ) / (float)( SCREEN_HEIGHT * gl->vidWidth );
 }
-
-// DAJ_RP: [Menus] 16:9 (0.75) and wider gets the 16:9 art; 16:10 (0.83) keeps the 4:3 one, as in TaystJK
-#define UI_WIDESCREEN_RATIO		0.76f
 
 // DAJ_RP: [Menus] the connect screen's background menu: its 16:9 version (connect_16_9.menu) on a wide screen, as in
 // TaystJK; the 4:3 one otherwise, or if that menu is not loaded. NULL if neither is.
