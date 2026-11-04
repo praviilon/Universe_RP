@@ -1809,14 +1809,17 @@ typedef enum //# animNumber_e
 	BOTH_SITCROSS,		//# /anim sit5 (was 1613)
 	BOTH_SITCROSS2,		//# /anim sit6 (was 1614)
 	BOTH_SITLEAN,		//# /anim sit7 (was 1615)
-	BOTH_CIN_42,		//# Level specific cinematic
-	BOTH_CIN_43,		//# Level specific cinematic
-	BOTH_CIN_44,		//# Level specific cinematic
-	BOTH_CIN_45,		//# Level specific cinematic
-	BOTH_CIN_46,		//# Level specific cinematic
-	BOTH_CIN_47,		//# Level specific cinematic
-	BOTH_CIN_48,		//# Level specific cinematic
-	BOTH_CIN_49,		//# Level specific cinematic
+	// GLX_U: [JKG Anims] BOTH_CIN_42..49 renamed in place (no other number moves): Jedi Knight Galaxies'
+	// telekinesis set, frames from its GLA (animation.cfg); single-player slots, so non-plugin clients aren't
+	// kicked (TaystJK has its own empty BOTH_CIN_11..18 here)
+	BOTH_FORCELEVITATED,		//# JKG telekinesis: lifted, the target
+	BOTH_FORCELEVITATEDIDLE,		//# JKG telekinesis: held up, the target (loop)
+	BOTH_FORCELEVITATEDLAND,		//# JKG telekinesis: let down, the target lands
+	BOTH_FORCELIFT,		//# JKG telekinesis: lift, the caster
+	BOTH_FORCELEVITATE,		//# JKG telekinesis: levitate, the caster (lift, then holding)
+	BOTH_FORCELEVITATEIDLE,		//# JKG telekinesis: holding, the caster (loop)
+	BOTH_FORCELEVITATEWAVE,		//# JKG telekinesis: throwing it, the caster
+	BOTH_FORCELEVITATEDONE,		//# JKG telekinesis: letting go, the caster
 	BOTH_CIN_50,		//# Level specific cinematic
 	//GalaxyRP Animations start here
 	BOTH_ARMSCROSSED,

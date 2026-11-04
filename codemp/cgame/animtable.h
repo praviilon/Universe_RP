@@ -1804,14 +1804,17 @@ stringID_table_t animTable [MAX_ANIMATIONS+1] =
 	ENUM2STRING(BOTH_SITCROSS),		//# /anim sit5 (was 1613)
 	ENUM2STRING(BOTH_SITCROSS2),		//# /anim sit6 (was 1614)
 	ENUM2STRING(BOTH_SITLEAN),		//# /anim sit7 (was 1615)
-	ENUM2STRING(BOTH_CIN_42),		//# Level specific cinematic
-	ENUM2STRING(BOTH_CIN_43),		//# Level specific cinematic
-	ENUM2STRING(BOTH_CIN_44),		//# Level specific cinematic
-	ENUM2STRING(BOTH_CIN_45),		//# Level specific cinematic
-	ENUM2STRING(BOTH_CIN_46),		//# Level specific cinematic
-	ENUM2STRING(BOTH_CIN_47),		//# Level specific cinematic
-	ENUM2STRING(BOTH_CIN_48),		//# Level specific cinematic
-	ENUM2STRING(BOTH_CIN_49),		//# Level specific cinematic
+	// GLX_U: [JKG Anims] BOTH_CIN_42..49 renamed in place (no other number moves): Jedi Knight Galaxies'
+	// telekinesis set, frames from its GLA (animation.cfg); single-player slots, so non-plugin clients aren't
+	// kicked (TaystJK has its own empty BOTH_CIN_11..18 here)
+	ENUM2STRING(BOTH_FORCELEVITATED),		//# JKG telekinesis: lifted, the target
+	ENUM2STRING(BOTH_FORCELEVITATEDIDLE),		//# JKG telekinesis: held up, the target (loop)
+	ENUM2STRING(BOTH_FORCELEVITATEDLAND),		//# JKG telekinesis: let down, the target lands
+	ENUM2STRING(BOTH_FORCELIFT),		//# JKG telekinesis: lift, the caster
+	ENUM2STRING(BOTH_FORCELEVITATE),		//# JKG telekinesis: levitate, the caster (lift, then holding)
+	ENUM2STRING(BOTH_FORCELEVITATEIDLE),		//# JKG telekinesis: holding, the caster (loop)
+	ENUM2STRING(BOTH_FORCELEVITATEWAVE),		//# JKG telekinesis: throwing it, the caster
+	ENUM2STRING(BOTH_FORCELEVITATEDONE),		//# JKG telekinesis: letting go, the caster
 	ENUM2STRING(BOTH_CIN_50),		//# Level specific cinematic
 	ENUM2STRING(BOTH_ARMSCROSSED),
 	ENUM2STRING(BOTH_CUFFEDFRONT),
