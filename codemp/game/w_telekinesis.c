@@ -15,7 +15,7 @@ no damage, no choke, no crack, no grip sound, no hand effect. Logged-out players
             only range and line of sight drop it. Push throws it (RP_TelekinesisThrow).
   Level 4   as 3, and lifts what grip refuses: vehicles, Galak's mech, the AT-ST and the Rancor
             (RP_TelekinesisLiftsHeavy, asked by ForcePowerUsableOn).
-  Level 5   as 4, for up to RP_TK_MAX_TARGETS targets in a 25-degree cone within 256 units; they keep
+  Level 5   as 4, for up to RP_TK_MAX_TARGETS targets within 35 degrees of the aim and 256 units; they keep
             their places around the aimed one and move as a group. Each breaks free on its own.
 
 A hold lasts while the key is held and force lasts: the hand timer caps it at 10/20/30/40/60 s by level, and
@@ -45,7 +45,7 @@ extern qboolean WP_ForcePowerUsable( gentity_t *self, forcePowers_t forcePower )
 #define RP_TK_MIN_DIST			64		// level 3+: the hold point is at least this far along the aim...
 #define RP_TK_MAX_DIST			224		// ...and at most this far (MAX_GRIP_DISTANCE less room for the lift)
 #define RP_TK_DROP_DIST			(MAX_GRIP_DISTANCE + 64)	// a target further from the caster than this drops
-#define RP_TK_CONE				0.9f	// level 5: the cosine of the cone the extra targets are picked in
+#define RP_TK_CONE				0.819f	// level 5: the extra targets are picked within 35 degrees of the aim (its cosine)
 #define RP_TK_STEER_MS			100		// the targets' velocity is set this often
 #define RP_TK_STEER_GAIN		6.0f	// velocity = distance to the hold point * this, per second
 #define RP_TK_STEER_MAX			600.0f
@@ -254,6 +254,9 @@ static void RP_TK_ReleaseOne( gentity_t *ent, qboolean landing )
 	}
 	ent->client->ps.forceGripChangeMovetype = PM_NORMAL;
 	ent->client->tkHeldUntil = 0;
+	// let go is let go: no "being gripped" mark left to run out (grip leaves a second of it), which kept him crippled,
+	// slowed and hearing grip's choking sound through his fall (WP_ForcePowersUpdate); the throw clears it the same way
+	ent->client->ps.fd.forceGripBeingGripped = 0;
 	ent->client->tkLandUntil = ( landing && ent->health > 0 && !RP_TK_IsVehicle( ent ) && ent->client->ps.groundEntityNum == ENTITYNUM_NONE )
 		? level.time + RP_TK_LAND_WINDOW_MS : 0;	// a landing only for one that was in the air
 }

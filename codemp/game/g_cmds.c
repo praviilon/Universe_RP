@@ -15494,7 +15494,7 @@ static qboolean RP_SettingToggle( gentity_t *ent, int value )
 	}
 	else if (value == RP_SETTING_TELEKINESIS)
 	{	// GLX_U: [Telekinesis] not ON or OFF but which power; and, as Sense Health, a note when he has no skill for it
-		const char *power = (ent->client->pers.player_settings & (1 << RP_SETTING_TELEKINESIS)) ? "^5Telekinesis^7" : "^3Grip^7";
+		const char *power = (ent->client->pers.player_settings & (1 << RP_SETTING_TELEKINESIS)) ? "^5Telekinesis^7" : "^1Grip^7";
 
 		if (ent->client->pers.skill_levels[14] < 1)
 		{
@@ -15678,7 +15678,7 @@ void Cmd_Settings_f( gentity_t *ent ) {
 		}
 		else
 		{
-			len += sprintf(message + len, "\n^3 7 - Grip/Telekinesis Toggle - ^3Grip");
+			len += sprintf(message + len, "\n^3 7 - Grip/Telekinesis Toggle - ^1Grip");
 		}
 
 		// GalaxyRP fix: [Challenge Mode] the status lines for settings 14 (Boss Battle Music) and 15
