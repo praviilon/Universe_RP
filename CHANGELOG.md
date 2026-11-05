@@ -2,6 +2,11 @@
 
 
 
+## [3.9.5]
+
+### Added
+- Telekinesis: the Grip skill is now "Grip/Telekinesis", and `/settings 7` switches it between the two (Grip by default). Telekinesis lifts and carries targets without harm: level 1 lifts, 2 carries as you walk, 3 follows your aim and Push throws, 4 also lifts vehicles and large creatures, 5 up to five targets at once. It has its own levitation animations for the caster and the target (ported from Jedi Knight Galaxies), and the Universe RP client shows it in the force select with its own name and icon.
+
 ## [3.9.1]
 
 ### Added
