@@ -402,6 +402,14 @@ void RP_CVU_startingShield(void)
 // G_RegisterCvars() runs update callbacks at registration as well as on change, so a config that
 // still says "set g_debugMelee 0" is corrected before the first frame rather than at some later
 // point, and an admin who inspects the cvar always sees the value actually in force.
+// GLX_U: [Ammo Pickups] the seven rp_max_* ammo caps: pickups compare against them on both sides (bg_misc.c), so a
+// change goes out to every client at once. Also run at registration, before the rest are registered; G_InitGame sends
+// the full set again once all are.
+void RP_CVU_maxAmmo(void)
+{
+	RP_AmmoMaxShare();
+}
+
 void RP_CVU_debugMelee(void)
 {
 	if (g_debugMelee.integer != 1)

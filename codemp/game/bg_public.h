@@ -156,7 +156,12 @@ Ghoul2 Insert End
 #define RP_NPCSABER_GROUPS		( ( MAX_GENTITIES - MAX_CLIENTS ) / RP_NPCSABER_GROUP_SIZE )
 #define CS_RP_NPCSABERS			(CS_BSP_MODELS + MAX_SUB_BSP)
 
-#define CS_MAX					(CS_RP_NPCSABERS + RP_NPCSABER_GROUPS)
+// GLX_U: [Ammo Pickups] the server's ammo caps (its rp_max_* cvars, RP_MaxAmmo) for every ammo type in order,
+// "0 0 300 300 300 25 0 10 10 10", 0 for a type it never fills: BG_CanItemBeGrabbed runs on both sides and must
+// compare against the same numbers (BG_ParseAmmoMax, BG_AmmoPickupMax)
+#define CS_RP_AMMOMAX			(CS_RP_NPCSABERS + RP_NPCSABER_GROUPS)
+
+#define CS_MAX					(CS_RP_AMMOMAX + 1)
 
 #if (CS_MAX) > MAX_CONFIGSTRINGS
 #error overflow: (CS_MAX) > MAX_CONFIGSTRINGS
@@ -1339,6 +1344,10 @@ gitem_t	*BG_FindItemForHoldable( holdable_t pw );
 // function, refuses what the server refuses. Nothing else in the game, cgame or the engine uses userInt1.
 #define RP_PS_MINIGAME_FIGHTER( ps )	( (ps)->userInt1 )
 qboolean	BG_CanItemBeGrabbed( int gametype, const entityState_t *ent, const playerState_t *ps );
+// GLX_U: [Ammo Pickups] the most of one ammo type a pickup fills you to: the server's cap as CS_RP_AMMOMAX carries it,
+// parsed by the server from its own text and by cgame from the configstring (bg_misc.c)
+void		BG_ParseAmmoMax( const char *s );
+int			BG_AmmoPickupMax( int ammoType );
 
 
 

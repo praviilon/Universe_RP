@@ -1018,6 +1018,10 @@ static void CG_ConfigStringModified( void ) {
 	{	// GLX_U: [NPC Saber Colours]
 		CG_RpParseNpcSabers( num - CS_RP_NPCSABERS );
 	}
+	else if ( num == CS_RP_AMMOMAX )
+	{	// GLX_U: [Ammo Pickups] an rp_max_* ammo cap changed on the server: pickups are predicted against the new caps
+		BG_ParseAmmoMax( str );
+	}
 
 }
 

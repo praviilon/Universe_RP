@@ -1948,6 +1948,7 @@ void G_InitGame( int levelTime, int randomSeed, int restart ) {
 	trap->Print ("gamedate: %s\n", SOURCE_DATE);
 
 	G_RegisterCvars();
+	RP_AmmoMaxShare();	// GLX_U: [Ammo Pickups] every cap registered: CS_RP_AMMOMAX and the shared table
 
 	G_ProcessIPBans();
 

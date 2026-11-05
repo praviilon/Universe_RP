@@ -2602,6 +2602,7 @@ void FinishSpawningItem( gentity_t *ent );
 void RP_ItemSetStill( gentity_t *ent );	// DAJ_RP: [Still Weapons] g_items.c
 void	Add_Ammo (gentity_t *ent, int weapon, int count);
 int		RP_MaxAmmo( int ammoType );
+void	RP_AmmoMaxShare( void );
 void	RP_ClampAmmoToCaps( gentity_t *ent );
 // DAJ_RP: [Ammo] rp_add_ammo_scale, and the one rule every dropped weapon's ammo follows (g_items.c)
 #define RP_AMMO_SCALE_MIN	0.01f
@@ -3322,6 +3323,8 @@ void RP_CVU_playerCorpseTime(void);
 void RP_CVU_itemLifetime(void);
 // DAJ_RP: [Ammo] rp_add_ammo_scale is held to RP_AMMO_SCALE_MIN..RP_AMMO_SCALE_MAX.
 void RP_CVU_addAmmoScale(void);
+// GLX_U: [Ammo Pickups] an rp_max_* ammo cap changed: send the caps again (RP_AmmoMaxShare)
+void RP_CVU_maxAmmo(void);
 int RP_CorpseSecondsToMs(int seconds);
 
 // GalaxyRP fix: [validation] duel and minigame cvars whose feature becomes permanently unusable

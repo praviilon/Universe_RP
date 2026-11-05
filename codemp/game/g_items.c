@@ -2721,6 +2721,26 @@ int RP_MaxAmmo( int ammoType )
 	}
 }
 
+// GLX_U: [Ammo Pickups] the caps above for every ammo type, to CS_RP_AMMOMAX and to this module's copy of the table
+// BG_CanItemBeGrabbed reads (bg_misc.c). The server parses its own text, as cgame parses the configstring, so the
+// two sides compare against the very same numbers and cgame's pickup prediction never takes what the server
+// refuses. At G_InitGame and whenever an rp_max_* cvar changes (RP_CVU_maxAmmo, g_cvar.c).
+void RP_AmmoMaxShare( void )
+{
+	char buf[MAX_STRING_CHARS];
+	int i;
+
+	buf[0] = '\0';
+	for ( i = 0; i < AMMO_MAX; i++ )
+	{
+		int cap = RP_MaxAmmo( i );
+
+		Q_strcat( buf, sizeof( buf ), va( i ? " %i" : "%i", cap > 0 ? cap : 0 ) );
+	}
+	trap->SetConfigstring( CS_RP_AMMOMAX, buf );
+	BG_ParseAmmoMax( buf );
+}
+
 // DAJ_RP: [Ammo] bring every capped ammo type down to its rp_max_* cap -- lowers only, never raises.
 // Called right after a character's saved ammo is read from the database (/login, /new, /char and
 // every respawn -- see g_cmds.c), so ammo saved above the caps is cut back on the next load and saved
@@ -2863,6 +2883,7 @@ int Pickup_Ammo (gentity_t *ent, gentity_t *other)
 
 int Pickup_Weapon (gentity_t *ent, gentity_t *other) {
 	int		quantity;
+	qboolean	ammoFinal = qfalse;	// GLX_U: [Ammo Pickups] quantity already in the units handed out (scaled)
 
 	if ( ent->count < 0 ) {
 		quantity = 0; // None for you, sir!
@@ -2879,12 +2900,25 @@ int Pickup_Weapon (gentity_t *ent, gentity_t *other) {
 
 			// New method:  If the player has less than half the minimum, give them the minimum, else add 1/2 the min.
 
-			// drop the quantity if the already have over the minimum
-			if ( other->client->ps.ammo[ ent->item->giTag ] < quantity*0.5 ) {
-				quantity = quantity - other->client->ps.ammo[ ent->item->giTag ];
+			// GLX_U: [Ammo Pickups] that rule, made to work. It read ps.ammo[weapon number] -- a Quake 3 leftover,
+			// where weapon and ammo slot were one -- so the Blaster looked at your rockets, the Flechette and every
+			// weapon after it at an unused slot (0), and nearly every pickup gave a full pack. Now the weapon's own
+			// ammo type, compared in the units handed out (the pack as RP_ScaledAmmo gives it): below half a pack,
+			// topped up to a full one; otherwise half a pack (at least 1). The amount is final here, so it goes to
+			// Add_Ammo below unscaled.
+			const int ammoIndex = weaponData[ent->item->giTag].ammoIndex;
+			const int have = other->client->ps.ammo[ ammoIndex ];
+			const int full = RP_ScaledAmmo( quantity );
+
+			if ( have * 2 < full ) {
+				quantity = full - have;
 			} else {
-				quantity = quantity*0.5;		// only add half the value.
+				quantity = ( full + 1 ) / 2;		// only add half the value.
+				if ( quantity < 1 ) {
+					quantity = 1;
+				}
 			}
+			ammoFinal = qtrue;
 
 			// Old method:  If the player has less than the minimum, give them the minimum, else just add 1.
 /*
@@ -2902,7 +2936,7 @@ int Pickup_Weapon (gentity_t *ent, gentity_t *other) {
 	other->client->ps.stats[STAT_WEAPONS] |= ( 1 << ent->item->giTag );
 
 	//Add_Ammo( other, ent->item->giTag, quantity );
-	Add_Ammo( other, weaponData[ent->item->giTag].ammoIndex, RP_ScaledAmmo(quantity) ); // zyk: cvar to scale the add ammo amount (DAJ_RP: [Ammo] clamped, see RP_AmmoScale)
+	Add_Ammo( other, weaponData[ent->item->giTag].ammoIndex, ammoFinal ? quantity : RP_ScaledAmmo(quantity) ); // zyk: cvar to scale the add ammo amount (DAJ_RP: [Ammo] clamped, see RP_AmmoScale)
 
 	G_LogWeaponPickup(other->s.number, ent->item->giTag);
 

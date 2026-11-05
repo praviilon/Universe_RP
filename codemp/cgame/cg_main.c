@@ -2669,6 +2669,7 @@ Ghoul2 Insert End
 	cgs.levelStartTime = atoi( s );
 
 	CG_ParseServerinfo();
+	BG_ParseAmmoMax( CG_ConfigString( CS_RP_AMMOMAX ) );	// GLX_U: [Ammo Pickups] the server's caps, for pickup prediction
 
 	// load the new map
 //	CG_LoadingString( "collision map" );

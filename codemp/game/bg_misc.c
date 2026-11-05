@@ -2137,6 +2137,56 @@ Returns false if the item should not be picked up.
 This needs to be the same for client side prediction and server use.
 ================
 */
+// GLX_U: [Ammo Pickups] the server's ammo caps, the same on both sides: the server parses the text it puts in
+// CS_RP_AMMOMAX (RP_AmmoMaxShare, g_items.c), cgame the configstring (CG_Init, CG_ConfigStringModified). Until
+// either has, BG_AmmoPickupMax answers with the base game's ammoData maximums, as before.
+static int bg_rpAmmoMax[AMMO_MAX];
+static qboolean bg_rpAmmoMaxSet = qfalse;
+
+void BG_ParseAmmoMax( const char *s )
+{
+	int i;
+
+	if ( !s || !s[0] )
+	{	// nothing sent (an older server): the base game's maximums
+		bg_rpAmmoMaxSet = qfalse;
+		return;
+	}
+	for ( i = 0; i < AMMO_MAX; i++ )
+	{
+		while ( *s == ' ' )
+		{
+			s++;
+		}
+		bg_rpAmmoMax[i] = atoi( s );
+		if ( bg_rpAmmoMax[i] < 0 )
+		{
+			bg_rpAmmoMax[i] = 0;
+		}
+		while ( *s && *s != ' ' )
+		{
+			s++;
+		}
+	}
+	bg_rpAmmoMaxSet = qtrue;
+}
+
+// the most of ammoType a pickup fills you to; 0 for one never filled (none, force, emplaced)
+int BG_AmmoPickupMax( int ammoType )
+{
+	if ( ammoType < 0 || ammoType >= AMMO_MAX )
+	{
+		return 0;
+	}
+	return bg_rpAmmoMaxSet ? bg_rpAmmoMax[ammoType] : ammoData[ammoType].max;
+}
+
+// GLX_U: [Ammo Pickups] below its cap: a pickup of this ammo would give some
+static qboolean BG_AmmoBelowMax( const playerState_t *ps, int ammoType )
+{
+	return ( ammoType > AMMO_NONE && ammoType < AMMO_MAX && ps->ammo[ammoType] < BG_AmmoPickupMax( ammoType ) ) ? qtrue : qfalse;
+}
+
 qboolean BG_CanItemBeGrabbed( int gametype, const entityState_t *ent, const playerState_t *ps ) {
 	gitem_t	*item;
 
@@ -2205,26 +2255,38 @@ qboolean BG_CanItemBeGrabbed( int gametype, const entityState_t *ent, const play
 		}
 		*/
 		// zyk: weapons now only test for max ammo, and stun baton can always be picked up
-		// if (item->giTag == WP_THERMAL || item->giTag == WP_TRIP_MINE || item->giTag == WP_DET_PACK)
-		if (ps->stats[STAT_WEAPONS] & (1 << item->giTag) && item->giTag != WP_STUN_BATON)
-		{ //check to see if full on ammo for this, if so, then..
-			int ammoIndex = weaponData[item->giTag].ammoIndex;
-			if (ps->ammo[ammoIndex] >= ammoData[ammoIndex].max)
-			{ //don't need it
-				return qfalse;
-			}
+		// GLX_U: [Ammo Pickups] a weapon you don't have is always picked up; one you have only while its ammo is
+		// below the server's cap (BG_AmmoPickupMax: the rp_max_* cvars, not the base game's ammoData maximums,
+		// which let a pickup at the cap through for nothing). One with no ammo -- the stun baton zyk let through
+		// every time, melee, the saber -- has nothing to give: not picked up again.
+		if (ps->stats[STAT_WEAPONS] & (1 << item->giTag))
+		{
+			return BG_AmmoBelowMax( ps, weaponData[item->giTag].ammoIndex );
 		}
 		return qtrue;	// weapons are always picked up
 
 	case IT_AMMO:
+		// GLX_U: [Ammo Pickups] against the server's cap (as weapons above); an ammo type the server never fills
+		// (force, emplaced) has a cap of 0, so ammo_force -- "Don't place this" -- is never taken for nothing
 		if (item->giTag == -1)
 		{ //special case for "all ammo" packs
-			return qtrue;
+			// GLX_U: [Ammo Pickups] taken if any ammo it would fill is below its cap (what Pickup_Ammo gives: the
+			// four, and in Siege the explosives of the weapons you have)
+			if ( BG_AmmoBelowMax( ps, AMMO_BLASTER ) || BG_AmmoBelowMax( ps, AMMO_POWERCELL ) ||
+				BG_AmmoBelowMax( ps, AMMO_METAL_BOLTS ) || BG_AmmoBelowMax( ps, AMMO_ROCKETS ) )
+			{
+				return qtrue;
+			}
+			if ( gametype == GT_SIEGE &&
+				( ( (ps->stats[STAT_WEAPONS] & (1 << WP_DET_PACK)) && BG_AmmoBelowMax( ps, AMMO_DETPACK ) ) ||
+				  ( (ps->stats[STAT_WEAPONS] & (1 << WP_THERMAL)) && BG_AmmoBelowMax( ps, AMMO_THERMAL ) ) ||
+				  ( (ps->stats[STAT_WEAPONS] & (1 << WP_TRIP_MINE)) && BG_AmmoBelowMax( ps, AMMO_TRIPMINE ) ) ) )
+			{
+				return qtrue;
+			}
+			return qfalse;
 		}
-		if ( ps->ammo[item->giTag] >= ammoData[item->giTag].max) {
-			return qfalse;		// can't hold any more
-		}
-		return qtrue;
+		return BG_AmmoBelowMax( ps, item->giTag );	// can't hold any more
 
 	case IT_ARMOR:
 		// GalaxyRP fix: [Shield] against the SHIELD ceiling, not the health one. This compared
