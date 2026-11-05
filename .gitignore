@@ -195,3 +195,6 @@ compile_commands.json
 #############
 [Bb]uild*/
 cmake-build-*
+/[Ii]nstall-*/
+# scripts/builds/ is tracked but matches [Bb]uild*/ above: without this, new files there would be ignored
+!/scripts/builds/
