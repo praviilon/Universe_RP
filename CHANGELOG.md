@@ -8,6 +8,9 @@
 - Telekinesis: the Grip skill is now "Grip/Telekinesis", and `/settings 7` switches it between the two (Grip by default). Telekinesis lifts and carries targets without harm: level 1 lifts, 2 carries as you walk, 3 follows your aim and Push throws, 4 also lifts vehicles and large creatures, 5 up to five targets at once. It has its own levitation animations for the caster and the target (ported from Jedi Knight Galaxies), and the Universe RP client shows it in the force select with its own name and icon.
 - Settings menu: a new "Settings" button in the Universe RP menu (logged-in players) lists your `/settings` with their current values, to change with a click and save with APPLY (ESC closes without saving).
 
+### Fixed
+- Ammo and weapons you already have are now picked up only while that ammo is below the server's maximum (`rp_max_*`), so a full player no longer takes them for nothing; a stun baton, melee or saber you own is never picked up again. A repeat weapon pickup now gives half a pack once you hold more than half a pack, as originally intended (it checked the wrong ammo type).
+
 ## [3.9.1]
 
 ### Added
