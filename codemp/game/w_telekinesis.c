@@ -13,10 +13,15 @@ no damage, no choke, no crack, no grip sound, no hand effect. Logged-out players
             does not swing it (and turning away drops it).
   Level 3   the target follows the aim in every direction, at the distance it was grabbed (64-224 units);
             only range and line of sight drop it. Push throws it (RP_TelekinesisThrow).
-  Level 4   as 3, and lifts what grip refuses: vehicles, Galak's mech, the AT-ST and the Rancor
-            (RP_TelekinesisLiftsHeavy, asked by ForcePowerUsableOn).
-  Level 5   as 4, for up to RP_TK_MAX_TARGETS targets within 35 degrees of the aim and 256 units; they keep
-            their places around the aimed one and move as a group. Each breaks free on its own.
+  Level 4   as 3, reaching 320 units (held at 64-288), and lifts what grip refuses: vehicles, Galak's mech,
+            the AT-ST and the Rancor (RP_TelekinesisLiftsHeavy, asked by ForcePowerUsableOn).
+  Level 5   as 4, reaching 450 units (held at 64-418), for up to RP_TK_MAX_TARGETS targets within 35 degrees
+            of the aim; they keep their places around the aimed one and move as a group. Each breaks free on
+            its own.
+
+The reach to start (from the eyes) is 256/256/256/320/450 by level, and a target is dropped beyond
+320/320/320/450/550 (feet to feet): rpTkReach, rpTkDrop. At level 3+ the hold point is that reach less 32
+(rpTkHoldMax), so a held target stays well inside its drop distance.
 
 A hold lasts while the key is held and force lasts: the hand timer caps it at 10/20/30/40/60 s by level, and
 it drains 1 force every 100/100/125/200/200 ms (RP_TelekinesisDrainInterval, in WP_ForcePowerRun). Being
@@ -42,21 +47,26 @@ extern qboolean WP_ForcePowerAvailable( gentity_t *self, forcePowers_t forcePowe
 extern qboolean WP_ForcePowerUsable( gentity_t *self, forcePowers_t forcePower );
 
 #define RP_TK_LIFT_HEIGHT		64		// levels 1-2: how far above the grab point the target is held
-#define RP_TK_MIN_DIST			64		// level 3+: the hold point is at least this far along the aim...
-#define RP_TK_MAX_DIST			224		// ...and at most this far (MAX_GRIP_DISTANCE less room for the lift)
-#define RP_TK_DROP_DIST			(MAX_GRIP_DISTANCE + 64)	// a target further from the caster than this drops
+#define RP_TK_MIN_DIST			64		// level 3+: the hold point is at least this far along the aim (at most rpTkHoldMax)
 #define RP_TK_CONE				0.819f	// level 5: the extra targets are picked within 35 degrees of the aim (its cosine)
 #define RP_TK_STEER_MS			100		// the targets' velocity is set this often
 #define RP_TK_STEER_GAIN		6.0f	// velocity = distance to the hold point * this, per second
 #define RP_TK_STEER_MAX			600.0f
 #define RP_TK_STEER_DEAD		8.0f	// within this of the hold point the target is stopped
 #define RP_TK_LIFT_ANIM_MS		1500	// the caster's BOTH_FORCELEVITATE, before BOTH_FORCELEVITATEIDLE
-#define RP_TK_THROW_DELAY_MS	500		// Push: the targets fly this long into BOTH_FORCELEVITATEWAVE
+#define RP_TK_THROW_DELAY_MS	850		// Push: the targets fly this long into BOTH_FORCELEVITATEWAVE -- its forward thrust
+										// (the hands swing back 0-0.6 s, thrust 0.7-0.9 s, fastest at 0.8)
 #define RP_TK_LAND_WINDOW_MS	3000	// a released target landing within this plays BOTH_FORCELEVITATEDLAND
 #define RP_TK_HELD_MS			200		// a target counts as held this long after its last update
 
 static const int rpTkHoldCapMs[NUM_FORCE_POWER_LEVELS] = { 0, 10000, 20000, 30000, 40000, 60000 };
 static const int rpTkDrainMs[NUM_FORCE_POWER_LEVELS] = { 100, 100, 100, 125, 200, 200 };
+// by level: the reach to start, from the eyes (level 5's extra targets too; grip's is MAX_GRIP_DISTANCE, 256);
+// a held target further than the drop distance from the caster (feet to feet) is let go; at level 3+ the hold
+// point is at most rpTkHoldMax along the aim, the reach less 32 (levels 1-2 are not held along the aim)
+static const int rpTkReach[NUM_FORCE_POWER_LEVELS] = { 256, 256, 256, 256, 320, 450 };
+static const int rpTkDrop[NUM_FORCE_POWER_LEVELS] = { 320, 320, 320, 320, 450, 550 };
+static const int rpTkHoldMax[NUM_FORCE_POWER_LEVELS] = { 224, 224, 224, 224, 288, 418 };
 
 static int RP_TK_Level( const gentity_t *ent )
 {
@@ -298,7 +308,7 @@ qboolean RP_TelekinesisGrab( gentity_t *self )
 	memset( tk, 0, sizeof( *tk ) );
 
 	RP_TK_Eye( self, eye, fwd );
-	VectorMA( eye, MAX_GRIP_DISTANCE, fwd, end );
+	VectorMA( eye, rpTkReach[lvl], fwd, end );
 	trap->Trace( &tr, eye, NULL, NULL, end, self->s.number, MASK_PLAYERSOLID, qfalse, 0, 0 );
 
 	if ( tr.fraction != 1.0f && tr.entityNum < ENTITYNUM_WORLD && g_entities[tr.entityNum].client )
@@ -346,7 +356,7 @@ qboolean RP_TelekinesisGrab( gentity_t *self )
 			}
 			VectorSubtract( ent->client->ps.origin, eye, to );
 			dist = VectorNormalize( to );
-			if ( dist > MAX_GRIP_DISTANCE )
+			if ( dist > rpTkReach[lvl] )
 			{
 				continue;
 			}
@@ -422,9 +432,9 @@ qboolean RP_TelekinesisGrab( gentity_t *self )
 		{
 			tk->dist = RP_TK_MIN_DIST;
 		}
-		else if ( tk->dist > RP_TK_MAX_DIST )
+		else if ( tk->dist > rpTkHoldMax[lvl] )
 		{
-			tk->dist = RP_TK_MAX_DIST;
+			tk->dist = rpTkHoldMax[lvl];
 		}
 		VectorMA( eye, tk->dist, fwd, hold );
 		VectorClear( tk->offsets[0] );
@@ -453,6 +463,9 @@ static void RP_TK_DoThrow( gentity_t *self )
 	vec3_t eye, fwd;
 	float speed = 256.0f * tk->throwLevel;
 	int i;
+
+	// the push sound with the push itself (the targets flying), not on the key: the animation's thrust comes later
+	G_Sound( self, CHAN_BODY, G_SoundIndex( "sound/weapons/force/push.wav" ) );
 
 	RP_TK_Eye( self, eye, fwd );
 	for ( i = 0; i < tk->num; i++ )
@@ -537,7 +550,7 @@ void RP_TelekinesisUpdate( gentity_t *self )
 			continue;
 		}
 		VectorSubtract( ent->client->ps.origin, self->client->ps.origin, a );
-		if ( VectorLength( a ) > RP_TK_DROP_DIST || !RP_TK_Visible( self, ent ) )
+		if ( VectorLength( a ) > rpTkDrop[lvl] || !RP_TK_Visible( self, ent ) )
 		{
 			RP_TK_Remove( self, i--, qtrue );
 			continue;
@@ -671,8 +684,9 @@ void RP_TelekinesisEscape( gentity_t *holder, gentity_t *victim )
 }
 
 // The push key while holding (ForceThrow, which does nothing else while the hand is busy). At level 3+, with a
-// Push skill and the force for it at that level, the targets are thrown half a second into the push animation
-// (RP_TK_DoThrow). Below level 3, or without Push, the key does nothing.
+// Push skill and the force for it at that level, the force is paid now and the targets are thrown, with the push
+// sound, RP_TK_THROW_DELAY_MS into the push animation, at its thrust (RP_TK_DoThrow). Below level 3, or without
+// Push, the key does nothing.
 void RP_TelekinesisThrow( gentity_t *self )
 {
 	rpTelekinesis_t *tk = &self->client->tk;
@@ -690,8 +704,7 @@ void RP_TelekinesisThrow( gentity_t *self )
 	{
 		return;
 	}
-	BG_ForcePowerDrain( &self->client->ps, FP_PUSH, 0 );
-	G_Sound( self, CHAN_BODY, G_SoundIndex( "sound/weapons/force/push.wav" ) );
+	BG_ForcePowerDrain( &self->client->ps, FP_PUSH, 0 );	// paid now; the sound comes with the throw (RP_TK_DoThrow)
 	tk->throwTime = level.time + RP_TK_THROW_DELAY_MS;
 	tk->throwLevel = pushLevel;
 }
