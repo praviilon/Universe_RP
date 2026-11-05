@@ -19,8 +19,8 @@
 		disableColor			0.5 0.5 0.5 1
 		style					1
 		border					1
-		descX					180
-		descY					319
+		descX					320
+		descY					384
 		descScale				0.7
 		descColor				1 .682 0 .8
 		descAlignment			ITEM_ALIGN_CENTER
