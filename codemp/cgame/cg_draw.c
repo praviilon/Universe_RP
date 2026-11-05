@@ -1563,13 +1563,19 @@ static qboolean CG_TelekinesisMode( void )
 	return cg.snap && (cg.snap->ps.stats[STAT_RP_SELF_FX] & RP_SELF_FX_TK_MODE);
 }
 
-// GLX_U: [Telekinesis] the icon of a force power, wherever one is drawn: Grip's slot keeps Grip's icon in
-// Telekinesis mode until a telekinesis icon is made (then this is where it goes)
+// GLX_U: [Telekinesis] the icon of a force power in the force select and the active-powers row. In Telekinesis
+// mode Grip's slot shows Force Jump's icon (gfx/mp/f_icon_levitation): a stock icon the client already loads with
+// the others (CG_Init), and one our play never shows otherwise -- Jump is not in the force select, nor
+// a duration power for the active-powers row.
 static qhandle_t CG_ForcePowerIcon( int power )
 {
 	if ( power < 0 || power >= NUM_FORCE_POWERS )
 	{
 		return 0;
+	}
+	if ( power == FP_GRIP && CG_TelekinesisMode() )
+	{
+		return cgs.media.forcePowerIcons[FP_LEVITATION];
 	}
 	return cgs.media.forcePowerIcons[power];
 }
@@ -5944,8 +5950,8 @@ static void CG_DrawHolocronIcons(void)
 	while (i < NUM_FORCE_POWERS)
 	{
 		if (cg.snap->ps.holocronBits & (1 << forcePowerSorted[i]))
-		{
-			CG_DrawPic( startx, starty, endx, endy, CG_ForcePowerIcon(forcePowerSorted[i]));
+		{	// GLX_U: [Telekinesis] the holocron carried, not the power chosen: its own icon (not CG_ForcePowerIcon)
+			CG_DrawPic( startx, starty, endx, endy, cgs.media.forcePowerIcons[forcePowerSorted[i]]);
 			starty += (icon_size+2); //+2 for spacing
 			if ((starty+icon_size) >= SCREEN_HEIGHT-80)
 			{
