@@ -46,5 +46,6 @@
 	loadMenu { "ui/jamp/ingame_rpx_lights.menu" 		}
 	loadMenu { "ui/jamp/ingame_rpx_spawners.menu" 		}
 	loadMenu { "ui/jamp/ingame_rpdialog.menu" 		}	// GLX_U: [Dialogues]
+	loadMenu { "ui/jamp/ingame_rpsettings.menu" 		}	// GLX_U: [Settings Menu]
 }
 

@@ -165,6 +165,22 @@ XCVAR_DEF( ui_team_timelimit,				"20",					NULL,				CVAR_ARCHIVE|CVAR_INTERNAL )
 // quit, reconnected, and stayed logged out/spectating (see the CMD_ALIVE fix on "zykmod" in
 // g_cmds.c for the other half of this bug).
 XCVAR_DEF( ui_loggedin,					"0",					NULL,				CVAR_ROM|CVAR_INTERNAL )
+// GLX_U: [Settings Menu] the Settings menu (ingame_rpsettings.menu): the value of each /settings number as the menu
+// shows and cycles it (1 ON, or Telekinesis for 7), whether the player may turn on the admin settings 2, 5 and 6,
+// and whether the server's values have arrived. cgame's CG_RpSettings_f sets them from the server's reply; the
+// menu's APPLY sends ui_rpset_1..7 (uiScript rpSettingsApply, ui_main.c). Not archived: a copy for the open menu,
+// not a preference. Not ROM: the menu's cycle items write them.
+XCVAR_DEF( ui_rpset_1,						"0",					NULL,				CVAR_INTERNAL )
+XCVAR_DEF( ui_rpset_2,						"0",					NULL,				CVAR_INTERNAL )
+XCVAR_DEF( ui_rpset_3,						"0",					NULL,				CVAR_INTERNAL )
+XCVAR_DEF( ui_rpset_4,						"0",					NULL,				CVAR_INTERNAL )
+XCVAR_DEF( ui_rpset_5,						"0",					NULL,				CVAR_INTERNAL )
+XCVAR_DEF( ui_rpset_6,						"0",					NULL,				CVAR_INTERNAL )
+XCVAR_DEF( ui_rpset_7,						"0",					NULL,				CVAR_INTERNAL )
+XCVAR_DEF( ui_rpset_2_ok,					"0",					NULL,				CVAR_INTERNAL )
+XCVAR_DEF( ui_rpset_5_ok,					"0",					NULL,				CVAR_INTERNAL )
+XCVAR_DEF( ui_rpset_6_ok,					"0",					NULL,				CVAR_INTERNAL )
+XCVAR_DEF( ui_rpset_ready,					"0",					NULL,				CVAR_INTERNAL )
 XCVAR_DEF( ui_zyk_rpg_level,				"0",					NULL,				CVAR_ARCHIVE|CVAR_INTERNAL )
 XCVAR_DEF( ui_zyk_rpg_skillpoints,			"20",					NULL,				CVAR_ARCHIVE|CVAR_INTERNAL )
 XCVAR_DEF( ui_zyk_rpg_credits,				"20",					NULL,				CVAR_ARCHIVE|CVAR_INTERNAL )

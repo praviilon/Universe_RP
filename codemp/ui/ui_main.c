@@ -6409,6 +6409,20 @@ static void UI_RunMenuScript(char **args)
 			UI_StartSkirmish(qtrue);
 		} else if (Q_stricmp(name, "SkirmishStart") == 0) {
 			UI_StartSkirmish(qfalse);
+		} else if (Q_stricmp(name, "rpSettingsApply") == 0) {
+			// GLX_U: [Settings Menu] the Settings menu's APPLY: the seven values as the menu shows them, to the
+			// server's settingsapply (Cmd_SettingsApply_f, g_cmds.c). Nothing before the server's values arrived.
+			if ( trap->Cvar_VariableValue( "ui_rpset_ready" ) ) {
+				char cmd[64];
+				int n;
+
+				Q_strncpyz( cmd, "settingsapply", sizeof( cmd ) );
+				for ( n = 1; n <= 7; n++ ) {
+					Q_strcat( cmd, sizeof( cmd ), trap->Cvar_VariableValue( va( "ui_rpset_%d", n ) ) ? " 1" : " 0" );
+				}
+				Q_strcat( cmd, sizeof( cmd ), "\n" );
+				trap->Cmd_ExecuteText( EXEC_APPEND, cmd );
+			}
 		} else if (Q_stricmp(name, "closeingame") == 0) {
 			trap->Key_SetCatcher( trap->Key_GetCatcher() & ~KEYCATCH_UI );
 			trap->Key_ClearStates();

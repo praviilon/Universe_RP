@@ -1,0 +1,354 @@
+//----------------------------------------------------------------------------------------------
+// ingame_rpsettings: the Settings menu of the Universe RP menu.
+// GLX_U: [Settings Menu] the Settings button of ingame_galaxyrp.menu opens it. One row per /settings number, each
+// cycled with a click; the values are the menu's own cvars (ui_rpset_1..7, 1 ON or Telekinesis), filled from the
+// server when it opens ("settingsui", answered by "rpsettings": Cmd_SettingsUi_f in g_cmds.c, CG_RpSettings_f in
+// cg_servercmds.c). Until they arrive every row and APPLY are greyed. ESC closes it and sends nothing; APPLY sends
+// the values (uiScript rpSettingsApply, ui_main.c, to Cmd_SettingsApply_f) and returns to the game. The admin rows
+// are greyed for a player without their admin power (ui_rpset_<n>_ok). Generated rows: one per setting.
+//----------------------------------------------------------------------------------------------
+{
+	menuDef
+	{
+		name					"ingame_rpsettings"
+		visible					0
+		fullscreen				0
+		outOfBoundsClick
+		rect					140 72 360 335
+		focusColor				1 1 1 1
+		disableColor			0.5 0.5 0.5 1
+		style					1
+		border					1
+		descX					180
+		descY					319
+		descScale				0.7
+		descColor				1 .682 0 .8
+		descAlignment			ITEM_ALIGN_CENTER
+
+		onOpen
+		{
+			setcvar			ui_rpset_ready 0 ;
+			setcvar			ui_rpset_2_ok 0 ;
+			setcvar			ui_rpset_5_ok 0 ;
+			setcvar			ui_rpset_6_ok 0 ;
+			exec			"settingsui"
+		}
+		onESC
+		{
+			play			"sound/interface/button1.wav" ;
+			close			ingame_rpsettings
+		}
+
+		itemDef
+		{
+			name				rpset_background
+			style				WINDOW_STYLE_SHADER
+			rect				0 0 360 335
+			background			"gfx/menus/menu_box_ingame"
+			forecolor			1 1 1 1
+			visible				1
+			decoration
+		}
+		itemDef
+		{
+			name				rpset_title
+			style				WINDOW_STYLE_SHADER
+			background			"gfx/menus/menu_blendbox"
+			text				"^9Universe ^7RP^3 Settings"
+			rect				15 5 330 28
+			textalign			ITEM_ALIGN_CENTER
+			textalignx			165
+			textaligny			2
+			font				3
+			textscale			0.9
+			forecolor			.549 .854 1 1
+			visible				1
+			decoration
+		}
+		itemDef
+		{
+			name				rpset_loading
+			type				ITEM_TYPE_TEXT
+			style				WINDOW_STYLE_EMPTY
+			text				"Loading..."
+			rect				0 293 360 16
+			textalign			ITEM_ALIGN_CENTER
+			textalignx			180
+			textaligny			0
+			font				2
+			textscale			0.6
+			forecolor			1 1 .4 1
+			visible				1
+			decoration
+			cvarTest			"ui_rpset_ready"
+			showCvar
+			{
+				"0"
+			}
+		}
+		itemDef
+		{
+			name				rpset_1
+			type				ITEM_TYPE_MULTI
+			text				"Sense Health:"
+			cvar				"ui_rpset_1"
+			rect				30 44 300 22
+			textalign			ITEM_ALIGN_LEFT
+			textalignx			0
+			textaligny			0
+			font				2
+			textscale			0.7
+			forecolor			1 .682 0 1
+			visible				1
+			descText			"Shows the health of who you look at while Force Sense is on. Needs the Sense Health skill"
+			cvarTest			"ui_rpset_ready"
+			enableCvar
+			{
+				"1"
+			}
+			cvarFloatList
+			{
+				"Off" 0
+				"On" 1
+			}
+			action
+			{
+				play "sound/interface/button1.wav"
+			}
+		}
+		itemDef
+		{
+			name				rpset_3
+			type				ITEM_TYPE_MULTI
+			text				"Ignite Saber when Drawn:"
+			cvar				"ui_rpset_3"
+			rect				30 70 300 22
+			textalign			ITEM_ALIGN_LEFT
+			textalignx			0
+			textaligny			0
+			font				2
+			textscale			0.7
+			forecolor			1 .682 0 1
+			visible				1
+			descText			"On: your saber ignites when you draw it. Off: it is drawn unlit"
+			cvarTest			"ui_rpset_ready"
+			enableCvar
+			{
+				"1"
+			}
+			cvarFloatList
+			{
+				"Off" 0
+				"On" 1
+			}
+			action
+			{
+				play "sound/interface/button1.wav"
+			}
+		}
+		itemDef
+		{
+			name				rpset_4
+			type				ITEM_TYPE_MULTI
+			text				"Use Hint:"
+			cvar				"ui_rpset_4"
+			rect				30 96 300 22
+			textalign			ITEM_ALIGN_LEFT
+			textalignx			0
+			textaligny			0
+			font				2
+			textscale			0.7
+			forecolor			1 .682 0 1
+			visible				1
+			descText			"Shows a hand icon when you look at something you can use"
+			cvarTest			"ui_rpset_ready"
+			enableCvar
+			{
+				"1"
+			}
+			cvarFloatList
+			{
+				"Off" 0
+				"On" 1
+			}
+			action
+			{
+				play "sound/interface/button1.wav"
+			}
+		}
+		itemDef
+		{
+			name				rpset_7
+			type				ITEM_TYPE_MULTI
+			text				"Grip/Telekinesis:"
+			cvar				"ui_rpset_7"
+			rect				30 122 300 22
+			textalign			ITEM_ALIGN_LEFT
+			textalignx			0
+			textaligny			0
+			font				2
+			textscale			0.7
+			forecolor			1 .682 0 1
+			visible				1
+			descText			"Which power your Grip/Telekinesis skill uses"
+			cvarTest			"ui_rpset_ready"
+			enableCvar
+			{
+				"1"
+			}
+			cvarFloatList
+			{
+				"Grip" 0
+				"Telekinesis" 1
+			}
+			action
+			{
+				play "sound/interface/button1.wav"
+			}
+		}
+		itemDef
+		{
+			name				rpset_admin
+			type				ITEM_TYPE_TEXT
+			style				WINDOW_STYLE_EMPTY
+			text				"Admin (each needs its admin power)"
+			rect				30 154 300 18
+			textalign			ITEM_ALIGN_LEFT
+			textalignx			0
+			textaligny			0
+			font				2
+			textscale			0.65
+			forecolor			.549 .854 1 1
+			visible				1
+			decoration
+		}
+		itemDef
+		{
+			name				rpset_2
+			type				ITEM_TYPE_MULTI
+			text				"Admin Protect:"
+			cvar				"ui_rpset_2"
+			rect				30 178 300 22
+			textalign			ITEM_ALIGN_LEFT
+			textalignx			0
+			textaligny			0
+			font				2
+			textscale			0.7
+			forecolor			1 .682 0 1
+			visible				1
+			descText			"Protects you from gameplay admin commands. Needs the Admin Protect admin power"
+			cvarTest			"ui_rpset_2_ok"
+			enableCvar
+			{
+				"1"
+			}
+			cvarFloatList
+			{
+				"Off" 0
+				"On" 1
+			}
+			action
+			{
+				play "sound/interface/button1.wav"
+			}
+		}
+		itemDef
+		{
+			name				rpset_5
+			type				ITEM_TYPE_MULTI
+			text				"Ignore Chat Distance:"
+			cvar				"ui_rpset_5"
+			rect				30 204 300 22
+			textalign			ITEM_ALIGN_LEFT
+			textalignx			0
+			textaligny			0
+			font				2
+			textscale			0.7
+			forecolor			1 .682 0 1
+			visible				1
+			descText			"You hear all chat, however far away. Needs the Ignore Chat Distance admin power"
+			cvarTest			"ui_rpset_5_ok"
+			enableCvar
+			{
+				"1"
+			}
+			cvarFloatList
+			{
+				"Off" 0
+				"On" 1
+			}
+			action
+			{
+				play "sound/interface/button1.wav"
+			}
+		}
+		itemDef
+		{
+			name				rpset_6
+			type				ITEM_TYPE_MULTI
+			text				"Entity Bounds:"
+			cvar				"ui_rpset_6"
+			rect				30 230 300 22
+			textalign			ITEM_ALIGN_LEFT
+			textalignx			0
+			textaligny			0
+			font				2
+			textscale			0.7
+			forecolor			1 .682 0 1
+			visible				1
+			descText			"Draws the box of the entity you aim at. Needs the Entities and Remaps admin power"
+			cvarTest			"ui_rpset_6_ok"
+			enableCvar
+			{
+				"1"
+			}
+			cvarFloatList
+			{
+				"Off" 0
+				"On" 1
+			}
+			action
+			{
+				play "sound/interface/button1.wav"
+			}
+		}
+		itemDef
+		{
+			name				rpset_apply
+			type				ITEM_TYPE_BUTTON
+			style				WINDOW_STYLE_FILLED
+			rect				120 264 120 26
+			text				"APPLY"
+			textalign			ITEM_ALIGN_CENTER
+			textalignx			60
+			textaligny			2
+			font				2
+			textscale			0.8
+			forecolor			1 .682 0 1
+			backcolor			0 0 0 .6
+			border				1
+			bordercolor			1 .682 0 .6
+			visible				1
+			descText			"Save these settings and return to the game. ESC closes without saving"
+			cvarTest			"ui_rpset_ready"
+			enableCvar
+			{
+				"1"
+			}
+			mouseEnter
+			{
+				setitemcolor rpset_apply bordercolor 1 1 1 1
+			}
+			mouseExit
+			{
+				setitemcolor rpset_apply bordercolor 1 .682 0 .6
+			}
+			action
+			{
+				play			"sound/interface/button1.wav" ;
+				uiScript		rpSettingsApply ;
+				uiScript		closeingame
+			}
+		}
+	}
+}

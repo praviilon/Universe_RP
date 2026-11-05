@@ -15358,6 +15358,160 @@ void Cmd_AllyRemove_f( gentity_t *ent ) {
 		RP_AllyRemoveClient(ent, client_id);
 	}
 }
+// The player-facing /settings numbers and the player_settings bits they stand for; see the comments on it in
+// Cmd_Settings_f below. GLX_U: [Telekinesis] /settings 7 added -- "Grip/Telekinesis Toggle" -- on bit 21, never used
+// before. GLX_U: [Settings Menu] moved out of Cmd_Settings_f, so the Settings menu's commands below share it.
+static const int settings_number_to_bit[] = { 0, 5, 13, 11, 6, 16, 20, RP_SETTING_TELEKINESIS }; // index 0 unused (rejected below)
+
+// GLX_U: [Settings Menu] one /settings toggle of the setting on player_settings bit `value`: the admin-power gates
+// for turning a setting ON, the flip, what a switch must stop, and the confirmation line. Returns qfalse if a gate
+// refused it (its message already sent), qtrue if it flipped; the caller saves the account. Shared by /settings <n>
+// and the Settings menu's settingsapply (Cmd_SettingsApply_f), so the two can never apply different rules. Moved
+// here from Cmd_Settings_f as it was: "above" in the comments below means in Cmd_Settings_f.
+static qboolean RP_SettingToggle( gentity_t *ent, int value )
+{
+	char new_status[32];
+
+	// GalaxyRP fix: [Settings] gate turning Admin Protect ON behind the "Admin Protect" admin
+	// command (ADM_ADMPROTECT) -- this was originally gated behind ADM_GIVEADM ("Give Admin"), but
+	// ADM_ADMPROTECT's own in-game help text (see the command_number == ADM_ADMPROTECT branch
+	// further down in this file) already documents it as "With this flag, a player can use Admin
+	// Protect option in /settings to self-protect from gameplay-related admin commands" -- i.e.
+	// the codebase itself designates ADM_ADMPROTECT, not ADM_GIVEADM, as the permission for this.
+	// Corrected here to match. It is also the same flag that gates whether Admin Protect has any
+	// effect once it IS on (see the 6 enforcement sites in Cmd_Give_f, Cmd_Scale_f and
+	// Cmd_Teleport_f), so a player can now only turn the setting on if it can actually do
+	// something for them. Turning it back OFF is never gated, so a player can always give up
+	// their own protection. Bit 13 is inverted (clear == ON, set == OFF -- see the status-line
+	// block above), so "turning ON" is the branch just below that is about to CLEAR the bit,
+	// i.e. the bit must currently be SET.
+	// check_admin_command() prints the standard "You need the Admin Protect admin command" error
+	// and returns qfalse when the caller lacks it, matching every other admin-gated command in this
+	// file.
+	if (value == 13 && (ent->client->pers.player_settings & (1 << value)) && !check_admin_command(ent, ADM_ADMPROTECT, qtrue))
+	{
+		return qfalse;
+	}
+
+	// DAJ_RP: [Settings] the same gate for Ignore Chat Distance (bit 16, /settings 5): turning it ON
+	// needs the "Ignore Chat Distance" admin power, the only thing it has any effect with (see
+	// zyk_ignores_chat_distance()). Turning it OFF is never gated. A player who switched it on before
+	// this gate existed keeps it on, harmlessly -- it still does nothing without the power.
+	if (value == 16 && (ent->client->pers.player_settings & (1 << value)) && !check_admin_command(ent, ADM_IGNORECHATDISTANCE, qtrue))
+	{
+		return qfalse;
+	}
+
+	// DAJ_RP: [Entity Bounds] the same gate for Entity Bounds (bit 20, /settings 6): turning it ON needs
+	// the Entity System admin power, the only thing it draws anything with. Turning it OFF is never
+	// gated. An account that shows it ON without the power (every account that predates the setting)
+	// simply draws nothing -- RP_EntBoundsFrame() checks the power itself.
+	if (value == 20 && (ent->client->pers.player_settings & (1 << value)) && !check_admin_command(ent, ADM_ENTITYSYSTEM, qtrue))
+	{
+		return qfalse;
+	}
+
+	if (ent->client->pers.player_settings & (1 << value))
+	{
+		ent->client->pers.player_settings &= ~(1 << value);
+
+		strcpy(new_status,"^2ON^7");
+	}
+	else
+	{
+		ent->client->pers.player_settings |= (1 << value);
+
+		strcpy(new_status,"^1OFF^7");
+	}
+	// GalaxyRP fix: [Settings] the old setting 3, "Starting Single Saber Style", used to have a
+	// value==8 special case here alongside the generic toggle above, cycling player_settings bits
+	// 26-29. Removed along with that setting -- see the range-check comment above. Player-facing
+	// number 3 has since been reassigned to a brand new setting, "Activate Saber on Spawn" (bit
+	// 11), which needs no special handling -- it's a plain toggle like Admin Protect.
+	// GalaxyRP fix: [Challenge Mode] the value==14 (Boss Battle Music cycling) and value==15
+	// (Difficulty/Challenge Mode activation gate) branches used to be here. Both are removed since
+	// 14 and 15 are now rejected above as invalid settings values, and everything downstream of
+	// Challenge Mode activation is dead.
+
+	// GLX_U: [Telekinesis] a grip or a telekinesis hold in progress ends with the switch: the power that runs
+	// is the one the bit said when it started (w_telekinesis.c)
+	if (value == RP_SETTING_TELEKINESIS && (ent->client->ps.fd.forcePowersActive & (1 << FP_GRIP)))
+	{
+		WP_ForcePowerStop(ent, FP_GRIP);
+	}
+
+	// GalaxyRP fix: [Quests] the value==0 (RPG quests) print branch used to be here. Removed since
+	// 0 is now rejected above as an invalid settings value.
+	if (value == 5)
+	{
+		// DAJ_RP: [Settings] the Sense Health Toggle can be switched on without the skill -- it just
+		// has nothing to show until the skill is bought -- so say so rather than refusing.
+		// skill_levels[35] is the Sense Health skill; /settings is logged-in only, so it is current.
+		if (!(ent->client->pers.player_settings & (1 << 5)) && ent->client->pers.skill_levels[35] < 1)
+		{
+			trap->SendServerCommand( ent-g_entities, va("print \"Sense Health Toggle %s\n^3You don't have the Sense Health skill, so this has no effect until you do.\n\"", new_status) );
+		}
+		else
+		{
+			trap->SendServerCommand( ent-g_entities, va("print \"Sense Health Toggle %s\n\"", new_status) );
+		}
+	}
+	// GalaxyRP fix: [Settings] the value==6 (Allow Force Powers from allies), value==8 (Starting
+	// Single Saber Style), value==9 (Allow Screen Message) and value==10 (Use healing force only at
+	// allied players) print branches used to be here. Removed along with those settings -- see the
+	// range-check comment above. value==11 used to be here too, printing for the old "Start With
+	// Saber" -- that setting is also removed, but the bit itself is back in use below for the new
+	// "Activate Saber on Spawn".
+	// GalaxyRP fix: [Magic] the value==7 (Show magic cast in chat) print branch used to be here.
+	// Removed since 7 is now rejected above as an invalid settings value.
+	else if (value == 13)
+	{
+		trap->SendServerCommand( ent-g_entities, va("print \"Admin Protect %s\n\"", new_status) );
+	}
+	else if (value == 11)
+	{
+		trap->SendServerCommand( ent-g_entities, va("print \"Ignite Saber when Drawn %s\n\"", new_status) );
+	}
+	// GalaxyRP fix: [Use hint] this branch was missing when /settings 4 was added, so the toggle
+	// flipped the bit and saved it but printed nothing at all -- the player had no way to tell
+	// whether they had just turned the hint on or off, or whether the command had worked. Every
+	// player-facing setting needs an entry here -- if you add one to settings_number_to_bit[] above,
+	// add its status line and its confirmation together, or the toggle will silently do nothing
+	// visible.
+	else if (value == 6)
+	{
+		trap->SendServerCommand( ent-g_entities, va("print \"Use Hint %s\n\"", new_status) );
+	}
+	else if (value == 16)
+	{
+		// DAJ_RP: [Settings] no "no effect" warning any more: turning it ON without the admin power
+		// is now refused by the gate above, so ON always means it works.
+		trap->SendServerCommand( ent-g_entities, va("print \"Ignore Chat Distance %s\n\"", new_status) );
+	}
+	else if (value == 20)
+	{
+		trap->SendServerCommand( ent-g_entities, va("print \"Entity Bounds %s\n\"", new_status) );
+	}
+	else if (value == RP_SETTING_TELEKINESIS)
+	{	// GLX_U: [Telekinesis] not ON or OFF but which power; and, as Sense Health, a note when he has no skill for it
+		const char *power = (ent->client->pers.player_settings & (1 << RP_SETTING_TELEKINESIS)) ? "^5Telekinesis^7" : "^3Grip^7";
+
+		if (ent->client->pers.skill_levels[14] < 1)
+		{
+			trap->SendServerCommand( ent-g_entities, va("print \"Grip/Telekinesis Toggle: %s\n^3You don't have the Grip/Telekinesis skill, so this has no effect until you do.\n\"", power) );
+		}
+		else
+		{
+			trap->SendServerCommand( ent-g_entities, va("print \"Grip/Telekinesis Toggle: %s\n\"", power) );
+		}
+	}
+	// GalaxyRP fix: [Challenge Mode] the value==14 (Boss Battle Music) and value==15 (Difficulty)
+	// print branches used to be here. Removed since 14 and 15 are now rejected above as invalid
+	// settings values.
+
+	return qtrue;
+}
+
 // TODO: JLH start here
 /*
 ==================
@@ -15537,7 +15691,6 @@ void Cmd_Settings_f( gentity_t *ent ) {
 	else
 	{
 		char arg1[MAX_STRING_CHARS];
-		char new_status[32];
 		int value = 0;
 
 		trap->Argv(1, arg1, sizeof( arg1 ));
@@ -15565,7 +15718,8 @@ void Cmd_Settings_f( gentity_t *ent ) {
 		// DAJ_RP: [Settings] /settings 5 added -- "Ignore Chat Distance" -- on bit 16, never used before.
 		// DAJ_RP: [Entity Bounds] /settings 6 added -- "Entity Bounds" -- on bit 20, never used before.
 		// GLX_U: [Telekinesis] /settings 7 added -- "Grip/Telekinesis Toggle" -- on bit 21, never used before.
-		static const int settings_number_to_bit[] = { 0, 5, 13, 11, 6, 16, 20, RP_SETTING_TELEKINESIS }; // index 0 unused (rejected below)
+		// GLX_U: [Settings Menu] settings_number_to_bit[] is file-level now, above RP_SettingToggle(), so the Settings
+		// menu's settingsui and settingsapply use the same table.
 
 		if (value <= 0 || value >= (int)ARRAY_LEN(settings_number_to_bit))
 		{
@@ -15575,149 +15729,127 @@ void Cmd_Settings_f( gentity_t *ent ) {
 
 		value = settings_number_to_bit[value];
 
-		// GalaxyRP fix: [Settings] gate turning Admin Protect ON behind the "Admin Protect" admin
-		// command (ADM_ADMPROTECT) -- this was originally gated behind ADM_GIVEADM ("Give Admin"), but
-		// ADM_ADMPROTECT's own in-game help text (see the command_number == ADM_ADMPROTECT branch
-		// further down in this file) already documents it as "With this flag, a player can use Admin
-		// Protect option in /settings to self-protect from gameplay-related admin commands" -- i.e.
-		// the codebase itself designates ADM_ADMPROTECT, not ADM_GIVEADM, as the permission for this.
-		// Corrected here to match. It is also the same flag that gates whether Admin Protect has any
-		// effect once it IS on (see the 6 enforcement sites in Cmd_Give_f, Cmd_Scale_f and
-		// Cmd_Teleport_f), so a player can now only turn the setting on if it can actually do
-		// something for them. Turning it back OFF is never gated, so a player can always give up
-		// their own protection. Bit 13 is inverted (clear == ON, set == OFF -- see the status-line
-		// block above), so "turning ON" is the branch just below that is about to CLEAR the bit,
-		// i.e. the bit must currently be SET.
-		// check_admin_command() prints the standard "You need the Admin Protect admin command" error
-		// and returns qfalse when the caller lacks it, matching every other admin-gated command in this
-		// file.
-		if (value == 13 && (ent->client->pers.player_settings & (1 << value)) && !check_admin_command(ent, ADM_ADMPROTECT, qtrue))
+		// GLX_U: [Settings Menu] the gates, the flip, the switch's side effects and the confirmation are
+		// RP_SettingToggle() above, shared with the Settings menu's settingsapply.
+		if (RP_SettingToggle(ent, value))
 		{
-			return;
+			save_account(ent, qfalse);
 		}
-
-		// DAJ_RP: [Settings] the same gate for Ignore Chat Distance (bit 16, /settings 5): turning it ON
-		// needs the "Ignore Chat Distance" admin power, the only thing it has any effect with (see
-		// zyk_ignores_chat_distance()). Turning it OFF is never gated. A player who switched it on before
-		// this gate existed keeps it on, harmlessly -- it still does nothing without the power.
-		if (value == 16 && (ent->client->pers.player_settings & (1 << value)) && !check_admin_command(ent, ADM_IGNORECHATDISTANCE, qtrue))
-		{
-			return;
-		}
-
-		// DAJ_RP: [Entity Bounds] the same gate for Entity Bounds (bit 20, /settings 6): turning it ON needs
-		// the Entity System admin power, the only thing it draws anything with. Turning it OFF is never
-		// gated. An account that shows it ON without the power (every account that predates the setting)
-		// simply draws nothing -- RP_EntBoundsFrame() checks the power itself.
-		if (value == 20 && (ent->client->pers.player_settings & (1 << value)) && !check_admin_command(ent, ADM_ENTITYSYSTEM, qtrue))
-		{
-			return;
-		}
-
-		if (ent->client->pers.player_settings & (1 << value))
-		{
-			ent->client->pers.player_settings &= ~(1 << value);
-
-			strcpy(new_status,"^2ON^7");
-		}
-		else
-		{
-			ent->client->pers.player_settings |= (1 << value);
-
-			strcpy(new_status,"^1OFF^7");
-		}
-		// GalaxyRP fix: [Settings] the old setting 3, "Starting Single Saber Style", used to have a
-		// value==8 special case here alongside the generic toggle above, cycling player_settings bits
-		// 26-29. Removed along with that setting -- see the range-check comment above. Player-facing
-		// number 3 has since been reassigned to a brand new setting, "Activate Saber on Spawn" (bit
-		// 11), which needs no special handling -- it's a plain toggle like Admin Protect.
-		// GalaxyRP fix: [Challenge Mode] the value==14 (Boss Battle Music cycling) and value==15
-		// (Difficulty/Challenge Mode activation gate) branches used to be here. Both are removed since
-		// 14 and 15 are now rejected above as invalid settings values, and everything downstream of
-		// Challenge Mode activation is dead.
-
-		// GLX_U: [Telekinesis] a grip or a telekinesis hold in progress ends with the switch: the power that runs
-		// is the one the bit said when it started (w_telekinesis.c)
-		if (value == RP_SETTING_TELEKINESIS && (ent->client->ps.fd.forcePowersActive & (1 << FP_GRIP)))
-		{
-			WP_ForcePowerStop(ent, FP_GRIP);
-		}
-
-		save_account(ent, qfalse);
-
-		// GalaxyRP fix: [Quests] the value==0 (RPG quests) print branch used to be here. Removed since
-		// 0 is now rejected above as an invalid settings value.
-		if (value == 5)
-		{
-			// DAJ_RP: [Settings] the Sense Health Toggle can be switched on without the skill -- it just
-			// has nothing to show until the skill is bought -- so say so rather than refusing.
-			// skill_levels[35] is the Sense Health skill; /settings is logged-in only, so it is current.
-			if (!(ent->client->pers.player_settings & (1 << 5)) && ent->client->pers.skill_levels[35] < 1)
-			{
-				trap->SendServerCommand( ent-g_entities, va("print \"Sense Health Toggle %s\n^3You don't have the Sense Health skill, so this has no effect until you do.\n\"", new_status) );
-			}
-			else
-			{
-				trap->SendServerCommand( ent-g_entities, va("print \"Sense Health Toggle %s\n\"", new_status) );
-			}
-		}
-		// GalaxyRP fix: [Settings] the value==6 (Allow Force Powers from allies), value==8 (Starting
-		// Single Saber Style), value==9 (Allow Screen Message) and value==10 (Use healing force only at
-		// allied players) print branches used to be here. Removed along with those settings -- see the
-		// range-check comment above. value==11 used to be here too, printing for the old "Start With
-		// Saber" -- that setting is also removed, but the bit itself is back in use below for the new
-		// "Activate Saber on Spawn".
-		// GalaxyRP fix: [Magic] the value==7 (Show magic cast in chat) print branch used to be here.
-		// Removed since 7 is now rejected above as an invalid settings value.
-		else if (value == 13)
-		{
-			trap->SendServerCommand( ent-g_entities, va("print \"Admin Protect %s\n\"", new_status) );
-		}
-		else if (value == 11)
-		{
-			trap->SendServerCommand( ent-g_entities, va("print \"Ignite Saber when Drawn %s\n\"", new_status) );
-		}
-		// GalaxyRP fix: [Use hint] this branch was missing when /settings 4 was added, so the toggle
-		// flipped the bit and saved it but printed nothing at all -- the player had no way to tell
-		// whether they had just turned the hint on or off, or whether the command had worked. Every
-		// player-facing setting needs an entry here -- if you add one to settings_number_to_bit[] above,
-		// add its status line and its confirmation together, or the toggle will silently do nothing
-		// visible.
-		else if (value == 6)
-		{
-			trap->SendServerCommand( ent-g_entities, va("print \"Use Hint %s\n\"", new_status) );
-		}
-		else if (value == 16)
-		{
-			// DAJ_RP: [Settings] no "no effect" warning any more: turning it ON without the admin power
-			// is now refused by the gate above, so ON always means it works.
-			trap->SendServerCommand( ent-g_entities, va("print \"Ignore Chat Distance %s\n\"", new_status) );
-		}
-		else if (value == 20)
-		{
-			trap->SendServerCommand( ent-g_entities, va("print \"Entity Bounds %s\n\"", new_status) );
-		}
-		else if (value == RP_SETTING_TELEKINESIS)
-		{	// GLX_U: [Telekinesis] not ON or OFF but which power; and, as Sense Health, a note when he has no skill for it
-			const char *power = (ent->client->pers.player_settings & (1 << RP_SETTING_TELEKINESIS)) ? "^5Telekinesis^7" : "^3Grip^7";
-
-			if (ent->client->pers.skill_levels[14] < 1)
-			{
-				trap->SendServerCommand( ent-g_entities, va("print \"Grip/Telekinesis Toggle: %s\n^3You don't have the Grip/Telekinesis skill, so this has no effect until you do.\n\"", power) );
-			}
-			else
-			{
-				trap->SendServerCommand( ent-g_entities, va("print \"Grip/Telekinesis Toggle: %s\n\"", power) );
-			}
-		}
-		// GalaxyRP fix: [Challenge Mode] the value==14 (Boss Battle Music) and value==15 (Difficulty)
-		// print branches used to be here. Removed since 14 and 15 are now rejected above as invalid
-		// settings values.
-
 		// GalaxyRP fix: [Quests] the value==0 kill-on-toggle block used to be here, forcing a player
 		// out of round when toggling RPG quests. Removed since 0 is now rejected above as an invalid
 		// settings value.
 
+	}
+}
+
+// GLX_U: [Settings Menu] the value a setting shows in /settings and the Settings menu: 1 for ON (Telekinesis for
+// /settings 7), 0 for OFF (Grip). Every bit but Telekinesis's is inverted (clear == ON); see player_settings.
+static int RP_SettingValue( const gentity_t *ent, int bit )
+{
+	qboolean set = (ent->client->pers.player_settings & (1 << bit)) ? qtrue : qfalse;
+
+	if (bit == RP_SETTING_TELEKINESIS)
+	{
+		return set ? 1 : 0;
+	}
+	return set ? 0 : 1;
+}
+
+// GLX_U: [Settings Menu] the admin power that turning the setting on bit `bit` ON needs (RP_SettingToggle's gates),
+// or -1 for none
+static int RP_SettingAdminPower( int bit )
+{
+	switch (bit)
+	{
+	case 13:	return ADM_ADMPROTECT;
+	case 16:	return ADM_IGNORECHATDISTANCE;
+	case 20:	return ADM_ENTITYSYSTEM;
+	default:	return -1;
+	}
+}
+
+/*
+==================
+Cmd_SettingsUi_f
+
+GLX_U: [Settings Menu] "settingsui": the Settings menu (ingame_rpsettings.menu) asks for the player's settings when it
+opens. One reply, to him only: rpsettings "<v1> ... <v7> <a2> <a5> <a6>" -- the value of each /settings number (1 ON,
+or Telekinesis for 7; 0 OFF, or Grip), then whether he has the admin power to turn on settings 2, 5 and 6 (the menu
+greys a row he hasn't). cgame's CG_RpSettings_f (cg_servercmds.c) puts them into the menu's cvars.
+==================
+*/
+void Cmd_SettingsUi_f( gentity_t *ent ) {
+	char reply[64];
+	int n;
+
+	reply[0] = '\0';
+	for (n = 1; n < (int)ARRAY_LEN(settings_number_to_bit); n++)
+	{
+		Q_strcat(reply, sizeof(reply), va("%d ", RP_SettingValue(ent, settings_number_to_bit[n])));
+	}
+	for (n = 1; n < (int)ARRAY_LEN(settings_number_to_bit); n++)
+	{
+		int power = RP_SettingAdminPower(settings_number_to_bit[n]);
+
+		if (power >= 0)
+		{
+			Q_strcat(reply, sizeof(reply), va("%d ", check_admin_command(ent, power, qfalse) ? 1 : 0));
+		}
+	}
+	reply[strlen(reply) - 1] = '\0';	// the last space
+
+	trap->SendServerCommand(ent - g_entities, va("rpsettings \"%s\"", reply));
+}
+
+/*
+==================
+Cmd_SettingsApply_f
+
+GLX_U: [Settings Menu] "settingsapply <v1> ... <v7>": the Settings menu's APPLY. Each value is what that /settings
+number should be (1 ON, or Telekinesis for 7; 0 OFF, or Grip), not a toggle, so the result is what the player chose
+whatever changed since the menu opened. A setting that already has its value is left alone; one that differs goes
+through RP_SettingToggle(), exactly as /settings <n> would (the admin-power gates, the switch's side effects, the
+usual confirmation). A missing value, or anything but 0 or 1, leaves its setting alone. One save at the end.
+==================
+*/
+void Cmd_SettingsApply_f( gentity_t *ent ) {
+	char arg[8];
+	int n, tried = 0;
+	qboolean changed = qfalse;
+
+	for (n = 1; n < (int)ARRAY_LEN(settings_number_to_bit); n++)
+	{
+		int bit = settings_number_to_bit[n];
+		int want;
+
+		if (n >= trap->Argc())
+		{
+			break;
+		}
+		trap->Argv(n, arg, sizeof(arg));
+		if (strcmp(arg, "0") && strcmp(arg, "1"))
+		{
+			continue;
+		}
+		want = (arg[0] == '1') ? 1 : 0;
+		if (want == RP_SettingValue(ent, bit))
+		{
+			continue;
+		}
+		tried++;
+		if (RP_SettingToggle(ent, bit))
+		{
+			changed = qtrue;
+		}
+	}
+
+	if (changed)
+	{
+		save_account(ent, qfalse);
+	}
+	if (!tried)
+	{
+		trap->SendServerCommand(ent - g_entities, "print \"No settings changed.\n\"");
 	}
 }
 
@@ -26694,6 +26826,8 @@ command_t commands[] = {
 	{ "say_team",			Cmd_SayTeam_f,				0 },
 	{ "score",				Cmd_Score_f,				0 },
 	{ "settings",			Cmd_Settings_f,				CMD_LOGGEDIN|CMD_NOINTERMISSION },
+	{ "settingsapply",		Cmd_SettingsApply_f,		CMD_LOGGEDIN|CMD_NOINTERMISSION },	// GLX_U: [Settings Menu] the menu's APPLY
+	{ "settingsui",			Cmd_SettingsUi_f,			CMD_LOGGEDIN|CMD_NOINTERMISSION },	// GLX_U: [Settings Menu] the menu asks for the values
 	{ "setviewpos",			Cmd_SetViewpos_f,			CMD_CHEAT|CMD_NOINTERMISSION },
 	{ "shakescreen",		Cmd_ShakeScreen_f,			CMD_LOGGEDIN | CMD_NOINTERMISSION },
 	{ "siegeclass",			Cmd_SiegeClass_f,			CMD_NOINTERMISSION },

@@ -548,6 +548,64 @@
 			}
 		}
 
+		// GLX_U: [Settings Menu] "Settings", under Extras: the account's /settings in a menu of its own
+		// (ingame_rpsettings.menu), which this one closes for, as the Extras buttons do. Login-only, as /settings is.
+		itemDef
+		{
+			name				settingsButton_glow
+			style				WINDOW_STYLE_SHADER
+			rect				5 198 140 30
+			background			"gfx/menus/menu_blendbox2"
+			forecolor			1 1 1 1
+			visible				0
+			decoration
+			cvarTest			"ui_loggedin"
+			showCvar
+			{
+				"1"
+			}
+		}
+
+		itemDef
+		{
+			name				settingsButton
+			group				mainButtons
+			text				"Settings"
+			type				ITEM_TYPE_BUTTON
+			style				WINDOW_STYLE_EMPTY
+			rect				10 198 140 30
+			font				3
+			textscale			0.8
+			textalignx			15
+			textaligny			5
+			textalign			ITEM_ALIGN_LEFT
+			textstyle			3
+			forecolor			1 .682 0 1
+			visible				0
+			cvarTest			"ui_loggedin"
+			showCvar
+			{
+				"1"
+			}
+			descText			"Your account settings: saber ignition, use hint, Grip or Telekinesis and more"
+
+			mouseEnter
+			{
+				show			settingsButton_glow
+			}
+			mouseExit
+			{
+				hide			settingsButton_glow
+			}
+			action
+			{
+				play			"sound/interface/button1.wav" ;
+				hide			settingsButton_glow ;
+				close			ingame_galaxyrp ;
+				open			ingame_rpsettings
+			}
+		}
+
 		itemDef
 		{
 			name				extrasPropsButton_glow

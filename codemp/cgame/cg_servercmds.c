@@ -2103,6 +2103,46 @@ static void CG_ZykMod( void )
 	}
 }
 
+// GLX_U: [Settings Menu] the server's answer to the Settings menu's "settingsui" (Cmd_SettingsUi_f, g_cmds.c):
+// rpsettings "<v1> ... <v7> <a2> <a5> <a6>". The seven values go to the menu's ui_rpset_1..7, the admin flags of
+// settings 2, 5 and 6 to ui_rpset_2_ok/_5_ok/_6_ok, and ui_rpset_ready 1 last: until then the menu
+// (ingame_rpsettings.menu) has every row and APPLY greyed. A reply that isn't ten 0s and 1s sets nothing.
+#define RP_SETTINGS_COUNT		7
+static void CG_RpSettings_f( void )
+{
+	static const char *okCvars[] = { "ui_rpset_2_ok", "ui_rpset_5_ok", "ui_rpset_6_ok" };
+	char arg[MAX_STRING_CHARS];
+	char *tok[RP_SETTINGS_COUNT + ARRAY_LEN(okCvars) + 1];
+	char *p;
+	int n = 0, i;
+
+	trap->Cmd_Argv( 1, arg, sizeof( arg ) );
+	for ( p = strtok( arg, " " ); p && n < (int)ARRAY_LEN(tok); p = strtok( NULL, " " ) )
+	{
+		tok[n++] = p;
+	}
+	if ( n != RP_SETTINGS_COUNT + (int)ARRAY_LEN(okCvars) )
+	{
+		return;
+	}
+	for ( i = 0; i < n; i++ )
+	{
+		if ( strcmp( tok[i], "0" ) && strcmp( tok[i], "1" ) )
+		{
+			return;
+		}
+	}
+	for ( i = 0; i < RP_SETTINGS_COUNT; i++ )
+	{
+		trap->Cvar_Set( va( "ui_rpset_%d", i + 1 ), tok[i] );
+	}
+	for ( i = 0; i < (int)ARRAY_LEN(okCvars); i++ )
+	{
+		trap->Cvar_Set( okCvars[i], tok[RP_SETTINGS_COUNT + i] );
+	}
+	trap->Cvar_Set( "ui_rpset_ready", "1" );
+}
+
 typedef struct serverCommand_s {
 	const char	*cmd;
 	void		(*func)(void);
@@ -2133,6 +2173,7 @@ static serverCommand_t	commands[] = {
 	{ "rpxl",				CG_RpxReply },	// GalaxyRP: [Extras] a listing for the Extras menus, cg_rpextras.c
 	{ "rpdlg",				CG_RpDialogCmd },	// GLX_U: [Dialogues] a dialogue to show, cg_rpdialog.c
 	{ "rpdlgclose",			CG_RpDialogCloseCmd },
+	{ "rpsettings",			CG_RpSettings_f },	// GLX_U: [Settings Menu] the settings for the Settings menu
 	{ "sb",					CG_SiegeBriefingDisplay_f },
 	{ "scl",				CG_SiegeClassSelect_f },
 	{ "scores",				CG_ParseScores },
