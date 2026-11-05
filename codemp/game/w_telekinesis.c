@@ -311,7 +311,9 @@ static gentity_t *RP_TK_Resolve( gentity_t *self, gentity_t *cand, int lvl )
 {
 	gentity_t *veh;
 
-	if ( !cand->client->ps.m_iVehicleNum )
+	// GLX_U: [Telekinesis] a vehicle is itself: its m_iVehicleNum is its pilot's number + 1 (g_vehicles.c), not a
+	// vehicle it rides -- read as one, it lifted or ejected whatever sat in the slot after the pilot
+	if ( RP_TK_IsVehicle( cand ) || !cand->client->ps.m_iVehicleNum )
 	{
 		return cand;
 	}
@@ -333,6 +335,15 @@ static gentity_t *RP_TK_Resolve( gentity_t *self, gentity_t *cand, int lvl )
 static qboolean RP_TK_CanHold( gentity_t *self, gentity_t *ent, qboolean starting )
 {
 	if ( !ent || !ent->inuse || !ent->client || ent == self || ent->health < 1 )
+	{
+		return qfalse;
+	}
+	// GLX_U: [Telekinesis] not someone out of the world: a spectator (free or following someone), a temporary one (a
+	// dead Siege player waiting), or anyone unlinked (a spectator, a connecting player). They have health and grip's
+	// rules don't look at teams, and an unlinked one never blocks the sight trace, so level 5's cone took them; and a
+	// held player who turns spectator is let go here on the next frame. Players, NPCs, vehicles and riders are linked.
+	if ( ent->client->sess.sessionTeam == TEAM_SPECTATOR || ent->client->tempSpectate >= level.time ||
+		( ent->client->ps.pm_flags & PMF_FOLLOW ) || !ent->r.linked )
 	{
 		return qfalse;
 	}
@@ -583,12 +594,9 @@ qboolean RP_TelekinesisGrab( gentity_t *self )
 			}
 			if ( ent->client )
 			{
-				if ( ent->client->ps.m_iVehicleNum )
-				{	// a rider goes with his vehicle; only the aimed one is thrown off (RP_TK_Resolve)
-					continue;
-				}
-				if ( !RP_TK_CanHold( self, ent, qtrue ) )
-				{
+				if ( ent->client->ps.m_iVehicleNum && !RP_TK_IsVehicle( ent ) )
+				{	// a rider goes with his vehicle; only the aimed one is thrown off (RP_TK_Resolve). A vehicle's own
+					// m_iVehicleNum is its pilot + 1: a crewed vehicle joins, riders aboard
 					continue;
 				}
 			}
@@ -610,6 +618,10 @@ qboolean RP_TelekinesisGrab( gentity_t *self )
 			}
 			if ( !RP_TK_Visible( self, ent ) )
 			{
+				continue;
+			}
+			if ( ent->client && !RP_TK_CanHold( self, ent, qtrue ) )
+			{	// grip's rules last: they play the absorb sound on anyone absorbing, who should be only those in the cone
 				continue;
 			}
 			// insert by dot, the aimed one staying first

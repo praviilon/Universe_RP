@@ -5149,6 +5149,10 @@ void ForceThrow( gentity_t *self, qboolean pull )
 				}
 
 				VectorScale(pushDir,pushPowerMod,pushDir);
+				// GLX_U: [Items] the push starts from where the item is: with the start time set to now, a moving
+				// item (still flying from a push or a drop, or held or thrown by telekinesis) was put back at the
+				// start of its old motion first. An item at rest already starts where it lies.
+				VectorCopy( push_list[x]->r.currentOrigin, push_list[x]->s.pos.trBase );
 				push_list[x]->s.pos.trType = TR_GRAVITY;
 				push_list[x]->s.pos.trTime = level.time;
 				VectorCopy( pushDir, push_list[x]->s.pos.trDelta );
