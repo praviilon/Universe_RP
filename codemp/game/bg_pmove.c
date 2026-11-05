@@ -4868,7 +4868,27 @@ static void PM_GroundTraceMissed( void ) {
 
 	//rww - don't want to do this when handextend_choke, because you can be standing on the ground
 	//while still holding your throat.
-	if ( pm->ps->pm_type == PM_FLOAT )
+	if ( pm->ps->pm_type == PM_FLOAT && (pm->ps->stats[STAT_RP_SELF_FX] & RP_SELF_FX_TK_HELD) )
+	{	// GLX_U: [Telekinesis] lifted, not choked (w_telekinesis.c): the whole body is levitated -- the lift once,
+		// then its loop re-set every frame as the choke is. The torso timer is kept above 0 so a gun's ready
+		// stance does not take the torso back (PM_Weapon) while the loop's own timer is out.
+		if ( pm->ps->legsAnim == BOTH_FORCELEVITATED && pm->ps->legsTimer > 0 )
+		{
+		}
+		else if ( pm->ps->legsAnim == BOTH_FORCELEVITATED || pm->ps->legsAnim == BOTH_FORCELEVITATEDIDLE )
+		{
+			PM_SetAnim(SETANIM_BOTH, BOTH_FORCELEVITATEDIDLE, SETANIM_FLAG_OVERRIDE);
+		}
+		else
+		{
+			PM_SetAnim(SETANIM_BOTH, BOTH_FORCELEVITATED, SETANIM_FLAG_OVERRIDE|SETANIM_FLAG_HOLD);
+		}
+		if ( pm->ps->torsoAnim == pm->ps->legsAnim && pm->ps->torsoTimer < 1 )
+		{
+			pm->ps->torsoTimer = 1;
+		}
+	}
+	else if ( pm->ps->pm_type == PM_FLOAT )
 	{
 		//we're assuming this is because you're being choked
 		int parts = SETANIM_LEGS;
@@ -8273,7 +8293,23 @@ static void PM_Weapon( void )
 			desiredAnim = BOTH_FORCEPULL;
 			break;
 		case HANDEXTEND_FORCE_HOLD:
-			if ( (pm->ps->fd.forcePowersActive&(1<<FP_GRIP)) )
+			if ( (pm->ps->fd.forcePowersActive&(1<<FP_GRIP)) && (pm->ps->stats[STAT_RP_SELF_FX] & RP_SELF_FX_TK_MODE) )
+			{	// GLX_U: [Telekinesis] lifting (w_telekinesis.c): the lift, then the two-handed hold; the push while the
+				// throw is pending (the server keeps that one going after the hand is freed)
+				if ( pm->ps->stats[STAT_RP_SELF_FX] & RP_SELF_FX_TK_THROW )
+				{
+					desiredAnim = BOTH_FORCELEVITATEWAVE;
+				}
+				else if ( pm->ps->stats[STAT_RP_SELF_FX] & RP_SELF_FX_TK_LIFT )
+				{
+					desiredAnim = BOTH_FORCELEVITATE;
+				}
+				else
+				{
+					desiredAnim = BOTH_FORCELEVITATEIDLE;
+				}
+			}
+			else if ( (pm->ps->fd.forcePowersActive&(1<<FP_GRIP)) )
 			{//gripping
 				desiredAnim = BOTH_FORCEGRIP_HOLD;
 			}
@@ -8350,6 +8386,10 @@ static void PM_Weapon( void )
 			else if (pm->ps->torsoAnim == BOTH_PLAYER_PA_3_FLY && pm->ps->legsAnim == BOTH_PLAYER_PA_3_FLY)
 			{ // GLX_U: [Melee] thrown out of a head lock: keep the fly-and-land anim as the knockdown (as JA++)
 				desiredAnim = BOTH_PLAYER_PA_3_FLY;
+			}
+			else if (pm->ps->torsoAnim == BOTH_FORCELEVITATEDLAND && pm->ps->legsAnim == BOTH_FORCELEVITATEDLAND)
+			{ // GLX_U: [Telekinesis] dropped from a hold: the landing is the knockdown (RP_TelekinesisLanding, w_telekinesis.c)
+				desiredAnim = BOTH_FORCELEVITATEDLAND;
 			}
 			else
 			{

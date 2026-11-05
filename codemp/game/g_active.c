@@ -3644,6 +3644,11 @@ void ClientThink_real( gentity_t *ent ) {
 		Jetpack_Off( ent );
 	}
 
+	// GLX_U: [Telekinesis] before the move, for players and NPCs alike: the private bits the shared animation code
+	// reads (his mode, the hold's phase, being held), and a dropped target's landing (w_telekinesis.c)
+	RP_TelekinesisStatBits( ent );
+	RP_TelekinesisLanding( ent );
+
 	if ( client->noclip ) {
 		client->ps.pm_type = PM_NOCLIP;
 	} else if ( client->ps.eFlags & EF_DISINTEGRATION ) {

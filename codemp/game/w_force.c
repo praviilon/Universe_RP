@@ -705,8 +705,9 @@ int ForcePowerUsableOn(gentity_t *attacker, gentity_t *other, forcePowers_t forc
 
 	if (forcePower == FP_GRIP)
 	{
-		if (RP_GripRefused(other))
+		if (RP_GripRefused(other) && !RP_TelekinesisLiftsHeavy(attacker))
 		{ // DAJ_RP: [Force] no gripping vehicles, Galak's mech, the AT-ST or the Rancor (see RP_GripRefused())
+		  // GLX_U: [Telekinesis] ...except by telekinesis at level 4 or more, which lifts them (w_telekinesis.c)
 			return 0;
 		}
 		else if (other && other->client &&
@@ -2085,6 +2086,16 @@ void ForceGrip( gentity_t *self )
 
 	if ( !WP_ForcePowerUsable( self, FP_GRIP ) )
 	{
+		return;
+	}
+
+	if ( RP_TelekinesisMode( self ) )
+	{	// GLX_U: [Telekinesis] the Grip skill set to Telekinesis (/settings 7): the same key and checks up to here,
+		// its own targets and hold from here (w_telekinesis.c). WP_DoSpecificPower() starts the power as for grip.
+		if ( !RP_TelekinesisGrab( self ) )
+		{
+			self->client->ps.fd.forceGripEntityNum = ENTITYNUM_NONE;
+		}
 		return;
 	}
 
@@ -4260,6 +4271,13 @@ void ForceThrow( gentity_t *self, qboolean pull )
 
 	visionArc = 0;
 
+	if ( !pull && RP_TelekinesisHolding( self ) )
+	{	// GLX_U: [Telekinesis] the push key while holding: at level 3+ the held targets are thrown (w_telekinesis.c);
+		// nothing else, the hand being busy as for grip
+		RP_TelekinesisThrow( self );
+		return;
+	}
+
 	if ( !pull && RP_PairEmotePush( self ) )
 	{// GLX_U: [Couple Emotes] in a hug or kiss the push key slaps out of a kiss (the kissee's), and pushes no one
 		return;
@@ -4930,11 +4948,19 @@ void ForceThrow( gentity_t *self, qboolean pull )
 					//escape a force grip if we're in one
 					if (self->client->ps.fd.forceGripBeingGripped > level.time)
 					{ //force the enemy to stop gripping me if I managed to push him
-						if (push_list[x]->client->ps.fd.forceGripEntityNum == self->s.number)
+						if (push_list[x]->client->ps.fd.forceGripEntityNum == self->s.number ||
+							RP_TelekinesisHolds(push_list[x], self))
 						{
 							if (modPowerLevel >= push_list[x]->client->ps.fd.forcePowerLevel[FP_GRIP])
 							{ //only break the grip if our push/pull level is >= their grip level
-								WP_ForcePowerStop(push_list[x], FP_GRIP);
+								if (RP_TelekinesisHolds(push_list[x], self))
+								{	// GLX_U: [Telekinesis] out of a telekinesis hold: only this one is let go (w_telekinesis.c)
+									RP_TelekinesisEscape(push_list[x], self);
+								}
+								else
+								{
+									WP_ForcePowerStop(push_list[x], FP_GRIP);
+								}
 								self->client->ps.fd.forceGripBeingGripped = 0;
 								push_list[x]->client->ps.fd.forceGripUseTime = level.time + 1000; //since we just broke out of it..
 							}
@@ -5213,7 +5239,12 @@ void WP_ForcePowerStop( gentity_t *self, forcePowers_t forcePower )
 		break;
 	case FP_GRIP:
 		self->client->ps.fd.forceGripUseTime = level.time + 3000;
-		if (self->client->ps.fd.forcePowerLevel[FP_GRIP] > FORCE_LEVEL_1 &&
+		if ( self->client->tk.startTime )
+		{	// GLX_U: [Telekinesis] a telekinesis hold ends: the targets are let go (or thrown, if a push was pending)
+			// with no gasp, and the caster's release or push animation plays (w_telekinesis.c)
+			RP_TelekinesisStopped( self );
+		}
+		else if (self->client->ps.fd.forcePowerLevel[FP_GRIP] > FORCE_LEVEL_1 &&
 			g_entities[self->client->ps.fd.forceGripEntityNum].client &&
 			g_entities[self->client->ps.fd.forceGripEntityNum].health > 0 &&
 			g_entities[self->client->ps.fd.forceGripEntityNum].inuse &&
@@ -5796,7 +5827,8 @@ static void WP_ForcePowerRun( gentity_t *self, forcePowers_t forcePower, usercmd
 		if (self->client->ps.fd.forcePowerDebounce[FP_PULL] < level.time)
 		{ //This is sort of not ideal. Using the debounce value reserved for pull for this because pull doesn't need it.
 			BG_ForcePowerDrain( &self->client->ps, forcePower, 1 );
-			self->client->ps.fd.forcePowerDebounce[FP_PULL] = level.time + 100;
+			// GLX_U: [Telekinesis] grip's 100 ms, or the telekinesis level's (100/100/125/200/200 ms)
+			self->client->ps.fd.forcePowerDebounce[FP_PULL] = level.time + RP_TelekinesisDrainInterval( self );
 		}
 
 		if (self->client->ps.fd.forcePower < 1)
@@ -5808,6 +5840,11 @@ static void WP_ForcePowerRun( gentity_t *self, forcePowers_t forcePower, usercmd
 		// GalaxyRP fix: [Cloak Item] a held grip keeps breaking cloak, so re-cloaking while still
 		// choking someone does not stick -- see RP_AttackBreaksCloak.
 		RP_AttackBreaksCloak( self );
+		if ( RP_TelekinesisHolding( self ) )
+		{	// GLX_U: [Telekinesis] a telekinesis hold runs its own update (w_telekinesis.c)
+			RP_TelekinesisUpdate( self );
+			break;
+		}
 		DoGripAction(self, forcePower);
 		break;
 	case FP_LEVITATION:
@@ -7219,7 +7256,7 @@ void WP_ForcePowersUpdate( gentity_t *self, usercmd_t *ucmd )
 		self->client->ps.fd.forceJumpSound = 0;
 	}
 
-	if (self->client->ps.fd.forceGripCripple)
+	if (self->client->ps.fd.forceGripCripple && self->client->tkHeldUntil <= level.time) // GLX_U: [Telekinesis] no choking sound while lifted
 	{
 		if (self->client->ps.fd.forceGripSoundTime < level.time)
 		{
@@ -7288,7 +7325,8 @@ void WP_ForcePowersUpdate( gentity_t *self, usercmd_t *ucmd )
 	{ //see if we're using it generically.. if not, stop.
 		if (self->client->ps.fd.forcePowersActive & (1 << FP_GRIP))
 		{
-			if (!(ucmd->buttons & BUTTON_FORCEPOWER) || self->client->ps.fd.forcePowerSelected != FP_GRIP)
+			if ((!(ucmd->buttons & BUTTON_FORCEPOWER) || self->client->ps.fd.forcePowerSelected != FP_GRIP) &&
+				!self->client->tk.throwTime) // GLX_U: [Telekinesis] a pending push finishes the hold itself (w_telekinesis.c)
 			{
 				WP_ForcePowerStop(self, FP_GRIP);
 			}

@@ -2973,6 +2973,11 @@ void BG_PlayerStateToEntityState( playerState_t *ps, entityState_t *s, qboolean 
 			s->powerups |= 1 << i;
 		}
 	}
+	// GLX_U: [Telekinesis] no grip hand effect on a telekinesis caster (CG_Player draws it from this bit): the server
+	// keeps PW_DISINT_4 itself, for its push rules; only the other clients' copy goes without it (w_telekinesis.c)
+	if ( (ps->stats[STAT_RP_SELF_FX] & RP_SELF_FX_TK_MODE) && (ps->fd.forcePowersActive & (1 << FP_GRIP)) ) {
+		s->powerups &= ~(1 << PW_DISINT_4);
+	}
 
 	s->loopSound = ps->loopSound;
 	s->generic1 = ps->generic1;
@@ -3129,6 +3134,11 @@ void BG_PlayerStateToEntityStateExtraPolate( playerState_t *ps, entityState_t *s
 		if ( ps->powerups[ i ] ) {
 			s->powerups |= 1 << i;
 		}
+	}
+	// GLX_U: [Telekinesis] no grip hand effect on a telekinesis caster (CG_Player draws it from this bit): the server
+	// keeps PW_DISINT_4 itself, for its push rules; only the other clients' copy goes without it (w_telekinesis.c)
+	if ( (ps->stats[STAT_RP_SELF_FX] & RP_SELF_FX_TK_MODE) && (ps->fd.forcePowersActive & (1 << FP_GRIP)) ) {
+		s->powerups &= ~(1 << PW_DISINT_4);
 	}
 
 	s->loopSound = ps->loopSound;

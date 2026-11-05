@@ -1556,6 +1556,24 @@ void CG_DrawHUD(centity_t	*cent)
 
 #define MAX_SHOWPOWERS NUM_FORCE_POWERS
 
+// GLX_U: [Telekinesis] is the Grip slot showing Telekinesis for this player (/settings 7; the server says so in his
+// own playerState, STAT_RP_SELF_FX in bg_public.h)
+static qboolean CG_TelekinesisMode( void )
+{
+	return cg.snap && (cg.snap->ps.stats[STAT_RP_SELF_FX] & RP_SELF_FX_TK_MODE);
+}
+
+// GLX_U: [Telekinesis] the icon of a force power, wherever one is drawn: Grip's slot keeps Grip's icon in
+// Telekinesis mode until a telekinesis icon is made (then this is where it goes)
+static qhandle_t CG_ForcePowerIcon( int power )
+{
+	if ( power < 0 || power >= NUM_FORCE_POWERS )
+	{
+		return 0;
+	}
+	return cgs.media.forcePowerIcons[power];
+}
+
 qboolean ForcePower_Valid(int i)
 {
 	if (i == FP_LEVITATION ||
@@ -1672,9 +1690,9 @@ void CG_DrawForceSelect( void )
 
 		++iconCnt;					// Good icon
 
-		if (cgs.media.forcePowerIcons[forcePowerSorted[i]])
+		if (CG_ForcePowerIcon(forcePowerSorted[i]))
 		{
-			CG_DrawPic( holdX, y + yOffset, smallIconSize, smallIconSize, cgs.media.forcePowerIcons[forcePowerSorted[i]] );
+			CG_DrawPic( holdX, y + yOffset, smallIconSize, smallIconSize, CG_ForcePowerIcon(forcePowerSorted[i]) );
 			holdX -= (smallIconSize+pad);
 		}
 	}
@@ -1682,9 +1700,9 @@ void CG_DrawForceSelect( void )
 	if (ForcePower_Valid(cg.forceSelect))
 	{
 		// Current Center Icon
-		if (cgs.media.forcePowerIcons[cg.forceSelect])
+		if (CG_ForcePowerIcon(cg.forceSelect))
 		{
-			CG_DrawPic( x-(bigIconSize/2), (y-((bigIconSize-smallIconSize)/2)) + yOffset, bigIconSize, bigIconSize, cgs.media.forcePowerIcons[cg.forceSelect] ); //only cache the icon for display
+			CG_DrawPic( x-(bigIconSize/2), (y-((bigIconSize-smallIconSize)/2)) + yOffset, bigIconSize, bigIconSize, CG_ForcePowerIcon(cg.forceSelect) ); //only cache the icon for display
 		}
 	}
 
@@ -1710,16 +1728,22 @@ void CG_DrawForceSelect( void )
 
 		++iconCnt;					// Good icon
 
-		if (cgs.media.forcePowerIcons[forcePowerSorted[i]])
+		if (CG_ForcePowerIcon(forcePowerSorted[i]))
 		{
-			CG_DrawPic( holdX, y + yOffset, smallIconSize, smallIconSize, cgs.media.forcePowerIcons[forcePowerSorted[i]] ); //only cache the icon for display
+			CG_DrawPic( holdX, y + yOffset, smallIconSize, smallIconSize, CG_ForcePowerIcon(forcePowerSorted[i]) ); //only cache the icon for display
 			holdX += (smallIconSize+pad);
 		}
 	}
 
 	if ( showPowersName[cg.forceSelect] )
 	{
-		CG_DrawProportionalString(320, y + 30 + yOffset, CG_GetStringEdString("SP_INGAME", showPowersName[cg.forceSelect]), UI_CENTER | UI_SMALLFONT, colorTable[CT_ICON_BLUE]);
+		const char *name = CG_GetStringEdString("SP_INGAME", showPowersName[cg.forceSelect]);
+
+		if ( cg.forceSelect == FP_GRIP && CG_TelekinesisMode() )
+		{	// GLX_U: [Telekinesis] the Grip slot's other power
+			name = "Telekinesis";
+		}
+		CG_DrawProportionalString(320, y + 30 + yOffset, name, UI_CENTER | UI_SMALLFONT, colorTable[CT_ICON_BLUE]);
 	}
 }
 
@@ -5921,7 +5945,7 @@ static void CG_DrawHolocronIcons(void)
 	{
 		if (cg.snap->ps.holocronBits & (1 << forcePowerSorted[i]))
 		{
-			CG_DrawPic( startx, starty, endx, endy, cgs.media.forcePowerIcons[forcePowerSorted[i]]);
+			CG_DrawPic( startx, starty, endx, endy, CG_ForcePowerIcon(forcePowerSorted[i]));
 			starty += (icon_size+2); //+2 for spacing
 			if ((starty+icon_size) >= SCREEN_HEIGHT-80)
 			{
@@ -5979,7 +6003,7 @@ static void CG_DrawActivePowers(void)
 		if ((cg.snap->ps.fd.forcePowersActive & (1 << forcePowerSorted[i])) &&
 			CG_IsDurationPower(forcePowerSorted[i]))
 		{
-			CG_DrawPic( startx, starty, endx, endy, cgs.media.forcePowerIcons[forcePowerSorted[i]]);
+			CG_DrawPic( startx, starty, endx, endy, CG_ForcePowerIcon(forcePowerSorted[i]));
 			startx += (icon_size+2); //+2 for spacing
 			if ((startx+icon_size) >= SCREEN_WIDTH-80)
 			{

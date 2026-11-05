@@ -174,7 +174,7 @@ const skill_t skills[] = {
 	// and friendly npcs (RP_TeamPowerTargetValid in w_force.c).
 	{5, "Team Heal",			"restores health to your allies and friendly npcs near you. The range and HP restored grow with each level",																																																																		"force",	"light",	FP_TEAM_HEAL},
 	{5, "Lightning",			"attacks with a powerful electric attack at players near you. At level 4, does more damage and pushes the enemy back",																																															"force",	"dark",		FP_LIGHTNING},
-	{5, "Grip",					"attacks a player by holding and damaging him",																																																																	"force",	"dark",		FP_GRIP},
+	{5, "Grip/Telekinesis",		"holds and chokes a player. With /settings 7 it becomes Telekinesis: lifts and carries without harm (level 3 follows your aim and Push throws, level 4 lifts vehicles and big creatures, level 5 up to 5 targets)",																																																																	"force",	"dark",		FP_GRIP},
 	{5, "Drain",				"drains force power from a player to restore your health. At levels 4 and 5, Drain on someone right in front grabs him by the throat and drains him while you hold him",																																																														"force",	"dark",		FP_DRAIN},
 	// GalaxyRP fix: [Skills audit] description no longer references the "Force Guardian class...
 	// regen force when taking damage" sub-feature -- that class/behavior was removed in an earlier,
@@ -15516,6 +15516,17 @@ void Cmd_Settings_f( gentity_t *ent ) {
 			len += sprintf(message + len, "\n^3 6 - Entity Bounds (Requires Entities and Remaps admin power) - ^2ON");
 		}
 
+		// GLX_U: [Telekinesis] /settings 7 picks which of the Grip/Telekinesis skill's two powers the Grip key uses
+		// (w_telekinesis.c). Bit 21 is not inverted: clear is Grip, the default on every account, set is Telekinesis.
+		if (ent->client->pers.player_settings & (1 << RP_SETTING_TELEKINESIS))
+		{
+			len += sprintf(message + len, "\n^3 7 - Grip/Telekinesis Toggle - ^5Telekinesis");
+		}
+		else
+		{
+			len += sprintf(message + len, "\n^3 7 - Grip/Telekinesis Toggle - ^3Grip");
+		}
+
 		// GalaxyRP fix: [Challenge Mode] the status lines for settings 14 (Boss Battle Music) and 15
 		// (Difficulty/Challenge Mode) used to be printed here. Both settings have been removed below
 		// (see the range-check comment further down) since everything downstream of Challenge Mode
@@ -15553,7 +15564,8 @@ void Cmd_Settings_f( gentity_t *ent ) {
 		// happens to land on a previously-used bit because that bit was already free.
 		// DAJ_RP: [Settings] /settings 5 added -- "Ignore Chat Distance" -- on bit 16, never used before.
 		// DAJ_RP: [Entity Bounds] /settings 6 added -- "Entity Bounds" -- on bit 20, never used before.
-		static const int settings_number_to_bit[] = { 0, 5, 13, 11, 6, 16, 20 }; // index 0 unused (rejected below)
+		// GLX_U: [Telekinesis] /settings 7 added -- "Grip/Telekinesis Toggle" -- on bit 21, never used before.
+		static const int settings_number_to_bit[] = { 0, 5, 13, 11, 6, 16, 20, RP_SETTING_TELEKINESIS }; // index 0 unused (rejected below)
 
 		if (value <= 0 || value >= (int)ARRAY_LEN(settings_number_to_bit))
 		{
@@ -15624,6 +15636,13 @@ void Cmd_Settings_f( gentity_t *ent ) {
 		// 14 and 15 are now rejected above as invalid settings values, and everything downstream of
 		// Challenge Mode activation is dead.
 
+		// GLX_U: [Telekinesis] a grip or a telekinesis hold in progress ends with the switch: the power that runs
+		// is the one the bit said when it started (w_telekinesis.c)
+		if (value == RP_SETTING_TELEKINESIS && (ent->client->ps.fd.forcePowersActive & (1 << FP_GRIP)))
+		{
+			WP_ForcePowerStop(ent, FP_GRIP);
+		}
+
 		save_account(ent, qfalse);
 
 		// GalaxyRP fix: [Quests] the value==0 (RPG quests) print branch used to be here. Removed since
@@ -15677,6 +15696,19 @@ void Cmd_Settings_f( gentity_t *ent ) {
 		else if (value == 20)
 		{
 			trap->SendServerCommand( ent-g_entities, va("print \"Entity Bounds %s\n\"", new_status) );
+		}
+		else if (value == RP_SETTING_TELEKINESIS)
+		{	// GLX_U: [Telekinesis] not ON or OFF but which power; and, as Sense Health, a note when he has no skill for it
+			const char *power = (ent->client->pers.player_settings & (1 << RP_SETTING_TELEKINESIS)) ? "^5Telekinesis^7" : "^3Grip^7";
+
+			if (ent->client->pers.skill_levels[14] < 1)
+			{
+				trap->SendServerCommand( ent-g_entities, va("print \"Grip/Telekinesis Toggle: %s\n^3You don't have the Grip/Telekinesis skill, so this has no effect until you do.\n\"", power) );
+			}
+			else
+			{
+				trap->SendServerCommand( ent-g_entities, va("print \"Grip/Telekinesis Toggle: %s\n\"", power) );
+			}
 		}
 		// GalaxyRP fix: [Challenge Mode] the value==14 (Boss Battle Music) and value==15 (Difficulty)
 		// print branches used to be here. Removed since 14 and 15 are now rejected above as invalid

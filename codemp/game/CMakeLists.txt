@@ -123,6 +123,7 @@ set(MPGameGameFiles
 	"${MPDir}/game/tri_coll_test.c"
 	"${MPDir}/game/w_force.c"
 	"${MPDir}/game/w_saber.c"
+	"${MPDir}/game/w_telekinesis.c"
 	"${MPDir}/game/WalkerNPC.c"
 	"${MPDir}/game/ai.h"
 	"${MPDir}/game/ai_main.h"

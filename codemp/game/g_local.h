@@ -1168,6 +1168,9 @@ typedef struct clientPersistant_s {
 	//      0 here and reads as ON (inverted: clear == ON, set == OFF) -- existing admins keep hearing
 	//      everything. New accounts are created with it SET (OFF). Only has an effect together with the
 	//      ADM_IGNORECHATDISTANCE admin power; see zyk_ignores_chat_distance() (g_cmds.c).
+	// 21 - Grip/Telekinesis Toggle (/settings 7). GLX_U: [Telekinesis] never used before, so every account reads
+	//      0 here. NOT inverted, unlike the others: clear == Grip (the default), set == Telekinesis. Read by
+	//      RP_TelekinesisMode() (w_telekinesis.c); it only has an effect with the Grip/Telekinesis skill.
 	// GalaxyRP fix: [Settings] bits 14 ("Boss Battle Music") and 15 ("Difficulty") documentation
 	// removed here — those settings have been removed from the game entirely.
 	// GalaxyRP fix: [Settings] bits 26-29 ("Starting Single Saber Style") documentation removed here
@@ -1539,6 +1542,21 @@ typedef struct renderInfo_s
 
 // this structure is cleared on each ClientSpawn(),
 // except for 'client->pers' and 'client->sess'
+// GLX_U: [Telekinesis] a caster's hold: the targets, where each is steered to, and a pending push (w_telekinesis.c).
+#define RP_TK_MAX_TARGETS		5
+#define RP_SETTING_TELEKINESIS	21		// player_settings bit of /settings 7, set == Telekinesis (see player_settings above)
+typedef struct rpTelekinesis_s {
+	int		num;						// targets held; 0 when not holding
+	int		ents[RP_TK_MAX_TARGETS];	// their entity numbers
+	vec3_t	offsets[RP_TK_MAX_TARGETS];	// level 1: the hold point itself; 2: from the caster's origin; 3+: from the point on his aim
+	float	dist;						// level 3+: how far along the aim the hold point sits
+	int		startTime;					// level.time the hold began
+	int		moveTime;					// level.time the targets are next steered
+	int		throwTime;					// level.time the targets are thrown, 0 when no push is pending
+	int		throwLevel;					// the Push level the pending throw was paid for
+	qboolean thrown;					// the targets were just thrown: the stop keeps the push animation going
+} rpTelekinesis_t;
+
 struct gclient_s {
 	// ps MUST be the first element, because the server expects it
 	playerState_t	ps;				// communicated by server to clients
@@ -1828,6 +1846,13 @@ struct gclient_s {
 	int			entBoundsNextPrint;		// level.time the aimed entity's centre-print may be (re)sent
 	qboolean	entBoundsPrintPending;	// the aimed entity changed and its centre-print is still owed
 	qboolean	entBoundsPrinted;		// a centre-print of ours is on screen and needs clearing
+
+	// GLX_U: [Telekinesis] the hold this client runs as a caster (w_telekinesis.c), and his state as a target.
+	// Zeroed with the rest of gclient_s; a hold always ends through WP_ForcePowerStop(FP_GRIP), which spawn,
+	// death and disconnect all call.
+	rpTelekinesis_t	tk;
+	int			tkHeldUntil;	// level.time until which a caster holds this client (refreshed by every update)
+	int			tkLandUntil;	// level.time until which his first landing after a plain release plays BOTH_FORCELEVITATEDLAND
 
 	// GalaxyRP fix: [Death System] downedTime used to live here, in gclient_s. It has moved into
 	// clientPersistant_t above -- see the comment on it there for why the two halves of the downed
@@ -3488,6 +3513,20 @@ void WP_ForcePowersUpdate( gentity_t *self, usercmd_t *ucmd );
 int ForcePowerUsableOn(gentity_t *attacker, gentity_t *other, forcePowers_t forcePower);
 // DAJ_RP: [Force] Grip may not take hold of this one: a vehicle, Galak's mech, the AT-ST or the Rancor
 qboolean RP_GripRefused( const gentity_t *target );
+
+// GLX_U: [Telekinesis] w_telekinesis.c
+qboolean RP_TelekinesisMode( const gentity_t *ent );
+qboolean RP_TelekinesisLiftsHeavy( const gentity_t *ent );
+qboolean RP_TelekinesisHolding( const gentity_t *ent );
+qboolean RP_TelekinesisHolds( const gentity_t *holder, const gentity_t *ent );
+int RP_TelekinesisDrainInterval( const gentity_t *ent );
+qboolean RP_TelekinesisGrab( gentity_t *self );
+void RP_TelekinesisUpdate( gentity_t *self );
+void RP_TelekinesisStopped( gentity_t *self );
+void RP_TelekinesisEscape( gentity_t *holder, gentity_t *victim );
+void RP_TelekinesisThrow( gentity_t *self );
+void RP_TelekinesisStatBits( gentity_t *ent );
+void RP_TelekinesisLanding( gentity_t *ent );
 void ForceHeal( gentity_t *self );
 void ForceSpeed( gentity_t *self, int forceDuration );
 void ForceRage( gentity_t *self );

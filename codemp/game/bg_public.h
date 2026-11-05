@@ -646,6 +646,13 @@ typedef enum {
 
 // DAJ_RP: [Phase] STAT_RP_SELF_FX bits
 #define RP_SELF_FX_HIDDEN		(1<<0)	// /admhidden: he sees the Force Push body blur on himself (CG_Player(), cg_players.c)
+// GLX_U: [Telekinesis] the Grip skill's second power (w_telekinesis.c). Private for the same reason: the shared
+// BG code reads them for the owner's own animations (bg_pmove.c) and for leaving the grip hand effect out of his
+// entityState (bg_misc.c); his own client shows the name (cg_draw.c).
+#define RP_SELF_FX_TK_MODE		(1<<1)	// his Grip skill is in Telekinesis mode (/settings 7)
+#define RP_SELF_FX_TK_LIFT		(1<<2)	// the first 1.5 s of a hold: he plays BOTH_FORCELEVITATE, then BOTH_FORCELEVITATEIDLE
+#define RP_SELF_FX_TK_THROW		(1<<3)	// a push on the held targets is pending: he plays BOTH_FORCELEVITATEWAVE
+#define RP_SELF_FX_TK_HELD		(1<<4)	// he is held by telekinesis: he plays BOTH_FORCELEVITATED(IDLE), not the choke
 
 
 // playerState_t->persistant[] indexes
