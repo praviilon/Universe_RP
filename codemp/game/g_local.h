@@ -551,6 +551,11 @@ struct gentity_s {
 	// /entcut, 0 otherwise. Zeroed with the entity, so a freed or reused slot can never pass for the
 	// held one. See g_entgrab.c.
 	int			rpHeldBy;
+	// GLX_U: [Telekinesis] on an item a telekinesis hold has: 1 + the caster's client number, and the level.time
+	// the hold mark runs out (refreshed every frame of the hold, so it lapses by itself). Zeroed with the entity,
+	// so a freed or reused slot is never taken for the held item. See w_telekinesis.c and G_RunItem().
+	int			rpTkItemHolder;
+	int			rpTkItemHeldUntil;
 	// GLX_U: [Lua] 1 + the plugin slot of the script that spawned this entity (a prop or an NPC), 0
 	// otherwise, with the stamp its handle carries; a freed slot is zeroed, so a stale handle never
 	// matches. /entsave leaves these out. See rp_lua_world.c.
@@ -1548,6 +1553,7 @@ typedef struct renderInfo_s
 typedef struct rpTelekinesis_s {
 	int		num;						// targets held; 0 when not holding
 	int		ents[RP_TK_MAX_TARGETS];	// their entity numbers
+	qboolean item[RP_TK_MAX_TARGETS];	// that target is an item (ET_ITEM, no client), not a player, NPC or vehicle
 	vec3_t	offsets[RP_TK_MAX_TARGETS];	// level 1: the hold point itself; 2: from the caster's origin; 3+: from the point on his aim
 	float	dist;						// level 3+: how far along the aim the hold point sits
 	int		startTime;					// level.time the hold began
@@ -3519,6 +3525,7 @@ qboolean RP_TelekinesisMode( const gentity_t *ent );
 qboolean RP_TelekinesisLiftsHeavy( const gentity_t *ent );
 qboolean RP_TelekinesisHolding( const gentity_t *ent );
 qboolean RP_TelekinesisHolds( const gentity_t *holder, const gentity_t *ent );
+qboolean RP_TelekinesisItemHeld( const gentity_t *ent );
 int RP_TelekinesisDrainInterval( const gentity_t *ent );
 qboolean RP_TelekinesisGrab( gentity_t *self );
 void RP_TelekinesisUpdate( gentity_t *self );

@@ -1665,7 +1665,7 @@
 			descText			""
 			type				1
 			font				3
-			textscale			.42
+			textscale			.5
 			style				WINDOW_STYLE_FILLED
 			rect				320 180 50 15
 			textalign			ITEM_ALIGN_LEFT

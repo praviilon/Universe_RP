@@ -174,7 +174,7 @@ const skill_t skills[] = {
 	// and friendly npcs (RP_TeamPowerTargetValid in w_force.c).
 	{5, "Team Heal",			"restores health to your allies and friendly npcs near you. The range and HP restored grow with each level",																																																																		"force",	"light",	FP_TEAM_HEAL},
 	{5, "Lightning",			"attacks with a powerful electric attack at players near you. At level 4, does more damage and pushes the enemy back",																																															"force",	"dark",		FP_LIGHTNING},
-	{5, "Grip/Telekinesis",		"holds and chokes a player. With /settings 7 it becomes Telekinesis: lifts and carries without harm (level 3 follows your aim and Push throws, level 4 lifts vehicles and big creatures, level 5 up to 5 targets)",																																																																	"force",	"dark",		FP_GRIP},
+	{5, "Grip/Telekinesis",		"holds and chokes a player. With /settings 7 it becomes Telekinesis: lifts and carries players and items without harm (level 3 follows your aim and Push throws, level 4 lifts vehicles and big creatures, level 5 up to 5 targets)",																																																																	"force",	"dark",		FP_GRIP},
 	{5, "Drain",				"drains force power from a player to restore your health. At levels 4 and 5, Drain on someone right in front grabs him by the throat and drains him while you hold him",																																																														"force",	"dark",		FP_DRAIN},
 	// GalaxyRP fix: [Skills audit] description no longer references the "Force Guardian class...
 	// regen force when taking damage" sub-feature -- that class/behavior was removed in an earlier,

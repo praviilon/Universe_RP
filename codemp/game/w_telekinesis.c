@@ -23,6 +23,16 @@ The reach to start (from the eyes) is 256/256/256/320/450 by level, and a target
 320/320/320/450/550 (feet to feet): rpTkReach, rpTkDrop. At level 3+ the hold point is that reach less 32
 (rpTkHoldMax), so a held target stays well inside its drop distance.
 
+Items too: weapons, ammo, powerups and holdables -- any item Force Push and Pull may move that is there to take
+right now, but no team item (the flags). With no player, NPC or vehicle on the aim, the item nearest the aim line
+(within RP_TK_ITEM_BAND of it, in reach and in sight) is taken; at level 5 items share the group with the others.
+Every level holds one as it holds a player, steering it in a straight line (TR_LINEAR) to the hold point every
+100 ms; let go or thrown, it falls, bounces and settles as a pushed one does (G_RunItem, which leaves a held item
+alone: gentity_t::rpTkItemHeldUntil). Its own clock keeps running: a map item gets the push's return
+(G_ReturnPushedItem) when taken and goes home when that runs out, a dropped one vanishes at its lifetime, and a
+touch picks it up as usual -- each time the hold just lets it go, untouched. Another player's Push or Pull gives it
+a jolt, as it gives a held player, and the next steer brings it back.
+
 A hold lasts while the key is held and force lasts: the hand timer caps it at 10/20/30/40/60 s by level, and
 it drains 1 force every 100/100/125/200/200 ms (RP_TelekinesisDrainInterval, in WP_ForcePowerRun). Being
 gripped or lifted yourself ends it. Everything else is grip's: the busy hand (HANDEXTEND_FORCE_HOLD, so no
@@ -58,6 +68,7 @@ extern qboolean WP_ForcePowerUsable( gentity_t *self, forcePowers_t forcePower )
 										// (the hands swing back 0-0.6 s, thrust 0.7-0.9 s, fastest at 0.8)
 #define RP_TK_LAND_WINDOW_MS	3000	// a released target landing within this plays BOTH_FORCELEVITATEDLAND
 #define RP_TK_HELD_MS			200		// a target counts as held this long after its last update
+#define RP_TK_ITEM_BAND			32.0f	// with nothing else on the aim, an item is taken within this of the aim line
 
 static const int rpTkHoldCapMs[NUM_FORCE_POWER_LEVELS] = { 0, 10000, 20000, 30000, 40000, 60000 };
 static const int rpTkDrainMs[NUM_FORCE_POWER_LEVELS] = { 100, 100, 100, 125, 200, 200 };
@@ -145,6 +156,154 @@ static qboolean RP_TK_IsVehicle( const gentity_t *ent )
 	return ent->s.eType == ET_NPC && ent->s.NPC_class == CLASS_VEHICLE;
 }
 
+// where a target is: a client's origin, an item's (the bottom of its box)
+static void RP_TK_Origin( const gentity_t *ent, vec3_t out )
+{
+	if ( ent->client )
+	{
+		VectorCopy( ent->client->ps.origin, out );
+	}
+	else
+	{
+		VectorCopy( ent->r.currentOrigin, out );
+	}
+}
+
+// the point a target is aimed at and seen at: a client's origin, an item's middle
+static void RP_TK_SeenPoint( const gentity_t *ent, vec3_t out )
+{
+	if ( ent->client )
+	{
+		VectorCopy( ent->client->ps.origin, out );
+		return;
+	}
+	VectorAdd( ent->r.mins, ent->r.maxs, out );
+	VectorMA( ent->r.currentOrigin, 0.5f, out, out );
+}
+
+// an item under a telekinesis hold right now: G_RunItem leaves its motion to the hold
+qboolean RP_TelekinesisItemHeld( const gentity_t *ent )
+{
+	return ( ent->rpTkItemHolder && ent->rpTkItemHeldUntil > level.time ) ? qtrue : qfalse;
+}
+
+// an item self may take (starting) or keep holding: one Push and Pull may move (w_force.c) -- an item there to take
+// right now, not a flag -- that an admin isn't holding (/entcopy, /entcut: rpHeldBy), and, starting, that no hold
+// has; kept, that it is still ours. A freed or reused slot is zeroed, so it never passes for ours.
+static qboolean RP_TK_ItemMovable( const gentity_t *self, const gentity_t *ent, qboolean starting )
+{
+	if ( !ent->inuse || ent->client || ent->s.eType != ET_ITEM || !ent->item || ent->item->giType == IT_TEAM )
+	{
+		return qfalse;
+	}
+	if ( (ent->s.eFlags & (EF_NODRAW | EF_ITEMPLACEHOLDER)) || !(ent->r.contents & CONTENTS_TRIGGER) || !ent->r.linked || ent->rpHeldBy )
+	{	// taken and waiting on RespawnItem, still spawning, or an admin's
+		return qfalse;
+	}
+	if ( starting )
+	{
+		return RP_TelekinesisItemHeld( ent ) ? qfalse : qtrue;
+	}
+	return ( ent->rpTkItemHolder == self->s.number + 1 ) ? qtrue : qfalse;
+}
+
+// a held item stays in the hold while it is movable and ours, and, for a map item, until the return it got when taken
+// has run (G_ReturnPushedItem clears its think time and puts it home: it is then left where that put it)
+static qboolean RP_TK_ItemKept( const gentity_t *self, const gentity_t *ent )
+{
+	if ( !RP_TK_ItemMovable( self, ent, qfalse ) )
+	{
+		return qfalse;
+	}
+	if ( !(ent->flags & FL_DROPPED_ITEM) && ( ent->think != G_ReturnPushedItem || !ent->nextthink ) )
+	{
+		return qfalse;
+	}
+	return qtrue;
+}
+
+// the hold mark off an item, if it is ours
+static void RP_TK_ItemUnmark( const gentity_t *self, gentity_t *ent )
+{
+	if ( ent->rpTkItemHolder == self->s.number + 1 )
+	{
+		ent->rpTkItemHolder = 0;
+		ent->rpTkItemHeldUntil = 0;
+	}
+}
+
+// an item is taken: marked as ours, and a map item gets the return a push gives it, so it goes home in time
+// whatever happens to it (G_ReturnPushedItem, G_ItemPushReturnTime); a dropped one keeps its lifetime
+static void RP_TK_ItemTake( gentity_t *self, gentity_t *ent )
+{
+	ent->rpTkItemHolder = self->s.number + 1;
+	ent->rpTkItemHeldUntil = level.time + RP_TK_HELD_MS;
+	ent->physicsObject = qtrue;		// as a pushed item
+	if ( !(ent->flags & FL_DROPPED_ITEM) )
+	{
+		ent->think = G_ReturnPushedItem;
+		ent->nextthink = level.time + G_ItemPushReturnTime( ent ) * 1000;
+	}
+}
+
+// steers a held item to point: a straight line from where it is, at the speed a held player gets
+static void RP_TK_ItemSteer( gentity_t *ent, const vec3_t point )
+{
+	vec3_t a;
+	float len;
+
+	VectorSubtract( point, ent->r.currentOrigin, a );
+	len = VectorLength( a );
+	if ( len < RP_TK_STEER_DEAD )
+	{
+		VectorClear( a );
+	}
+	else
+	{
+		float v = len * RP_TK_STEER_GAIN;
+
+		if ( v > RP_TK_STEER_MAX )
+		{
+			v = RP_TK_STEER_MAX;
+		}
+		VectorScale( a, v / len, a );
+	}
+	VectorCopy( ent->r.currentOrigin, ent->s.pos.trBase );
+	VectorCopy( a, ent->s.pos.trDelta );
+	ent->s.pos.trType = TR_LINEAR;
+	ent->s.pos.trTime = level.time;
+	ent->s.groundEntityNum = ENTITYNUM_NONE;
+}
+
+// lets a held item go from where it is, with the motion it has (or vel): it falls, bounces and settles as a pushed
+// one does (G_RunItem). One that is no longer ours to hold (taken, gone, or sent home: RP_TK_ItemKept) only loses
+// the mark, if it is still ours, and is otherwise left as it is.
+static void RP_TK_ItemRelease( gentity_t *self, gentity_t *ent, const vec3_t vel )
+{
+	vec3_t v;
+
+	if ( !RP_TK_ItemKept( self, ent ) )
+	{
+		RP_TK_ItemUnmark( self, ent );
+		return;
+	}
+	RP_TK_ItemUnmark( self, ent );
+	if ( vel )
+	{
+		VectorCopy( vel, v );
+	}
+	else
+	{
+		BG_EvaluateTrajectoryDelta( &ent->s.pos, level.time, v );
+	}
+	VectorCopy( ent->r.currentOrigin, ent->s.pos.trBase );
+	VectorCopy( v, ent->s.pos.trDelta );
+	ent->s.pos.trType = TR_GRAVITY;
+	ent->s.pos.trTime = level.time;
+	ent->s.groundEntityNum = ENTITYNUM_NONE;
+	trap->LinkEntity( (sharedEntity_t *)ent );
+}
+
 // the player-on-a-vehicle rules, as Push's: a speeder or animal rider aimed at is thrown off and lifted
 // alone; a walker or fighter pilot can't be lifted on his own -- at level 4+ his vehicle is lifted instead,
 // rider aboard, below that nothing is. Returns what to lift, or NULL.
@@ -210,12 +369,15 @@ static void RP_TK_Eye( const gentity_t *self, vec3_t eye, vec3_t fwd )
 	AngleVectors( self->client->ps.viewangles, fwd, NULL, NULL );
 }
 
-// can self see ent's origin from his own: the world and other players block it, the held targets don't
+// can self see ent's origin (an item's middle) from his own: the world and other players block it, the held targets
+// don't (an item never does: it is not solid)
 static qboolean RP_TK_Visible( gentity_t *self, gentity_t *ent )
 {
 	trace_t tr;
+	vec3_t p;
 
-	trap->Trace( &tr, self->client->ps.origin, NULL, NULL, ent->client->ps.origin, self->s.number, MASK_PLAYERSOLID, qfalse, 0, 0 );
+	RP_TK_SeenPoint( ent, p );
+	trap->Trace( &tr, self->client->ps.origin, NULL, NULL, p, self->s.number, MASK_PLAYERSOLID, qfalse, 0, 0 );
 	if ( tr.fraction == 1.0f || tr.entityNum == ent->s.number )
 	{
 		return qtrue;
@@ -249,7 +411,13 @@ static void RP_TK_Add( gentity_t *self, gentity_t *ent )
 {
 	rpTelekinesis_t *tk = &self->client->tk;
 
+	tk->item[tk->num] = ent->client ? qfalse : qtrue;
 	tk->ents[tk->num++] = ent->s.number;
+	if ( !ent->client )
+	{
+		RP_TK_ItemTake( self, ent );
+		return;
+	}
 	ent->client->ps.fd.forceGripStarted = level.time;
 	ent->client->tkHeldUntil = level.time + RP_TK_HELD_MS;
 	ent->client->tkLandUntil = 0;
@@ -271,22 +439,85 @@ static void RP_TK_ReleaseOne( gentity_t *ent, qboolean landing )
 		? level.time + RP_TK_LAND_WINDOW_MS : 0;	// a landing only for one that was in the air
 }
 
-static void RP_TK_Remove( gentity_t *self, int i, qboolean landing )
+// lets the i-th target go: a player, NPC or vehicle as RP_TK_ReleaseOne, an item as RP_TK_ItemRelease
+static void RP_TK_ReleaseAt( gentity_t *self, int i, qboolean landing )
 {
 	rpTelekinesis_t *tk = &self->client->tk;
 	gentity_t *ent = &g_entities[tk->ents[i]];
 
-	RP_TK_ReleaseOne( ent, landing );
+	if ( tk->item[i] )
+	{
+		RP_TK_ItemRelease( self, ent, NULL );
+	}
+	else
+	{
+		RP_TK_ReleaseOne( ent, landing );
+	}
+}
+
+static void RP_TK_Remove( gentity_t *self, int i, qboolean landing )
+{
+	rpTelekinesis_t *tk = &self->client->tk;
+	int num = tk->ents[i];		// not ent->s.number: a freed item's is cleared
+
+	RP_TK_ReleaseAt( self, i, landing );
 	for ( ; i < tk->num - 1; i++ )
 	{
 		tk->ents[i] = tk->ents[i + 1];
+		tk->item[i] = tk->item[i + 1];
 		VectorCopy( tk->offsets[i + 1], tk->offsets[i] );
 	}
 	tk->num--;
-	if ( self->client->ps.fd.forceGripEntityNum == ent->s.number )
+	if ( self->client->ps.fd.forceGripEntityNum == num )
 	{	// the stock code's one target: keep it one we hold
 		self->client->ps.fd.forceGripEntityNum = tk->num ? tk->ents[0] : ENTITYNUM_NONE;
 	}
+}
+
+// with no player, NPC or vehicle on the aim: the item nearest the aim line, within RP_TK_ITEM_BAND of it, in front,
+// in reach (the eyes to its middle) and in sight; of two as near the line, the nearer one. NULL if there is none.
+static gentity_t *RP_TK_PickItem( gentity_t *self, int lvl, const vec3_t eye, const vec3_t fwd )
+{
+	gentity_t *best = NULL;
+	float bestOff = 0, bestAlong = 0;
+	int i;
+
+	for ( i = MAX_CLIENTS; i < level.num_entities; i++ )
+	{
+		gentity_t *ent = &g_entities[i];
+		vec3_t p, to;
+		float along, off2, off;
+
+		if ( !RP_TK_ItemMovable( self, ent, qtrue ) )
+		{
+			continue;
+		}
+		RP_TK_SeenPoint( ent, p );
+		VectorSubtract( p, eye, to );
+		along = DotProduct( to, fwd );
+		if ( along <= 0 || VectorLength( to ) > rpTkReach[lvl] )
+		{
+			continue;
+		}
+		off2 = VectorLengthSquared( to ) - along * along;
+		off = off2 > 0 ? sqrt( off2 ) : 0;
+		if ( off > RP_TK_ITEM_BAND )
+		{
+			continue;
+		}
+		if ( best && ( off > bestOff || ( off == bestOff && along >= bestAlong ) ) )
+		{
+			continue;
+		}
+		if ( !RP_TK_Visible( self, ent ) )
+		{
+			continue;
+		}
+		best = ent;
+		bestOff = off;
+		bestAlong = along;
+	}
+	return best;
 }
 
 // Called by ForceGrip() in place of its own target code once the caster may grip at all. Picks the targets
@@ -325,6 +556,10 @@ qboolean RP_TelekinesisGrab( gentity_t *self )
 		}
 	}
 
+	if ( !first )
+	{	// no one on the aim: an item near it
+		first = RP_TK_PickItem( self, lvl, eye, fwd );
+	}
 	if ( first )
 	{
 		RP_TK_Add( self, first );
@@ -338,23 +573,31 @@ qboolean RP_TelekinesisGrab( gentity_t *self )
 		for ( i = 0; i < level.num_entities; i++ )
 		{
 			gentity_t *ent = &g_entities[i];
-			vec3_t to;
+			vec3_t p, to;
 			float dist, dot;
 			int j, k;
 
-			if ( !ent->inuse || !ent->client || ent == self || ent == first )
+			if ( !ent->inuse || ent == self || ent == first )
 			{
 				continue;
 			}
-			if ( ent->client->ps.m_iVehicleNum )
-			{	// a rider goes with his vehicle; only the aimed one is thrown off (RP_TK_Resolve)
-				continue;
-			}
-			if ( !RP_TK_CanHold( self, ent, qtrue ) )
+			if ( ent->client )
 			{
+				if ( ent->client->ps.m_iVehicleNum )
+				{	// a rider goes with his vehicle; only the aimed one is thrown off (RP_TK_Resolve)
+					continue;
+				}
+				if ( !RP_TK_CanHold( self, ent, qtrue ) )
+				{
+					continue;
+				}
+			}
+			else if ( !RP_TK_ItemMovable( self, ent, qtrue ) )
+			{	// nor an item to take
 				continue;
 			}
-			VectorSubtract( ent->client->ps.origin, eye, to );
+			RP_TK_SeenPoint( ent, p );
+			VectorSubtract( p, eye, to );
 			dist = VectorNormalize( to );
 			if ( dist > rpTkReach[lvl] )
 			{
@@ -411,7 +654,7 @@ qboolean RP_TelekinesisGrab( gentity_t *self )
 	// the hold point and each target's place around it
 	if ( lvl <= FORCE_LEVEL_2 )
 	{
-		VectorCopy( first->client->ps.origin, hold );
+		RP_TK_Origin( first, hold );
 		hold[2] += RP_TK_LIFT_HEIGHT;
 		if ( lvl == FORCE_LEVEL_1 )
 		{
@@ -426,7 +669,8 @@ qboolean RP_TelekinesisGrab( gentity_t *self )
 	{
 		vec3_t to;
 
-		VectorSubtract( first->client->ps.origin, eye, to );
+		RP_TK_Origin( first, to );
+		VectorSubtract( to, eye, to );
 		tk->dist = VectorLength( to );
 		if ( tk->dist < RP_TK_MIN_DIST )
 		{
@@ -440,7 +684,8 @@ qboolean RP_TelekinesisGrab( gentity_t *self )
 		VectorClear( tk->offsets[0] );
 		for ( i = 1; i < tk->num; i++ )
 		{
-			VectorSubtract( g_entities[tk->ents[i]].client->ps.origin, hold, tk->offsets[i] );
+			RP_TK_Origin( &g_entities[tk->ents[i]], tk->offsets[i] );
+			VectorSubtract( tk->offsets[i], hold, tk->offsets[i] );
 		}
 	}
 
@@ -472,6 +717,18 @@ static void RP_TK_DoThrow( gentity_t *self )
 	{
 		gentity_t *ent = &g_entities[tk->ents[i]];
 
+		if ( tk->item[i] )
+		{	// an item flies the same way, and falls as a pushed one
+			vec3_t vel;
+
+			VectorScale( fwd, speed, vel );
+			if ( vel[2] < 128 )
+			{
+				vel[2] = 128;
+			}
+			RP_TK_ItemRelease( self, ent, vel );
+			continue;
+		}
 		if ( !ent->inuse || !ent->client )
 		{
 			continue;
@@ -543,6 +800,40 @@ void RP_TelekinesisUpdate( gentity_t *self )
 		gentity_t *ent = &g_entities[tk->ents[i]];
 		vec3_t a, point;
 		int useLvl;
+
+		if ( tk->item[i] )
+		{	// an item: let go untouched when it isn't ours to hold any more (taken, gone, or sent home); let fall
+			// when out of range or sight, or, below level 3, when the caster looks away; else held and steered
+			vec3_t org;
+
+			if ( !RP_TK_ItemKept( self, ent ) )
+			{	// RP_TK_ItemRelease, through the remove, only takes the mark off
+				RP_TK_Remove( self, i--, qfalse );
+				continue;
+			}
+			RP_TK_Origin( ent, org );
+			VectorSubtract( org, self->client->ps.origin, a );
+			if ( VectorLength( a ) > rpTkDrop[lvl] || !RP_TK_Visible( self, ent ) ||
+				( lvl < FORCE_LEVEL_3 && !InFront( org, self->client->ps.origin, self->client->ps.viewangles, 0.9f ) ) )
+			{
+				RP_TK_Remove( self, i--, qtrue );
+				continue;
+			}
+			ent->rpTkItemHeldUntil = level.time + RP_TK_HELD_MS;
+			if ( steer )
+			{
+				if ( lvl == FORCE_LEVEL_1 || lvl == FORCE_LEVEL_2 )
+				{
+					VectorCopy( hold, point );
+				}
+				else
+				{
+					VectorAdd( hold, tk->offsets[i], point );
+				}
+				RP_TK_ItemSteer( ent, point );
+			}
+			continue;
+		}
 
 		if ( !RP_TK_CanHold( self, ent, qfalse ) )
 		{
@@ -630,7 +921,7 @@ void RP_TelekinesisStopped( gentity_t *self )
 	}
 	for ( i = 0; i < tk->num; i++ )
 	{
-		RP_TK_ReleaseOne( &g_entities[tk->ents[i]], qtrue );
+		RP_TK_ReleaseAt( self, i, qtrue );
 	}
 
 	if ( handFree )

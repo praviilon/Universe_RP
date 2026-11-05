@@ -3010,6 +3010,10 @@ static qboolean G_ItemMoveHome( gentity_t *ent )
 	}
 
 	G_SetOrigin( ent, ent->s.origin );
+	// GLX_U: [Telekinesis] home is home: a telekinesis hold on it (w_telekinesis.c) lets it go where it is now, rather
+	// than steer it back out -- whichever way it came home (its return, a no-drop volume, its respawn)
+	ent->rpTkItemHolder = 0;
+	ent->rpTkItemHeldUntil = 0;
 
 	if ( suspended )
 	{
@@ -4197,8 +4201,12 @@ void G_RunItem( gentity_t *ent ) {
 	int			mask;
 
 	// if groundentity has been set to ENTITYNUM_NONE, it may have been pushed off an edge
-	if ( ent->s.groundEntityNum == ENTITYNUM_NONE ) {
+	// GLX_U: [Telekinesis] except while a telekinesis hold steers it (a straight line to the hold point, renewed every
+	// 100 ms, w_telekinesis.c). And a fall starts from where the item is: the start point was left as it was, which
+	// is where it is for every item at rest, but not for one moving in a straight line -- it jumped back to it.
+	if ( ent->s.groundEntityNum == ENTITYNUM_NONE && !RP_TelekinesisItemHeld( ent ) ) {
 		if ( ent->s.pos.trType != TR_GRAVITY ) {
+			VectorCopy( ent->r.currentOrigin, ent->s.pos.trBase );
 			ent->s.pos.trType = TR_GRAVITY;
 			ent->s.pos.trTime = level.time;
 		}
