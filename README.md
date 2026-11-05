@@ -39,6 +39,7 @@ Claude Code is being used to develop the project.
 - Paired hugs and kisses
 - Better sit animations, ledge grab, and improved player head tracking
 - A grappling hook, `/autowalk`, and an AFK protection bubble with animations
+- Force Telekinesis, an alternative to Grip: lift, carry and throw players, NPCs and vehicles without harming them, up to five at once
 
 ### [Combat](https://praviilon.github.io/Universe_RP/features.html#combat)
 - Melee grapples (punch, knee throw, head lock), spin kicks and flip kicks
@@ -142,6 +143,7 @@ The mod actually requires only the game-code files from the build project: `jamp
 - Lord Marka Ragnos: G.Grievous, Strofitus, b3-k5 StroffxDesign, Bacon, Xioth
 - Throwable Stuff: Jose Carlos
 - HD HUD Elements: Grab
+- Additional animations: Jedi Knight Galaxies team (Darth Futuza, Noodle, Silverfang and others), JA+ team (Slider)
 
 # License
 **OpenJK** is licensed under GPLv2 as free software. You are free to use, modify and redistribute OpenJK following the terms in LICENSE.txt.
