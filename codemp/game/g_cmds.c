@@ -8141,17 +8141,20 @@ void BroadcastTeamChange( gclient_t *client, int oldTeam )
 		return;
 	}
 
+	// GLX_U: [Team Change] announced as a normal print -- the console and the top-left message lines, like "entered
+	// the game" -- not a centre print across everyone's screen, which broke into roleplay at every join and every trip
+	// to the spectators
 	if ( client->sess.sessionTeam == TEAM_RED ) {
-		trap->SendServerCommand( -1, va("cp \"%s" S_COLOR_WHITE " %s\n\"",
+		trap->SendServerCommand( -1, va("print \"%s" S_COLOR_WHITE " %s\n\"",
 			client->pers.netname, G_GetStringEdString("MP_SVGAME", "JOINEDTHEREDTEAM")) );
 	} else if ( client->sess.sessionTeam == TEAM_BLUE ) {
-		trap->SendServerCommand( -1, va("cp \"%s" S_COLOR_WHITE " %s\n\"",
+		trap->SendServerCommand( -1, va("print \"%s" S_COLOR_WHITE " %s\n\"",
 		client->pers.netname, G_GetStringEdString("MP_SVGAME", "JOINEDTHEBLUETEAM")));
 	} else if ( client->sess.sessionTeam == TEAM_SPECTATOR && oldTeam != TEAM_SPECTATOR ) {
-		trap->SendServerCommand( -1, va("cp \"%s" S_COLOR_WHITE " %s\n\"",
+		trap->SendServerCommand( -1, va("print \"%s" S_COLOR_WHITE " %s\n\"",
 		client->pers.netname, G_GetStringEdString("MP_SVGAME", "JOINEDTHESPECTATORS")));
 	} else if ( client->sess.sessionTeam == TEAM_FREE ) {
-		trap->SendServerCommand( -1, va("cp \"%s" S_COLOR_WHITE " %s\n\"",
+		trap->SendServerCommand( -1, va("print \"%s" S_COLOR_WHITE " %s\n\"",
 		client->pers.netname, G_GetStringEdString("MP_SVGAME", "JOINEDTHEBATTLE")));
 	}
 
