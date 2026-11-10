@@ -1884,6 +1884,9 @@ void CG_RpDialogCmd( void );
 void CG_RpDialogCloseCmd( void );
 void CG_Rpx_f( void );
 
+// GLX_U: [Extras Admin Grey] the Extras tab's admin-power flags to 0 -- cg_servercmds.c
+void CG_RpExtrasAdminClear( void );
+
 // GLX_U: [Shader Aim] /shaderaim, the client's half -- cg_shaderaim.c
 void RP_ShaderAim_f( void );
 void RP_ShaderAimFree( void );

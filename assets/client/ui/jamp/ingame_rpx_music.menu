@@ -253,6 +253,13 @@
 			bordercolor         1 .682 0 .6
 			visible             1
 			descText            "Everyone on the map hears it (/playmusic)"
+			// GLX_U: [Extras Admin Grey] greyed and unclickable without the Music admin power (ui_rpx_adm_music,
+			// from the Galaxy RP menu's zykmod reply). Play for me, Stop and Map music need none
+			cvarTest            "ui_rpx_adm_music"
+			enableCvar
+			{
+				"1"
+			}
 			mouseEnter
 			{
 				setitemcolor rpx_all bordercolor 1 1 1 1

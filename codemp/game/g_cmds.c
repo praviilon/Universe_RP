@@ -26617,9 +26617,14 @@ void Cmd_TrainingMode_f(gentity_t* ent) {
 void Cmd_GalaxyRpUi_f(gentity_t* ent) {
 	// zyk: sends info to the client-side menu if player has the client-side plugin
 	char userinfo[MAX_INFO_STRING];
-	char modelname[MAX_STRING_CHARS];
-	char saber1Model[MAX_STRING_CHARS];
-	char saber2Model[MAX_STRING_CHARS];
+	// GLX_U: [Extras Admin Grey] MAX_QPATH, the most the game itself keeps of a model (ClientUserinfoChanged).
+	// These come from the userinfo, which lets one value run to about a thousand characters: copied whole,
+	// such a value made the first block below too long for content[], Q_strcat dropped it whole, and every
+	// later field reached the wrong cvar (CG_ZykMod). Cut here, the payload stays under about 570 characters,
+	// well inside content[] and the 1022 that SV_SendServerCommand sends.
+	char modelname[MAX_QPATH];
+	char saber1Model[MAX_QPATH];
+	char saber2Model[MAX_QPATH];
 	// GalaxyRP fix: [Char] this used to re-derive "this player's" own client slot via
 	// ClientNumberFromString(), which either treats the name as a raw slot index (if it's purely
 	// numeric) or does a case-insensitive SUBSTRING search across every connected player's name and
@@ -26730,6 +26735,19 @@ void Cmd_GalaxyRpUi_f(gentity_t* ent) {
 			for (int i = 0; i < ARRAY_LEN(upgrade_bits_to_sync); i++) {
 				owned_bit = upgrade_bits_to_sync[i];
 				Q_strcat(content, sizeof(content), va("%d~", (ent->client->pers.skill_levels[38] & (1 << owned_bit)) ? 1 : 0));
+			}
+		}
+
+		// GLX_U: [Extras Admin Grey] last, three admin powers the Extras tab needs: Entities and Remaps (MD3
+		// and GLM Props, Effects, Lights, Spawners), NPC management (NPCs & Vehicles) and Music (the Music
+		// menu's "Play for everyone"), each 1 or 0, into ui_rpx_adm_ent/_npc/_music (ui_cvars_in_order[],
+		// cg_servercmds.c, in this order). The menus grey those buttons without the power; the commands
+		// still check it themselves.
+		{
+			static const int extras_powers[] = { ADM_ENTITYSYSTEM, ADM_NPC, ADM_MUSIC };
+
+			for (int i = 0; i < ARRAY_LEN(extras_powers); i++) {
+				Q_strcat(content, sizeof(content), va("%d~", (ent->client->pers.bitvalue & (1 << extras_powers[i])) ? 1 : 0));
 			}
 		}
 

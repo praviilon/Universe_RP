@@ -279,6 +279,13 @@ XCVAR_DEF( ui_rp_skill_60_level,			"0",					NULL,				CVAR_ARCHIVE | CVAR_INTERNA
 XCVAR_DEF( ui_zyk_upgrade_1_owned,			"0",					NULL,				CVAR_ARCHIVE|CVAR_INTERNAL )
 XCVAR_DEF( ui_zyk_upgrade_2_owned,			"0",					NULL,				CVAR_ARCHIVE|CVAR_INTERNAL )
 XCVAR_DEF( ui_zyk_upgrade_3_owned,			"0",					NULL,				CVAR_ARCHIVE|CVAR_INTERNAL )
+// GLX_U: [Extras Admin Grey] whether the player has the Entities and Remaps, NPC management and Music admin
+// powers: the last three fields of the zykmod payload (CG_ZykMod), 0 at start and logout (CG_RpExtrasAdminClear).
+// Not archived: they belong to one account on one server. ingame_galaxyrp.menu's Extras buttons and
+// ingame_rpx_music.menu's "Play for everyone" are enabled only at 1.
+XCVAR_DEF( ui_rpx_adm_ent,					"0",					NULL,				CVAR_INTERNAL )
+XCVAR_DEF( ui_rpx_adm_npc,					"0",					NULL,				CVAR_INTERNAL )
+XCVAR_DEF( ui_rpx_adm_music,				"0",					NULL,				CVAR_INTERNAL )
 // GalaxyRP fix: [Quests] 40 quest-era cvars used to be defined here and just above:
 // ui_zyk_rpg_level_up_score, ui_zyk_rpg_magic_power, ui_zyk_rpg_rpgclass, the light / dark /
 // eternity / universe / ultimate / resurrection _power switches, ui_zyk_special_powers,

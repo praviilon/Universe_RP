@@ -1756,6 +1756,10 @@ static void CG_LoggedInUpdate_f(void)
 	}
 
 	trap->Cvar_Set("ui_loggedin", CG_Argv(1));
+	if (!atoi(CG_Argv(1)))
+	{
+		CG_RpExtrasAdminClear();	// GLX_U: [Extras Admin Grey] logged out: no account, no powers
+	}
 }
 
 // GalaxyRP: [Radar] the local player's ally set, as the two bitfields the server keeps in
@@ -2060,8 +2064,29 @@ char ui_cvars_in_order[100][100] = {
 	// removal does not affect the positional parsing below.
 	"ui_zyk_upgrade_1_owned",
 	"ui_zyk_upgrade_2_owned",
-	"ui_zyk_upgrade_3_owned"
+	"ui_zyk_upgrade_3_owned",
+	// GLX_U: [Extras Admin Grey] last, whether the player has the Entities and Remaps, NPC management and Music
+	// admin powers, in the order Cmd_GalaxyRpUi_f (g_cmds.c) appends them: the Extras buttons of
+	// ingame_galaxyrp.menu and ingame_rpx_music.menu's "Play for everyone" are greyed without them
+	"ui_rpx_adm_ent",
+	"ui_rpx_adm_npc",
+	"ui_rpx_adm_music"
 };
+
+/*
+CG_RpExtrasAdminClear
+
+GLX_U: [Extras Admin Grey] the three admin-power flags above back to 0. Called when the client game starts (a new
+map, server or account must not keep the last one's flags) and when the server says the player is logged out.
+Not when the menu opens: the last value stays until the zykmod reply replaces it, so an admin's buttons don't
+flash grey while it is on its way. A flag left at 0 by a lost reply only greys a button until the next ask.
+*/
+void CG_RpExtrasAdminClear( void )
+{
+	trap->Cvar_Set( "ui_rpx_adm_ent", "0" );
+	trap->Cvar_Set( "ui_rpx_adm_npc", "0" );
+	trap->Cvar_Set( "ui_rpx_adm_music", "0" );
+}
 
 // GalaxyRP fix: [stability] CG_ZykMod below assigns each "~"-delimited field of the zykmod payload to
 // ui_cvars_in_order[] purely by position, with nothing to catch the server's field count and this array
@@ -2073,7 +2098,8 @@ char ui_cvars_in_order[100][100] = {
 // There's no automatic way to keep the two sides in sync across this VM boundary, so this has to be
 // updated by hand whenever either side's field count changes -- the warning in CG_ZykMod is the safety
 // net for whenever it isn't.
-#define ZYKMOD_EXPECTED_FIELD_COUNT 72
+// GLX_U: [Extras Admin Grey] + the three admin-power flags appended after the shop-upgrade ones = 75.
+#define ZYKMOD_EXPECTED_FIELD_COUNT 75
 
 static void CG_ZykMod( void )
 { // zyk: receives account info of logged players
@@ -2091,6 +2117,7 @@ static void CG_ZykMod( void )
 		i++;
 		if (i >= ARRAY_LEN(ui_cvars_in_order)) {
 			trap->Print("WARNING: CG_ZykMod received more fields than ui_cvars_in_order[] has entries -- server and client zykmod field counts are out of sync.\n");
+			CG_RpExtrasAdminClear();	// GLX_U: [Extras Admin Grey] see below
 			return;
 		}
 		value = strtok(NULL, "~");
@@ -2104,6 +2131,10 @@ static void CG_ZykMod( void )
 	// immediately instead of quietly shipping wrong menu data.
 	if (i != ZYKMOD_EXPECTED_FIELD_COUNT) {
 		trap->Print("WARNING: CG_ZykMod received %d fields, expected %d -- zykmod payload may be out of sync with ui_cvars_in_order[].\n", i, ZYKMOD_EXPECTED_FIELD_COUNT);
+		// GLX_U: [Extras Admin Grey] the admin-power flags are the last fields, so a payload of another length (an
+		// older server, or an empty field, which strtok skips, moving every later one up) has them missing or
+		// shifted: grey those buttons rather than trust them. The server still checks each command.
+		CG_RpExtrasAdminClear();
 	}
 }
 

@@ -2640,6 +2640,7 @@ Ghoul2 Insert End
 	// GalaxyRP: [Extras] the Extras menus start this map afresh -- cg_rpextras.c
 	CG_RpxInit();
 	CG_RpDialogInit();	// GLX_U: [Dialogues] the rpdlg userinfo key, the font, clean cvars (cg_rpdialog.c)
+	CG_RpExtrasAdminClear();	// GLX_U: [Extras Admin Grey] no admin-power flags until the server sends this account's (cg_servercmds.c)
 
 	cg.renderingThirdPerson = cg_thirdPerson.integer;
 

@@ -464,6 +464,10 @@
 		// music and sounds, each in a menu of its own (ingame_rpx_*.menu, ui_rpextras.c). GLX_U: props
 		// are MD3 Props and GLM Props (.glm models, misc_model_ghoul) now, the others one place lower.
 		// The server refuses what a player may not do, so only the login gates it, as the buttons above.
+		// GLX_U: [Extras Admin Grey] and now the buttons needing an admin power (Entities and Remaps: MD3 and GLM
+		// Props, Effects, Lights, Spawners; NPC management: NPCs & Vehicles) are greyed for a player without it,
+		// from the flags the zykmod reply carries. Music and Sounds stay open: playing music for yourself and
+		// /playsound need no power, and the Music menu greys its own "Play for everyone".
 
 		itemDef
 		{
@@ -515,6 +519,9 @@
 			action
 			{
 				play			"sound/interface/button1.wav" ;
+				// GLX_U: [Extras Admin Grey] ask again, as Shop does: the reply's admin-power flags grey the
+				// buttons below a player can't use (ui_rpx_adm_ent/_npc, CG_ZykMod)
+				exec			"zykmod" ;
 				show 			extrasControls ;
 				hide			charControls ;
 				hide			changePassControls ;
@@ -634,6 +641,12 @@
 			forecolor			1 .682 0 1
 			visible				0
 			descText			"Browse the server's .md3 models, preview one and spawn it where you aim"
+			// GLX_U: [Extras Admin Grey] greyed and unclickable without the Entities and Remaps admin power
+			cvarTest			"ui_rpx_adm_ent"
+			enableCvar
+			{
+				"1"
+			}
 
 			mouseEnter
 			{
@@ -681,6 +694,12 @@
 			forecolor			1 .682 0 1
 			visible				0
 			descText			"Browse the server's .glm models, preview one and spawn it where you aim"
+			// GLX_U: [Extras Admin Grey] greyed and unclickable without the Entities and Remaps admin power
+			cvarTest			"ui_rpx_adm_ent"
+			enableCvar
+			{
+				"1"
+			}
 
 			mouseEnter
 			{
@@ -727,6 +746,12 @@
 			forecolor			1 .682 0 1
 			visible				0
 			descText			"Browse the server's effects, preview one and spawn it where you aim"
+			// GLX_U: [Extras Admin Grey] greyed and unclickable without the Entities and Remaps admin power
+			cvarTest			"ui_rpx_adm_ent"
+			enableCvar
+			{
+				"1"
+			}
 
 			mouseEnter
 			{
@@ -773,6 +798,12 @@
 			forecolor			1 .682 0 1
 			visible				0
 			descText			"Spawn an NPC or a vehicle from the server's list"
+			// GLX_U: [Extras Admin Grey] greyed and unclickable without the NPC management admin power
+			cvarTest			"ui_rpx_adm_npc"
+			enableCvar
+			{
+				"1"
+			}
 
 			mouseEnter
 			{
@@ -912,6 +943,12 @@
 			forecolor			1 .682 0 1
 			visible				0
 			descText			"Spawn a light where you aim, one you can switch on and off"
+			// GLX_U: [Extras Admin Grey] greyed and unclickable without the Entities and Remaps admin power
+			cvarTest			"ui_rpx_adm_ent"
+			enableCvar
+			{
+				"1"
+			}
 
 			mouseEnter
 			{
@@ -959,6 +996,12 @@
 			forecolor			1 .682 0 1
 			visible				0
 			descText			"Place an NPC or vehicle spawner where you aim, fired by its name"
+			// GLX_U: [Extras Admin Grey] greyed and unclickable without the Entities and Remaps admin power
+			cvarTest			"ui_rpx_adm_ent"
+			enableCvar
+			{
+				"1"
+			}
 
 			mouseEnter
 			{
