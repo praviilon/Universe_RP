@@ -45,6 +45,8 @@
 	loadMenu { "ui/jamp/ingame_rpx_sounds.menu" 		}
 	loadMenu { "ui/jamp/ingame_rpx_lights.menu" 		}
 	loadMenu { "ui/jamp/ingame_rpx_spawners.menu" 		}
+	loadMenu { "ui/jamp/ingame_rpx_shaders.menu" 		}	// GLX_U: [Shader Remaps Menu]
+	loadMenu { "ui/jamp/ingame_rpx_shprev.menu" 		}	// GLX_U: [Shader Remaps Menu] its preview strip
 	loadMenu { "ui/jamp/ingame_rpdialog.menu" 		}	// GLX_U: [Dialogues]
 	loadMenu { "ui/jamp/ingame_rpsettings.menu" 		}	// GLX_U: [Settings Menu]
 }

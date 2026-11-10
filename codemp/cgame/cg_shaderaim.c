@@ -792,14 +792,25 @@ static void RP_SA_PrintModel( const char *path, const char *where, float dist )
 		Com_Printf( "  ^3%s\n", RP_SA_Clean( names[i] ) );
 }
 
-/*
-==================
-RP_ShaderAim_f
+// what is under the aim
+typedef enum { RP_SA_NOTHING, RP_SA_SURFACE, RP_SA_PLAYER, RP_SA_MODEL, RP_SA_ENTITY } rpSaHitKind_t;
 
-"rpshaderaim", sent by the server after it has checked the power (Cmd_ShaderAim_f, g_cmds.c).
-==================
+typedef struct {
+	rpSaHitKind_t	kind;
+	char			shader[MAX_QPATH];	// RP_SA_SURFACE: its shader
+	char			where[64];			// RP_SA_SURFACE: "world" or the brush entity; RP_SA_MODEL: the entity or "static model"
+	const char		*modelPath;			// RP_SA_MODEL
+	int				num;				// RP_SA_PLAYER, RP_SA_ENTITY: the entity
+	float			dist;
+} rpSaHit_t;
+
+/*
+RP_SA_Lookup
+
+What the crosshair is on, nearest first: a drawn surface of the world or of a brush entity, a player or NPC, a
+model. Reads the map on its first use in a map.
 */
-void RP_ShaderAim_f( void )
+static void RP_SA_Lookup( rpSaHit_t *hit )
 {
 	const playerState_t *ps = &cg.predictedPlayerState;
 	vec3_t eye, dir, end;
@@ -812,11 +823,8 @@ void RP_ShaderAim_f( void )
 	int i;
 	trace_t tr;
 
-	if ( !cg.snap )
-		return;
-	if ( cg.time < rpSaNextAllowed && rpSaNextAllowed - cg.time <= RP_SA_DEBOUNCE_MSEC )
-		return;
-	rpSaNextAllowed = cg.time + RP_SA_DEBOUNCE_MSEC;
+	memset( hit, 0, sizeof( *hit ) );
+	modelWhere[0] = '\0';
 
 	VectorCopy( ps->origin, eye );
 	eye[2] += ps->viewheight;
@@ -824,12 +832,7 @@ void RP_ShaderAim_f( void )
 	VectorMA( eye, RP_SA_RANGE, dir, end );
 
 	if ( !rpSa.tried )
-	{
-		Com_Printf( "^7Reading %s's surfaces...\n", RP_SA_Clean( cgs.mapname ) );
 		RP_ShaderAimLoad( cgs.mapname );
-	}
-	if ( !rpSa.ok )
-		Com_Printf( "^1Could not read this map's surfaces. ^7Models are still found.\n" );
 
 	// 1. the world's drawn surfaces
 	bestShader = RP_ShaderAimTraceModel( 0, eye, dir, &best );
@@ -952,20 +955,119 @@ void RP_ShaderAim_f( void )
 	// the nearest wins; a surface over a model's box just in front of it (the box is bigger than the model)
 	if ( bestShader >= 0 && best <= modelDist + RP_SA_TIE )
 	{
-		char where[64];
-
+		hit->kind = RP_SA_SURFACE;
+		Q_strncpyz( hit->shader, RP_ShaderAimShaderName( bestShader ), sizeof( hit->shader ) );
 		if ( bestEnt >= 0 )
-			Com_sprintf( where, sizeof( where ), "#%i, brush model *%i", bestEnt, bestModel );
+			Com_sprintf( hit->where, sizeof( hit->where ), "#%i, brush model *%i", bestEnt, bestModel );
 		else
-			Q_strncpyz( where, "world", sizeof( where ) );
-		RP_SA_PrintShader( RP_ShaderAimShaderName( bestShader ), where, best );
+			Q_strncpyz( hit->where, "world", sizeof( hit->where ) );
+		hit->dist = best;
 	}
 	else if ( playerHit >= 0 )
-		Com_Printf( "^3Player/NPC #%i ^5(%i units)^7: its textures come from its model and skin.\n", playerHit, (int)modelDist );
+	{
+		hit->kind = RP_SA_PLAYER;
+		hit->num = playerHit;
+		hit->dist = modelDist;
+	}
 	else if ( modelPath )
-		RP_SA_PrintModel( modelPath, modelWhere, modelDist );
+	{
+		hit->kind = RP_SA_MODEL;
+		hit->modelPath = modelPath;
+		Q_strncpyz( hit->where, modelWhere, sizeof( hit->where ) );
+		hit->dist = modelDist;
+	}
 	else if ( tr.fraction < 1.0f && tr.entityNum < ENTITYNUM_WORLD && tr.entityNum != ENTITYNUM_NONE )
-		Com_Printf( "^3Entity #%i ^5(%i units)^7: no model to name.\n", tr.entityNum, (int)( tr.fraction * RP_SA_RANGE ) );
-	else
+	{
+		hit->kind = RP_SA_ENTITY;
+		hit->num = tr.entityNum;
+		hit->dist = tr.fraction * RP_SA_RANGE;
+	}
+}
+
+/*
+==================
+RP_ShaderAim_f
+
+"rpshaderaim", sent by the server after it has checked the power (Cmd_ShaderAim_f, g_cmds.c).
+==================
+*/
+void RP_ShaderAim_f( void )
+{
+	rpSaHit_t hit;
+
+	if ( !cg.snap )
+		return;
+	if ( cg.time < rpSaNextAllowed && rpSaNextAllowed - cg.time <= RP_SA_DEBOUNCE_MSEC )
+		return;
+	rpSaNextAllowed = cg.time + RP_SA_DEBOUNCE_MSEC;
+
+	if ( !rpSa.tried )
+	{
+		Com_Printf( "^7Reading %s's surfaces...\n", RP_SA_Clean( cgs.mapname ) );
+		RP_ShaderAimLoad( cgs.mapname );
+	}
+	if ( !rpSa.ok )
+		Com_Printf( "^1Could not read this map's surfaces. ^7Models are still found.\n" );
+
+	RP_SA_Lookup( &hit );
+
+	switch ( hit.kind )
+	{
+	case RP_SA_SURFACE:
+		RP_SA_PrintShader( hit.shader, hit.where, hit.dist );
+		break;
+	case RP_SA_PLAYER:
+		Com_Printf( "^3Player/NPC #%i ^5(%i units)^7: its textures come from its model and skin.\n", hit.num, (int)hit.dist );
+		break;
+	case RP_SA_MODEL:
+		RP_SA_PrintModel( hit.modelPath, hit.where, hit.dist );
+		break;
+	case RP_SA_ENTITY:
+		Com_Printf( "^3Entity #%i ^5(%i units)^7: no model to name.\n", hit.num, (int)hit.dist );
+		break;
+	default:
 		Com_Printf( "^7Nothing under your aim.\n" );
+		break;
+	}
+}
+
+/*
+RP_ShaderAimPick
+
+GLX_U: [Shader Remaps Menu] the menu's "Pick from world" (cg_rpextras.c): the shader of the map surface or brush
+entity under the aim into out, with what it is now remapped to in remap ("" for nothing). qfalse, with the
+reason in why, when the aim is on no drawn surface.
+*/
+qboolean RP_ShaderAimPick( char *out, int outSize, char *remap, int remapSize, char *why, int whySize )
+{
+	rpSaHit_t hit;
+
+	out[0] = remap[0] = why[0] = '\0';
+	if ( !cg.snap )
+	{
+		Q_strncpyz( why, "Not in the game yet.", whySize );
+		return qfalse;
+	}
+	RP_SA_Lookup( &hit );
+	switch ( hit.kind )
+	{
+	case RP_SA_SURFACE:
+		Q_strncpyz( out, hit.shader, outSize );
+		if ( RP_SA_RemappedTo( hit.shader, remap, remapSize ) && !Q_stricmp( remap, hit.shader ) )
+			remap[0] = '\0';	// an entry pointing at itself (/remap X X) is no remap
+		return qtrue;
+	case RP_SA_PLAYER:
+		Q_strncpyz( why, "That is a player or an NPC: its textures come from its model and skin.", whySize );
+		break;
+	case RP_SA_MODEL:
+		Q_strncpyz( why, "That is a model, not a map surface: /shaderaim names its shaders.", whySize );
+		break;
+	case RP_SA_ENTITY:
+		Q_strncpyz( why, "That entity has no map surface under your aim.", whySize );
+		break;
+	default:
+		Q_strncpyz( why, rpSa.ok ? "No map surface under your aim." : "Could not read this map's surfaces.", whySize );
+		break;
+	}
+	return qfalse;
 }

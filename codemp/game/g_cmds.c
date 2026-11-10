@@ -16449,6 +16449,39 @@ void Cmd_RemapReset_f( gentity_t *ent ) {
 
 /*
 ==================
+Cmd_RemapRemove_f
+
+GLX_U: [Shader Remaps Menu] /remapremove <shader>: takes one shader remap back (zyk_remove_remap(), g_utils.c).
+The Shader Remaps menu's Remove button sends it; typed, it takes the name /remaplist shows on the left.
+==================
+*/
+void Cmd_RemapRemove_f( gentity_t *ent ) {
+	char arg1[MAX_STRING_CHARS];
+
+	if (!check_admin_command(ent, ADM_ENTITYSYSTEM, qtrue))
+	{
+		return;
+	}
+
+	if ( trap->Argc() < 2 )
+	{
+		trap->SendServerCommand( ent-g_entities, "print \"You must specify the remapped shader. Ex: ^3/remapremove textures/kejim/basic^7 (see ^3/remaplist^7)\n\"" );
+		return;
+	}
+
+	trap->Argv( 1, arg1, sizeof( arg1 ) );
+
+	if ( zyk_valid_shader_name( arg1 ) == qfalse || zyk_remove_remap( arg1 ) == qfalse )
+	{
+		trap->SendServerCommand( ent-g_entities, "print \"That shader is not remapped (see ^3/remaplist^7)\n\"" );
+		return;
+	}
+
+	trap->SendServerCommand( ent-g_entities, "print \"Shader remap removed\n\"" );
+}
+
+/*
+==================
 Cmd_RemapDeleteFile_f
 ==================
 */
@@ -22235,7 +22268,7 @@ static void zyk_print_lines( gentity_t *ent, const char * const *lines, int coun
 
 void Cmd_EntitiesAndRemaps_f( gentity_t *ent ) {
 	static char entlist_line[512];
-	const char *lines[64];	// 53 now
+	const char *lines[64];	// 54 now
 	int n = 0;
 
 	if (!check_admin_command(ent, ADM_ENTITYSYSTEM, qtrue))
@@ -22302,6 +22335,7 @@ void Cmd_EntitiesAndRemaps_f( gentity_t *ent ) {
 	lines[n++] = "^3/shaderlist: ^7Your own game's list of every shader it has loaded, in your console.\n";
 	lines[n++] = "^3/remap <shader> <new shader>: ^7Remaps shader in the map.\n";
 	lines[n++] = "^3/remaplist <page number>: ^7Lists already remapped shaders in the map, eight per page.\n";
+	lines[n++] = "^3/remapremove <shader>: ^7Takes one shader remap back.\n";
 	lines[n++] = "^3/remapsave <file name>: ^7Saves current remaps in a preset file. Use ^3default ^7name to make it load with the map.\n";
 	lines[n++] = "^3/remapload <file name>: ^7Loads remaps from preset file.\n";
 	lines[n++] = "^3/remapdeletefile <file name>: ^7Deletes remap preset file.\n";
@@ -27026,6 +27060,7 @@ command_t commands[] = {
 	{ "remapdeletefile",	Cmd_RemapDeleteFile_f,		CMD_LOGGEDIN | CMD_NOINTERMISSION },
 	{ "remaplist",			Cmd_RemapList_f,			CMD_LOGGEDIN | CMD_NOINTERMISSION },
 	{ "remapload",			Cmd_RemapLoad_f,			CMD_LOGGEDIN | CMD_NOINTERMISSION },
+	{ "remapremove",		Cmd_RemapRemove_f,			CMD_LOGGEDIN | CMD_NOINTERMISSION },	// GLX_U: [Shader Remaps Menu]
 	{ "remapreset",			Cmd_RemapReset_f,			CMD_LOGGEDIN | CMD_NOINTERMISSION },
 	{ "remapsave",			Cmd_RemapSave_f,			CMD_LOGGEDIN | CMD_NOINTERMISSION },
 	{ "removexp",			Cmd_RemoveXp_f,				CMD_LOGGEDIN | CMD_NOINTERMISSION },

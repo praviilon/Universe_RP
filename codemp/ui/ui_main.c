@@ -3046,6 +3046,10 @@ static void UI_OwnerDraw(float x, float y, float w, float h, float text_x, float
 	if ( UI_RpxOwnerDraw( ownerDraw, &rect, scale, color, iMenuFont ) ) {
 		return;
 	}
+	// GLX_U: [Shader Remaps Menu] its two thumbnails -- ui_rpshaders.c
+	if ( UI_RpShOwnerDraw( ownerDraw, &rect, scale, color, iMenuFont ) ) {
+		return;
+	}
 
   switch (ownerDraw)
   {
@@ -6137,6 +6141,12 @@ static void UI_RunMenuScript(char **args)
 
 	if (String_Parse(args, &name))
 	{
+		// GLX_U: [Shader Remaps Menu] its scripts (rpxSh...) -- ui_rpshaders.c; before the rpx ones, which take
+		// every name that starts with rpx
+		if ( UI_RpShScript( name, args ) )
+		{
+			return;
+		}
 		// GalaxyRP: [Extras] the Extras menus' scripts (rpx...) -- ui_rpextras.c
 		if ( UI_RpxScript( name, args ) )
 		{
@@ -8354,6 +8364,14 @@ static int UI_FeederCount(float feederID)
 	{
 		return UI_RpxAnimFeederCount();
 	}
+	if ( (int)feederID == FEEDER_RPX_SHMAP )	// GLX_U: [Shader Remaps Menu] ui_rpshaders.c
+	{
+		return UI_RpShLeftCount();
+	}
+	if ( (int)feederID == FEEDER_RPX_SHNEW )
+	{
+		return UI_RpShRightCount();
+	}
 
 	switch ( (int)feederID )
 	{
@@ -8650,6 +8668,14 @@ static const char *UI_FeederItemText(float feederID, int index, int column,
 	if ( (int)feederID == FEEDER_RPX_ANIMS )	// GLX_U: [Extras] GLM Props' animations
 	{
 		return UI_RpxAnimFeederItemText( index );
+	}
+	if ( (int)feederID == FEEDER_RPX_SHMAP )	// GLX_U: [Shader Remaps Menu] ui_rpshaders.c
+	{
+		return UI_RpShLeftText( index );
+	}
+	if ( (int)feederID == FEEDER_RPX_SHNEW )
+	{
+		return UI_RpShRightText( index );
 	}
 
 	if (feederID == FEEDER_SABER_SINGLE_INFO)
@@ -9247,6 +9273,14 @@ qboolean UI_FeederSelection(float feederFloat, int index, itemDef_t *item)
 	if ( feederID == FEEDER_RPX_ANIMS )	// GLX_U: [Extras] GLM Props' animations
 	{
 		return UI_RpxAnimFeederSelection( index );
+	}
+	if ( feederID == FEEDER_RPX_SHMAP )	// GLX_U: [Shader Remaps Menu] ui_rpshaders.c
+	{
+		return UI_RpShLeftSelection( index );
+	}
+	if ( feederID == FEEDER_RPX_SHNEW )
+	{
+		return UI_RpShRightSelection( index );
 	}
 
 	if (feederID == FEEDER_Q3HEADS)

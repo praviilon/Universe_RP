@@ -135,6 +135,8 @@ along with this program; if not, see <http://www.gnu.org/licenses/>.
 #define FEEDER_SABER_STAFF_INFO				0x2c			// saber staff
 #define FEEDER_RPX_LIST						0x30			// GalaxyRP: [Extras] the list of the open Extras menu (ui_rpextras.c)
 #define FEEDER_RPX_ANIMS					0x31			// GLX_U: [Extras] GLM Props' named animations (ui_rpextras.c)
+#define FEEDER_RPX_SHMAP					0x32			// GLX_U: [Shader Remaps Menu] the map's shaders, or the remaps in force (ui_rpshaders.c)
+#define FEEDER_RPX_SHNEW					0x33			// GLX_U: [Shader Remaps Menu] what to remap to
 
 
 // Xbox specific, hope no one minds
@@ -386,6 +388,8 @@ along with this program; if not, see <http://www.gnu.org/licenses/>.
 #define UI_RPX_GANIMFILE	307		// GLX_U: the GLM Props menu's animation file line
 #define UI_RPX_GANIMRANGE	308		// GLX_U: the GLM Props menu's frames line
 #define UI_RPX_GSKIN		309		// GLX_U: the GLM Props menu's skin line
+#define UI_RPX_SHOLD		310		// GLX_U: the Shader Remaps menu's thumbnail of the shader to remap
+#define UI_RPX_SHNEW		311		// GLX_U: the Shader Remaps menu's thumbnail of what to remap it to
 
 #define VOICECHAT_GETFLAG			"getflag"				// command someone to get the flag
 #define VOICECHAT_OFFENSE			"offense"				// command someone to go on offense

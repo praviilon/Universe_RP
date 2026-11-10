@@ -1020,6 +1020,59 @@
 			}
 		}
 
+		itemDef
+		{
+			name				extrasShadersButton_glow
+			style				WINDOW_STYLE_SHADER
+			rect				160 250 150 24
+			background			"gfx/menus/menu_blendbox2"
+			forecolor			1 1 1 1
+			visible				0
+			decoration
+		}
+
+		// GLX_U: [Shader Remaps Menu] Shaders: the shader remap commands in a menu (ingame_rpx_shaders.menu)
+		itemDef
+		{
+			name				extrasShadersButton
+			group				extrasControls
+			text				"Shaders"
+			type				ITEM_TYPE_BUTTON
+			style				WINDOW_STYLE_EMPTY
+			rect				160 250 150 24
+			font				3
+			textscale			0.6
+			textalignx			15
+			textaligny			5
+			textalign			ITEM_ALIGN_LEFT
+			textstyle			3
+			forecolor			1 .682 0 1
+			visible				0
+			descText			"Remap the map's shaders and textures, with a preview"
+			// GLX_U: [Extras Admin Grey] greyed and unclickable without the Entities and Remaps admin power
+			cvarTest			"ui_rpx_adm_ent"
+			enableCvar
+			{
+				"1"
+			}
+
+			mouseEnter
+			{
+				show			extrasShadersButton_glow
+			}
+			mouseExit
+			{
+				hide			extrasShadersButton_glow
+			}
+			action
+			{
+				play			"sound/interface/button1.wav" ;
+				hide			extrasShadersButton_glow ;
+				close			ingame_galaxyrp ;
+				open			ingame_rpx_shaders
+			}
+		}
+
 
 		itemDef
 		{

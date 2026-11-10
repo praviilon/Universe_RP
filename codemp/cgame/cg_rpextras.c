@@ -1222,12 +1222,143 @@ CG_Rpx_f
 "rpx list <kind>", "rpx do <action>" -- from the Extras menus' scripts (ui_main.c).
 ==================
 */
+/*
+===========================================================================
+GLX_U: [Shader Remaps Menu] the Shader Remaps menu's commands (ui_rpshaders.c has the menu)
+===========================================================================
+*/
+
+// a shader name the server's /remap takes (zyk_valid_shader_name(), g_utils.c) and that is safe inside the
+// quotes of a command: 1 to MAX_QPATH - 1 printable characters, none of space = : @ " ; % \ ^
+static qboolean RPX_ShaderNameOk( const char *name ) {
+	int i;
+
+	for ( i = 0; name[i]; i++ ) {
+		unsigned char c = (unsigned char)name[i];
+
+		if ( c <= ' ' || c > 126 || strchr( "=:@\";%\\^", c ) ) {
+			return qfalse;
+		}
+	}
+	return ( i >= 1 && i < MAX_QPATH ) ? qtrue : qfalse;
+}
+
+// Apply: /remap <old> <new> from the menu's two names
+static void RPX_ShaderRemap( void ) {
+	char oldName[MAX_QPATH * 2], newName[MAX_QPATH * 2];
+
+	RPX_CvarString( "ui_rpx_sh_old", oldName, sizeof( oldName ) );
+	RPX_CvarString( "ui_rpx_sh_new", newName, sizeof( newName ) );
+	if ( !oldName[0] ) {
+		RPX_Refuse( "Select the shader to remap in the left list first." );
+		return;
+	}
+	if ( !newName[0] ) {
+		RPX_Refuse( "Select or type the shader to remap it to." );
+		return;
+	}
+	if ( !RPX_ShaderNameOk( oldName ) || !RPX_ShaderNameOk( newName ) ) {
+		RPX_Refuse( "A shader name is 1 to 63 characters, with no spaces or special signs." );
+		return;
+	}
+	if ( !Q_stricmp( oldName, newName ) ) {
+		RPX_Refuse( "A shader can't be remapped to itself. Remove takes a remap back." );
+		return;
+	}
+	RPX_Queue( va( "remap \"%s\" \"%s\"", oldName, newName ) );
+	RPX_Msg( va( "Remapping %s", oldName ) );
+}
+
+// Remove: /remapremove <old>
+static void RPX_ShaderRemapRemove( void ) {
+	char oldName[MAX_QPATH * 2];
+
+	RPX_CvarString( "ui_rpx_sh_old", oldName, sizeof( oldName ) );
+	if ( !RPX_ShaderNameOk( oldName ) ) {
+		RPX_Refuse( "Select a remap in the Current remaps list first." );
+		return;
+	}
+	RPX_Queue( va( "remapremove \"%s\"", oldName ) );
+	RPX_Msg( va( "Removing the remap of %s", oldName ) );
+}
+
+// Pick from world: the shader under the aim to the menu (ui_rpx_sh_pick; ui_rpx_sh_pickn says it is a new one)
+static void RPX_ShaderPick( void ) {
+	char name[MAX_QPATH], remap[MAX_QPATH], why[128];
+
+	if ( !RP_ShaderAimPick( name, sizeof( name ), remap, sizeof( remap ), why, sizeof( why ) ) ) {
+		RPX_Msg( va( "^3%s", why ) );
+		return;
+	}
+	trap->Cvar_Set( "ui_rpx_sh_pick", name );
+	trap->Cvar_Set( "ui_rpx_sh_pickn", va( "%d", RPX_CvarInt( "ui_rpx_sh_pickn" ) + 1 ) );
+	RPX_Msg( "" );
+}
+
+/*
+A thumbnail for the menu: "rpx shthumb <slot> <name>". The menu must not register a shader by its real name: the
+engine's R_RemapShader() takes the most recently made shader of a name as the one to remap to, and one made for a
+menu has no lightmap, so the next remap to that name would be drawn wrong on this client. So the image is reached
+through a name the renderer keeps apart but reads as the same file: the first '/' written as '\\' (shader names
+are compared as written, image and file names with the two as one). And it is registered here, not in the ui:
+cgame's R_RegisterShader loads the image mipmapped and repeating, as a map does, where the ui's
+R_RegisterShaderNoMip would load it unmipped and clamped -- and the renderer keeps one copy of an image, so a wall
+remapped to it later would be drawn with that copy. The ui draws the handle on a model (ui_rpshaders.c).
+Each different name keeps a shader slot until the map changes: RPX_SHADER_THUMBS a map.
+*/
+#define RPX_SHADER_THUMBS	128
+
+static struct {
+	char		name[MAX_QPATH];
+	qhandle_t	handle;
+} rpx_thumbs[RPX_SHADER_THUMBS];
+static int rpx_numThumbs;
+
+static void RPX_ShaderThumb( int slot, const char *name ) {
+	char alias[MAX_QPATH];
+	char *slash;
+	qhandle_t handle = 0;
+	int i;
+
+	if ( slot < 0 || slot > 1 || !RPX_ShaderNameOk( name ) ) {
+		return;
+	}
+	for ( i = 0; i < rpx_numThumbs; i++ ) {
+		if ( !Q_stricmp( rpx_thumbs[i].name, name ) ) {
+			break;
+		}
+	}
+	if ( i < rpx_numThumbs ) {
+		handle = rpx_thumbs[i].handle;
+	} else if ( rpx_numThumbs >= RPX_SHADER_THUMBS ) {
+		handle = -1;	// no more on this map
+	} else {
+		Q_strncpyz( alias, name, sizeof( alias ) );
+		slash = strchr( alias, '/' );
+		if ( slash ) {
+			*slash = '\\';
+			handle = trap->R_RegisterShader( alias );
+		}
+		Q_strncpyz( rpx_thumbs[rpx_numThumbs].name, name, sizeof( rpx_thumbs[0].name ) );
+		rpx_thumbs[rpx_numThumbs++].handle = handle;
+	}
+	trap->Cvar_Set( slot ? "ui_rpx_sh_thumb1" : "ui_rpx_sh_thumb0", va( "%d %s", handle, name ) );
+}
+
 void CG_Rpx_f( void ) {
 	char sub[32], arg[32];
 
 	// copies: CG_Argv() returns one buffer, which the next call overwrites
 	Q_strncpyz( sub, CG_Argv( 1 ), sizeof( sub ) );
 	Q_strncpyz( arg, CG_Argv( 2 ), sizeof( arg ) );
+
+	if ( !Q_stricmp( sub, "shthumb" ) ) {	// GLX_U: [Shader Remaps Menu]
+		char name[MAX_QPATH * 2];
+
+		Q_strncpyz( name, CG_Argv( 3 ), sizeof( name ) );
+		RPX_ShaderThumb( atoi( arg ), name );
+		return;
+	}
 
 	if ( !Q_stricmp( sub, "list" ) ) {
 		int kind = RPX_KindByName( arg );
@@ -1267,6 +1398,15 @@ void CG_Rpx_f( void ) {
 		} else if ( !Q_stricmp( arg, "fxstop" ) ) {
 			rpx_fx.windowEnd = 0;
 			rpx_fx.pendingId = 0;
+		} else if ( !Q_stricmp( arg, "remap" ) ) {	// GLX_U: [Shader Remaps Menu]
+			RPX_ShaderRemap();
+		} else if ( !Q_stricmp( arg, "remapremove" ) ) {
+			RPX_ShaderRemapRemove();
+		} else if ( !Q_stricmp( arg, "remapreset" ) ) {
+			RPX_Queue( "remapreset" );
+			RPX_Msg( "Clearing all shader remaps" );
+		} else if ( !Q_stricmp( arg, "pickshader" ) ) {
+			RPX_ShaderPick();
 		} else if ( !Q_stricmp( arg, "undo" ) ) {
 			RPX_Queue( "entundo" );		// through the queue, so it keeps to the flood gap too
 		} else if ( !Q_stricmp( arg, "stop" ) ) {
@@ -1426,6 +1566,7 @@ void CG_RpxInit( void ) {
 	rpx_reqCounter = ( now & 0xffff ) * 1000;
 	rpx_serial = ( now & 0xffff ) * 1000;
 	rpx_fileIndex = 0;
+	rpx_numThumbs = 0;	// GLX_U: [Shader Remaps Menu] the renderer's shaders are new with the map
 
 #define RPX_RESET( name, def ) trap->Cvar_Set( name, def );
 	RPX_CVAR_LIST( RPX_RESET )

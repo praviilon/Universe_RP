@@ -1891,6 +1891,7 @@ void CG_RpExtrasAdminClear( void );
 void RP_ShaderAim_f( void );
 void RP_ShaderAimFree( void );
 void RP_ShaderAimNoteStatic( int index, const char *path );
+qboolean RP_ShaderAimPick( char *out, int outSize, char *remap, int remapSize, char *why, int whySize );	// GLX_U: [Shader Remaps Menu]
 
 // GLX_U: [Chat] the chat input box -- cg_rpchat.c
 qboolean CG_RpChatActive( void );

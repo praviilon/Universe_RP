@@ -182,6 +182,20 @@ static const char * const rpxSoundChannels[] = {
 	X( "ui_rpx_sp_vdock",		"0" )		/* vehicles: spawnflags 2, fighters hang until boarded */ \
 	X( "ui_rpx_sp_lift",		"0" )		/* units out from the surface aimed at (/entaddaim aimoffset) */ \
 	X( "ui_rpx_s_chan",			"0" ) \
+	X( "ui_rpx_sh_old",			"" )		/* GLX_U: Shader Remaps: the shader to remap */ \
+	X( "ui_rpx_sh_new",			"" )		/* what to remap it to: picked in the right list, or typed */ \
+	X( "ui_rpx_sh_dir",			"textures" )	/* the right list's folder; "" the top */ \
+	X( "ui_rpx_sh_view",		"0" )		/* the left list: 0 the map's shaders, 1 the remaps in force */ \
+	X( "ui_rpx_filter_shmap",	"" ) \
+	X( "ui_rpx_filter_shnew",	"" ) \
+	X( "ui_rpx_sh_leftinfo",	"" )		/* ui: how many the left list has */ \
+	X( "ui_rpx_sh_path",		"" )		/* ui: the right list's folder and how many files */ \
+	X( "ui_rpx_sh_oldinfo",		"" )		/* ui: the Old shader is remapped now, or missing on this game */ \
+	X( "ui_rpx_sh_prevtext",	"" )		/* ui: the preview strip's line */ \
+	X( "ui_rpx_sh_pick",		"" )		/* cgame: the shader Pick from world found */ \
+	X( "ui_rpx_sh_pickn",		"0" )		/* cgame: raised with each one found */ \
+	X( "ui_rpx_sh_thumb0",		"" )		/* cgame: "<shader handle> <name>" for the Old thumbnail */ \
+	X( "ui_rpx_sh_thumb1",		"" )		/* cgame: the same for New */ \
 	X( "ui_rpx_status",			"" )		/* cgame: loading, or why a listing failed */ \
 	X( "ui_rpx_serial",			"0" )		/* cgame: raised each time it writes the list file */ \
 	X( "ui_rpx_file",			"rpx/list.dat" )	/* cgame: which of rpxListFiles it wrote */ \

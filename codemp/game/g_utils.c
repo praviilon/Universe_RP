@@ -283,6 +283,47 @@ int zyk_clear_all_remaps( void )
 	return cleared;
 }
 
+/*
+zyk_remove_remap
+
+GLX_U: [Shader Remaps Menu] /remapremove: one remap taken back, as zyk_clear_all_remaps() does for all of them
+and for the same reasons, in the same two sends: first the entry pointing at its own shader with a zero time
+offset, so every client restores it (R_RemapShader with old == new clears the remap), then the table without
+the entry, so a player who connects later gets no trace of it. "/remap X X" restores the shader too, but
+leaves an X=X entry in the table, in /remaplist, in a saved preset and in the configstring's space.
+qfalse when the shader is not remapped.
+*/
+qboolean zyk_remove_remap( const char *oldShader )
+{
+	int i;
+
+	for ( i = 0; i < remapCount; i++ )
+	{
+		if ( Q_stricmp( oldShader, remappedShaders[i].oldShader ) == 0 )
+		{
+			break;
+		}
+	}
+	if ( i == remapCount )
+	{
+		return qfalse;
+	}
+
+	Q_strncpyz( remappedShaders[i].newShader, remappedShaders[i].oldShader, sizeof( remappedShaders[i].newShader ) );
+	remappedShaders[i].timeOffset = 0.0f;
+	trap->SetConfigstring( CS_SHADERSTATE, BuildShaderStateConfig() );
+
+	for ( ; i < remapCount - 1; i++ )
+	{
+		remappedShaders[i] = remappedShaders[i + 1];
+	}
+	remapCount--;
+	memset( &remappedShaders[remapCount], 0, sizeof( remappedShaders[remapCount] ) );
+	trap->SetConfigstring( CS_SHADERSTATE, BuildShaderStateConfig() );
+
+	return qtrue;
+}
+
 // GalaxyRP fix: [security] the one reader for a remap preset file.
 //
 // There were two copies of this loop -- Cmd_RemapLoad_f() (g_cmds.c) and the default-preset load in

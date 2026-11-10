@@ -419,6 +419,15 @@ qboolean	UI_RpDialogScript( const char *name, char **args );
 qboolean	UI_RpDialogKey( menuDef_t *menu, int key );
 qboolean	UI_RpxOwnerDraw( int ownerDraw, rectDef_t *rect, float scale, vec4_t color, int iMenuFont );
 void		UI_RpxRegisterCvars( void );
+// GLX_U: [Shader Remaps Menu] ui_rpshaders.c
+int			UI_RpShLeftCount( void );
+const char	*UI_RpShLeftText( int index );
+qboolean	UI_RpShLeftSelection( int index );
+int			UI_RpShRightCount( void );
+const char	*UI_RpShRightText( int index );
+qboolean	UI_RpShRightSelection( int index );
+qboolean	UI_RpShScript( const char *name, char **args );
+qboolean	UI_RpShOwnerDraw( int ownerDraw, rectDef_t *rect, float scale, vec4_t color, int iMenuFont );
 char		*UI_Cvar_VariableString( const char *var_name );
 
 

@@ -2661,6 +2661,7 @@ qboolean	RP_SoundSetKnown( const char *name );
 // GalaxyRP fix: [Shader Remap] /remapreset's worker -- returns how many remaps it cleared. See the
 // definition in g_utils.c for why it sends the configstring twice and in that order.
 int zyk_clear_all_remaps( void );
+qboolean zyk_remove_remap( const char *oldShader );	// GLX_U: [Shader Remaps Menu] /remapremove (g_utils.c)
 qboolean G_PlayerIsDowned( gentity_t *ent );
 // GalaxyRP fix: [Death System] qtrue only for an ADMIN paralysis (the PLAYER_STATUS_ADMIN_PARALYSIS bit, always
 // accompanied by bit 6). G_PlayerIsDowned() stays true for both states -- everything that merely

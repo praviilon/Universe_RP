@@ -1,0 +1,638 @@
+//----------------------------------------------------------------------------------------------
+// ingame_rpx_shaders: the Shader Remaps menu of the Extras.
+// GLX_U: [Shader Remaps Menu] made by a generator, like the other ingame_rpx_*.menu; the Shaders button of the
+// Extras tab of ingame_galaxyrp.menu opens it. The lists, the thumbnails, the preview and the rpxSh scripts are
+// ui_rpshaders.c; the commands the buttons send are built in cg_rpextras.c. Preview closes it for the strip
+// ingame_rpx_shprev.menu, which opens it again.
+//----------------------------------------------------------------------------------------------
+{
+	menuDef
+	{
+		name                "ingame_rpx_shaders"
+		visible             0
+		fullscreen          0
+		outOfBoundsClick
+		rect                10 20 620 440
+		focusColor          1 1 1 1
+		disableColor        .5 .5 .5 1
+		style               1
+		border              1
+		descX               310
+		descY               424
+		descScale           0.8
+		descColor           1 .682 0 .8
+		descAlignment       ITEM_ALIGN_CENTER
+
+		onOpen
+		{
+			uiScript		rpxShOpen
+		}
+		onESC
+		{
+			play			"sound/interface/button1.wav" ;
+			close			ingame_rpx_shaders
+		}
+
+		itemDef
+		{
+			name                rpx_background
+			style               WINDOW_STYLE_SHADER
+			rect                0 0 620 440
+			background          "gfx/menus/menu_box_ingame"
+			forecolor           1 1 1 1
+			visible             1
+			decoration
+		}
+		itemDef
+		{
+			name                rpx_title
+			style               WINDOW_STYLE_SHADER
+			background          "gfx/menus/menu_blendbox"
+			text                "^9Universe ^7RP^3 Extras: ^7Shader Remaps"
+			rect                20 5 580 28
+			textalign           ITEM_ALIGN_CENTER
+			textalignx          290
+			textaligny          2
+			font                3
+			textscale           0.9
+			forecolor           .549 .854 1 1
+			visible             1
+			decoration
+		}
+		itemDef
+		{
+			name                rpx_back
+			type                ITEM_TYPE_BUTTON
+			style               WINDOW_STYLE_FILLED
+			rect                12 405 90 24
+			text                "Back"
+			textalign           ITEM_ALIGN_CENTER
+			textalignx          45
+			textaligny          2
+			font                2
+			textscale           0.7
+			forecolor           1 .682 0 1
+			backcolor           0 0 0 .6
+			border              1
+			bordercolor         1 .682 0 .6
+			visible             1
+			descText            "Back to the Universe RP menu"
+			mouseEnter
+			{
+				setitemcolor rpx_back bordercolor 1 1 1 1
+			}
+			mouseExit
+			{
+				setitemcolor rpx_back bordercolor 1 .682 0 .6
+			}
+			action
+			{
+				play "sound/interface/button1.wav" ;
+				setcvar ui_rpx_back 1 ;
+				close ingame_rpx_shaders ;
+				open ingame_galaxyrp
+			}
+		}
+		itemDef
+		{
+			name                rpx_msg
+			type                ITEM_TYPE_TEXT
+			style               WINDOW_STYLE_EMPTY
+			rect                110 415 500 14
+			cvar                "ui_rpx_msg"
+			textalign           ITEM_ALIGN_LEFT
+			textalignx          0
+			textaligny          0
+			font                2
+			textscale           0.6
+			forecolor           1 1 .4 1
+			visible             1
+			decoration
+		}
+		itemDef
+		{
+			name                rpx_pick
+			type                ITEM_TYPE_BUTTON
+			style               WINDOW_STYLE_FILLED
+			rect                12 38 140 20
+			text                "Pick from world"
+			textalign           ITEM_ALIGN_CENTER
+			textalignx          70
+			textaligny          0
+			font                2
+			textscale           0.6
+			forecolor           1 .682 0 1
+			backcolor           0 0 0 .6
+			border              1
+			bordercolor         1 .682 0 .6
+			visible             1
+			descText            "Selects the shader of the map surface under your crosshair"
+			mouseEnter
+			{
+				setitemcolor rpx_pick bordercolor 1 1 1 1
+			}
+			mouseExit
+			{
+				setitemcolor rpx_pick bordercolor 1 .682 0 .6
+			}
+			action
+			{
+				play "sound/interface/button1.wav" ;
+				uiScript rpxShPick
+			}
+		}
+		itemDef
+		{
+			name                rpx_viewremaps
+			type                ITEM_TYPE_BUTTON
+			style               WINDOW_STYLE_FILLED
+			rect                158 38 142 20
+			text                "Current remaps"
+			textalign           ITEM_ALIGN_CENTER
+			textalignx          71
+			textaligny          0
+			font                2
+			textscale           0.6
+			forecolor           1 .682 0 1
+			backcolor           0 0 0 .6
+			border              1
+			bordercolor         1 .682 0 .6
+			visible             1
+			descText            "Shows the remaps in force instead of the map's shaders"
+			cvarTest            "ui_rpx_sh_view"
+			showCvar
+			{
+				"0"
+			}
+			mouseEnter
+			{
+				setitemcolor rpx_viewremaps bordercolor 1 1 1 1
+			}
+			mouseExit
+			{
+				setitemcolor rpx_viewremaps bordercolor 1 .682 0 .6
+			}
+			action
+			{
+				play "sound/interface/button1.wav" ;
+				uiScript rpxShView 1
+			}
+		}
+		itemDef
+		{
+			name                rpx_viewmap
+			type                ITEM_TYPE_BUTTON
+			style               WINDOW_STYLE_FILLED
+			rect                158 38 142 20
+			text                "Map shaders"
+			textalign           ITEM_ALIGN_CENTER
+			textalignx          71
+			textaligny          0
+			font                2
+			textscale           0.6
+			forecolor           1 .682 0 1
+			backcolor           0 0 0 .6
+			border              1
+			bordercolor         1 .682 0 .6
+			visible             1
+			descText            "Back to the shaders of this map"
+			cvarTest            "ui_rpx_sh_view"
+			showCvar
+			{
+				"1"
+			}
+			mouseEnter
+			{
+				setitemcolor rpx_viewmap bordercolor 1 1 1 1
+			}
+			mouseExit
+			{
+				setitemcolor rpx_viewmap bordercolor 1 .682 0 .6
+			}
+			action
+			{
+				play "sound/interface/button1.wav" ;
+				uiScript rpxShView 0
+			}
+		}
+		itemDef
+		{
+			name                rpx_filter
+			type                ITEM_TYPE_EDITFIELD
+			style               0
+			text                "Filter: "
+			cvar                "ui_rpx_filter_shmap"
+			maxchars            30
+			maxPaintChars       30
+			rect                12 62 288 18
+			textalign           ITEM_ALIGN_LEFT
+			textalignx          0
+			textaligny          -2
+			font                2
+			textscale           0.6
+			forecolor           1 1 1 1
+			outlinecolor        1 .5 .5 .5
+			backcolor           0 0 0 .6
+			border              1
+			bordercolor         .5 .5 .5 .6
+			visible             1
+			descText            "Show only the names with this in them"
+		}
+		itemDef
+		{
+			name                rpx_list
+			type                ITEM_TYPE_LISTBOX
+			style               WINDOW_STYLE_FILLED
+			rect                12 82 288 180
+			elementwidth        268
+			elementheight       15
+			elementtype         LISTBOX_TEXT
+			feeder              FEEDER_RPX_SHMAP
+			font                2
+			textscale           0.55
+			textstyle           0
+			textalign           0
+			textaligny          0
+			columns             1 4 262 262
+			border              1
+			bordercolor         1 .682 0 .6
+			forecolor           1 1 1 1
+			backcolor           0 0 0 .6
+			outlinecolor        1 .682 0 .35
+			visible             1
+			descText            "The shader to remap. Red: missing on your game"
+			mouseEnter
+			{
+				setitemcolor rpx_list bordercolor 1 1 1 1
+			}
+			mouseExit
+			{
+				setitemcolor rpx_list bordercolor 1 .682 0 .6
+			}
+		}
+		itemDef
+		{
+			name                rpx_leftinfo
+			type                ITEM_TYPE_TEXT
+			style               WINDOW_STYLE_EMPTY
+			rect                12 264 288 12
+			cvar                "ui_rpx_sh_leftinfo"
+			textalign           ITEM_ALIGN_LEFT
+			textalignx          0
+			textaligny          0
+			font                2
+			textscale           0.5
+			forecolor           .8 .8 .8 1
+			visible             1
+			decoration
+		}
+		itemDef
+		{
+			name                rpx_remove
+			type                ITEM_TYPE_BUTTON
+			style               WINDOW_STYLE_FILLED
+			rect                12 278 90 18
+			text                "Remove"
+			textalign           ITEM_ALIGN_CENTER
+			textalignx          45
+			textaligny          0
+			font                2
+			textscale           0.6
+			forecolor           1 .682 0 1
+			backcolor           0 0 0 .6
+			border              1
+			bordercolor         1 .682 0 .6
+			visible             1
+			descText            "Takes the selected remap back (/remapremove)"
+			cvarTest            "ui_rpx_sh_view"
+			showCvar
+			{
+				"1"
+			}
+			mouseEnter
+			{
+				setitemcolor rpx_remove bordercolor 1 1 1 1
+			}
+			mouseExit
+			{
+				setitemcolor rpx_remove bordercolor 1 .682 0 .6
+			}
+			action
+			{
+				play "sound/interface/button1.wav" ;
+				uiScript rpxShRemove
+			}
+		}
+		itemDef
+		{
+			name                rpx_reset
+			type                ITEM_TYPE_BUTTON
+			style               WINDOW_STYLE_FILLED
+			rect                108 278 90 18
+			text                "Reset all"
+			textalign           ITEM_ALIGN_CENTER
+			textalignx          45
+			textaligny          0
+			font                2
+			textscale           0.6
+			forecolor           1 .682 0 1
+			backcolor           0 0 0 .6
+			border              1
+			bordercolor         1 .682 0 .6
+			visible             1
+			descText            "Clears every remap (/remapreset). Press twice"
+			cvarTest            "ui_rpx_sh_view"
+			showCvar
+			{
+				"1"
+			}
+			mouseEnter
+			{
+				setitemcolor rpx_reset bordercolor 1 1 1 1
+			}
+			mouseExit
+			{
+				setitemcolor rpx_reset bordercolor 1 .682 0 .6
+			}
+			action
+			{
+				play "sound/interface/button1.wav" ;
+				uiScript rpxShReset
+			}
+		}
+		itemDef
+		{
+			name                rpx_path
+			type                ITEM_TYPE_TEXT
+			style               WINDOW_STYLE_EMPTY
+			rect                320 42 288 14
+			cvar                "ui_rpx_sh_path"
+			textalign           ITEM_ALIGN_LEFT
+			textalignx          0
+			textaligny          0
+			font                2
+			textscale           0.55
+			forecolor           1 .682 0 1
+			visible             1
+			decoration
+		}
+		itemDef
+		{
+			name                rpx_filter2
+			type                ITEM_TYPE_EDITFIELD
+			style               0
+			text                "Filter: "
+			cvar                "ui_rpx_filter_shnew"
+			maxchars            30
+			maxPaintChars       30
+			rect                320 62 288 18
+			textalign           ITEM_ALIGN_LEFT
+			textalignx          0
+			textaligny          -2
+			font                2
+			textscale           0.6
+			forecolor           1 1 1 1
+			outlinecolor        1 .5 .5 .5
+			backcolor           0 0 0 .6
+			border              1
+			bordercolor         .5 .5 .5 .6
+			visible             1
+			descText            "Show only the names of this folder with this in them"
+		}
+		itemDef
+		{
+			name                rpx_list2
+			type                ITEM_TYPE_LISTBOX
+			style               WINDOW_STYLE_FILLED
+			rect                320 82 288 180
+			elementwidth        268
+			elementheight       15
+			elementtype         LISTBOX_TEXT
+			feeder              FEEDER_RPX_SHNEW
+			font                2
+			textscale           0.55
+			textstyle           0
+			textalign           0
+			textaligny          0
+			columns             1 4 262 262
+			border              1
+			bordercolor         1 .682 0 .6
+			forecolor           1 1 1 1
+			backcolor           0 0 0 .6
+			outlinecolor        1 .682 0 .35
+			visible             1
+			descText            "Double-click a folder to open it. Yellow: a scripted shader"
+			doubleclick
+			{
+				uiScript rpxShEnter
+			}
+			mouseEnter
+			{
+				setitemcolor rpx_list2 bordercolor 1 1 1 1
+			}
+			mouseExit
+			{
+				setitemcolor rpx_list2 bordercolor 1 .682 0 .6
+			}
+		}
+		itemDef
+		{
+			name                rpx_rightinfo
+			type                ITEM_TYPE_TEXT
+			style               WINDOW_STYLE_EMPTY
+			rect                320 264 288 12
+			text                "From your own game files. Other players need the file too."
+			textalign           ITEM_ALIGN_LEFT
+			textalignx          0
+			textaligny          0
+			font                2
+			textscale           0.5
+			forecolor           .8 .8 .8 1
+			visible             1
+			decoration
+		}
+		itemDef
+		{
+			name                rpx_thumbold
+			type                ITEM_TYPE_OWNERDRAW
+			ownerdraw           UI_RPX_SHOLD
+			style               WINDOW_STYLE_FILLED
+			rect                12 300 78 78
+			font                2
+			textscale           0.7
+			forecolor           .8 .8 .8 1
+			backcolor           0 0 0 .6
+			border              1
+			bordercolor         1 .682 0 .6
+			visible             1
+			decoration
+		}
+		itemDef
+		{
+			name                rpx_oldlabel
+			type                ITEM_TYPE_TEXT
+			style               WINDOW_STYLE_EMPTY
+			rect                98 300 200 14
+			text                "Old:"
+			textalign           ITEM_ALIGN_LEFT
+			textalignx          0
+			textaligny          0
+			font                2
+			textscale           0.6
+			forecolor           1 .682 0 1
+			visible             1
+			decoration
+		}
+		itemDef
+		{
+			name                rpx_oldname
+			type                ITEM_TYPE_TEXT
+			style               WINDOW_STYLE_EMPTY
+			rect                98 316 205 14
+			cvar                "ui_rpx_sh_old"
+			textalign           ITEM_ALIGN_LEFT
+			textalignx          0
+			textaligny          0
+			font                2
+			textscale           0.5
+			forecolor           1 1 1 1
+			visible             1
+			decoration
+		}
+		itemDef
+		{
+			name                rpx_oldinfo
+			type                ITEM_TYPE_TEXT
+			style               WINDOW_STYLE_EMPTY
+			rect                98 332 205 14
+			cvar                "ui_rpx_sh_oldinfo"
+			textalign           ITEM_ALIGN_LEFT
+			textalignx          0
+			textaligny          0
+			font                2
+			textscale           0.5
+			forecolor           1 .682 0 1
+			visible             1
+			decoration
+		}
+		itemDef
+		{
+			name                rpx_thumbnew
+			type                ITEM_TYPE_OWNERDRAW
+			ownerdraw           UI_RPX_SHNEW
+			style               WINDOW_STYLE_FILLED
+			rect                320 300 78 78
+			font                2
+			textscale           0.7
+			forecolor           .8 .8 .8 1
+			backcolor           0 0 0 .6
+			border              1
+			bordercolor         1 .682 0 .6
+			visible             1
+			decoration
+		}
+		itemDef
+		{
+			name                rpx_newlabel
+			type                ITEM_TYPE_TEXT
+			style               WINDOW_STYLE_EMPTY
+			rect                406 300 200 14
+			text                "New:"
+			textalign           ITEM_ALIGN_LEFT
+			textalignx          0
+			textaligny          0
+			font                2
+			textscale           0.6
+			forecolor           1 .682 0 1
+			visible             1
+			decoration
+		}
+		itemDef
+		{
+			name                rpx_newname
+			type                ITEM_TYPE_EDITFIELD
+			style               0
+			text                ""
+			cvar                "ui_rpx_sh_new"
+			maxchars            63
+			maxPaintChars       34
+			rect                406 316 202 18
+			textalign           ITEM_ALIGN_LEFT
+			textalignx          0
+			textaligny          -2
+			font                2
+			textscale           0.6
+			forecolor           1 1 1 1
+			outlinecolor        1 .5 .5 .5
+			backcolor           0 0 0 .6
+			border              1
+			bordercolor         .5 .5 .5 .6
+			visible             1
+			descText            "What to remap it to: pick it in the list above, or type a shader name"
+		}
+		itemDef
+		{
+			name                rpx_preview
+			type                ITEM_TYPE_BUTTON
+			style               WINDOW_STYLE_FILLED
+			rect                406 346 96 24
+			text                "Preview"
+			textalign           ITEM_ALIGN_CENTER
+			textalignx          48
+			textaligny          2
+			font                2
+			textscale           0.7
+			forecolor           1 .682 0 1
+			backcolor           0 0 0 .6
+			border              1
+			bordercolor         1 .682 0 .6
+			visible             1
+			descText            "Shows the remap on your screen only. Face the surface first: the menu makes way"
+			mouseEnter
+			{
+				setitemcolor rpx_preview bordercolor 1 1 1 1
+			}
+			mouseExit
+			{
+				setitemcolor rpx_preview bordercolor 1 .682 0 .6
+			}
+			action
+			{
+				play "sound/interface/button1.wav" ;
+				uiScript rpxShPreview
+			}
+		}
+		itemDef
+		{
+			name                rpx_apply
+			type                ITEM_TYPE_BUTTON
+			style               WINDOW_STYLE_FILLED
+			rect                512 346 96 24
+			text                "Apply"
+			textalign           ITEM_ALIGN_CENTER
+			textalignx          48
+			textaligny          2
+			font                2
+			textscale           0.7
+			forecolor           1 .682 0 1
+			backcolor           0 0 0 .6
+			border              1
+			bordercolor         1 .682 0 .6
+			visible             1
+			descText            "Remaps it for everyone (/remap)"
+			mouseEnter
+			{
+				setitemcolor rpx_apply bordercolor 1 1 1 1
+			}
+			mouseExit
+			{
+				setitemcolor rpx_apply bordercolor 1 .682 0 .6
+			}
+			action
+			{
+				play "sound/interface/button1.wav" ;
+				uiScript rpxShApply
+			}
+		}
+	}
+}
