@@ -33,6 +33,9 @@ How the two work together:
 
 // .dat: readable as a loose file even on a pure server. The first line is
 // RPX_LIST_MAGIC <serial> <kind> <folder> <count> <cut short 0/1>, tab-separated; then a name a line.
+// GLX_U: [Presets Menu] that last field is RPX_LIST_FAILED when the listing failed (cgame's RPX_FetchFail() writes
+// an empty list then), so a menu can tell a failed listing from an empty one
+#define RPX_LIST_FAILED		2
 static const char * const rpxListFiles[] = { "rpx/list.dat", "rpx/list1.dat", "rpx/list2.dat", "rpx/list3.dat" };
 #define RPX_NUM_LIST_FILES	( (int)( sizeof( rpxListFiles ) / sizeof( rpxListFiles[0] ) ) )
 #define RPX_LIST_MAGIC		"RPX1"

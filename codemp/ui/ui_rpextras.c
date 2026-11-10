@@ -52,6 +52,7 @@ typedef struct {
 static uiRpxEntry_t	rpxEntries[RPX_MAX_ENTRIES];
 static int			rpxNum;
 static qboolean		rpxTruncated;
+static qboolean		rpxListFailed;			// GLX_U: [Presets Menu] rpxEntries is from a listing that failed (empty)
 static int			rpxView[RPX_MAX_ENTRIES + 1];	// index into rpxEntries; -1 for ".."
 static int			rpxViewNum;
 static char			rpxFile[RPX_MAX_ENTRIES * ( RPX_NAME_LEN + 1 ) + 256];
@@ -408,7 +409,8 @@ static void RPX_LoadFile( int serial ) {
 	}
 
 	rpxNum = 0;
-	rpxTruncated = atoi( fields[5] ) ? qtrue : qfalse;
+	rpxTruncated = ( atoi( fields[5] ) == 1 ) ? qtrue : qfalse;
+	rpxListFailed = ( atoi( fields[5] ) == RPX_LIST_FAILED ) ? qtrue : qfalse;
 	while ( *p ) {
 		char *end = strchr( p, '\n' );
 
@@ -728,6 +730,10 @@ static void RPX_PresetAction( const char *action ) {
 	qboolean isSave = !Q_stricmp( action, "save" ) ? qtrue : qfalse;
 	qboolean isDelete = !Q_stricmp( action, "delete" ) ? qtrue : qfalse;
 	qboolean exists = qfalse;
+	// GLX_U: [Presets Menu] the list shown is this tab's, as the server sent it: not one still on its way (a tab
+	// just switched to), nor the empty one a failed listing leaves
+	qboolean loaded = ( rpxLoaded && rpxLoadedKind == rpxKind ) ? qtrue : qfalse;
+	qboolean known = ( loaded && !rpxListFailed ) ? qtrue : qfalse;
 	const char *ask = NULL;
 	int i;
 
@@ -756,13 +762,18 @@ static void RPX_PresetAction( const char *action ) {
 			break;
 		}
 	}
-	if ( !isSave && rpxLoaded && !exists ) {
+	// GLX_U: [Presets Menu] only a list that is known says a preset is not there; else the server says it
+	if ( !isSave && known && !exists ) {
 		RPX_Msg( va( "^3There is no %s preset %s on this map.", remaps ? "remap" : "entity", name ) );
 		return;
 	}
 
 	if ( isLoad && !remaps ) {
 		ask = va( "^3This replaces everything placed on the map. Press Load again to load %s.", name );
+	} else if ( isSave && !known ) {
+		// GLX_U: [Presets Menu] without the list it can't be told whether this overwrites one: always asked
+		ask = va( "^3The list %s: %s may exist. Press Save again to save it.",
+			loaded ? "could not be loaded" : "is not here yet", name );
 	} else if ( isSave && exists ) {
 		ask = va( "^3%s exists. Press Save again to overwrite it.", name );
 	} else if ( isDelete ) {

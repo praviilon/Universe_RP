@@ -217,7 +217,7 @@ The list file
 */
 
 // the list into one file; qfalse when it could not be opened
-static qboolean RPX_WriteListFile( const char *file, int kind, const char *folder, const char *names, int num, qboolean truncated, int serial ) {
+static qboolean RPX_WriteListFile( const char *file, int kind, const char *folder, const char *names, int num, int truncated, int serial ) {
 	fileHandle_t f = 0;
 	char buf[0x4000];
 	int used = 0, i;
@@ -228,7 +228,9 @@ static qboolean RPX_WriteListFile( const char *file, int kind, const char *folde
 		return qfalse;
 	}
 
-	Com_sprintf( buf, sizeof( buf ), "%s\t%d\t%s\t%s\t%d\t%d\n", RPX_LIST_MAGIC, serial, rpxKinds[kind].name, folder, num, truncated ? 1 : 0 );
+	// GLX_U: [Presets Menu] the last field: 0, 1 cut short, or RPX_LIST_FAILED (rp_extras.h)
+	Com_sprintf( buf, sizeof( buf ), "%s\t%d\t%s\t%s\t%d\t%d\n", RPX_LIST_MAGIC, serial, rpxKinds[kind].name, folder, num,
+		( truncated == RPX_LIST_FAILED ) ? RPX_LIST_FAILED : ( truncated ? 1 : 0 ) );
 	used = strlen( buf );
 
 	for ( i = 0; i < num; i++ ) {
@@ -274,7 +276,7 @@ static qboolean RPX_ListFileReadsBack( const char *file, int serial ) {
 
 static int rpx_fileIndex;
 
-static void RPX_WriteList( int kind, const char *folder, const char *names, int num, qboolean truncated ) {
+static void RPX_WriteList( int kind, const char *folder, const char *names, int num, int truncated ) {
 	int serial = rpx_serial + 1;
 	int tries;
 
@@ -301,7 +303,7 @@ Listings
 static void RPX_FetchFail( const char *why ) {
 	rpx_fetch.active = qfalse;
 	RPX_Status( why );
-	RPX_WriteList( rpx_fetch.kind, rpx_fetch.folder, "", 0, qfalse );
+	RPX_WriteList( rpx_fetch.kind, rpx_fetch.folder, "", 0, RPX_LIST_FAILED );	// GLX_U: [Presets Menu] marked failed
 }
 
 static void RPX_FetchDone( void ) {
