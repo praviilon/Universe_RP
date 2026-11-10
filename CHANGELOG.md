@@ -7,6 +7,7 @@
 ### Added
 - Shader Remaps menu: a new "Shaders" button in the Extras lists the map's textures and shaders (ones missing from your game in red), with "Pick from world" to select the one you aim at. Choose what to remap it to from your own game's textures and shaders, preview it on your screen only, then apply it for everyone; the current remaps can be removed one by one or all at once. Universe RP client only.
 - Presets menu: a new "Presets" button in the Extras lists the entity and remap presets saved for this map, to load, save or delete with a click. Loading entities, overwriting a preset and deleting ask for a second press.
+- Emotes menu: a new "Emotes" button in the Extras lists the `/emote` emotes, the named `/anim` animations and every animation of your character, with a preview of your own character playing the selected one. Play sends it and closes the menu; Hug and Kiss send `/wehug` and `/wekiss`. Universe RP client only.
 - `/shaderaim` prints the shader of the map surface or brush entity you aim at, or a model's shaders, with the `/remap` line to change it. Universe RP client only.
 - `/remapremove <shader>` takes back a single shader remap, without clearing the others as `/remapreset` does.
 - `/list entpresets` and `/list remappresets` list the presets saved for the current map. Unlike the other `/list` types, they need the Entities and Remaps admin power.
