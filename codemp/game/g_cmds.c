@@ -22298,7 +22298,7 @@ void Cmd_EntitiesAndRemaps_f( gentity_t *ent ) {
 	lines[n++] = "^7Props: ^3misc_model_breakable^7 (model, modelscale, light, color; spawnflags 1 solid, 2 animated), ^3misc_model_ghoul^7 (a .glm model), ^3rp_light^7 (light, color), ^3fx_runner^7 (fxFile). Model and effect files must be on the server. See ^3/enthelp^7.\n";
 
 	lines[n++] = "\n^3--------Shader Remaps--------\n";
-	lines[n++] = "^3/shaderaim: ^7Shows the shader of the map surface or brush entity you aim at, or a model's shaders. Needs the Universe RP client.\n";
+	lines[n++] = "^3/shaderaim: ^7Shows the shader of the map surface or brush entity you aim at, or a model's shaders. Needs the " RP_MOD_NAME " client.\n";
 	lines[n++] = "^3/shaderlist: ^7Your own game's list of every shader it has loaded, in your console.\n";
 	lines[n++] = "^3/remap <shader> <new shader>: ^7Remaps shader in the map.\n";
 	lines[n++] = "^3/remaplist <page number>: ^7Lists already remapped shaders in the map, eight per page.\n";
