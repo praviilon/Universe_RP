@@ -33,6 +33,7 @@ two work together. Here:
 
 #include "cg_local.h"
 #include "ui/rp_extras.h"
+#include "game/bg_rpemotes.h"	// GLX_U: [Emotes Menu] the names /emote and /anim take
 
 #define RPX_ARENA_SIZE		0x100000
 #define RPX_CACHE_MAX		64
@@ -1390,6 +1391,52 @@ static void RPX_Preset( int action ) {
 	RPX_Msg( va( "%s the %s preset %s", doing[action], mode ? "remap" : "entity", name ) );
 }
 
+/*
+GLX_U: [Emotes Menu] the Emotes menu's Play, Hug and Kiss (ui_rpemotes.c): /emote <name>, /anim <name> or
+/anim <number> of the row selected on its tab (ui_rpx_em_sel0, 1, 2), /wehug, /wekiss. The name must be one of
+the shared tables' (bg_rpemotes.h), or for the All animations tab an animation's own name (BOTH_STAND1 ...), sent
+as its number; what is sent is the table's spelling, so nothing typed or set in a cvar rides in the command. The
+server checks everything else (whether emotes are on, the player's state) and says why it refuses.
+*/
+extern stringID_table_t animTable[MAX_ANIMATIONS+1];	// the animations' own names (cgame/animtable.h)
+
+static void RPX_Emote( const char *action ) {
+	char name[RPX_NAME_LEN * 2];
+	int i;
+
+	if ( !Q_stricmp( action, "wehug" ) || !Q_stricmp( action, "wekiss" ) ) {
+		RPX_Queue( !Q_stricmp( action, "wehug" ) ? "wehug" : "wekiss" );
+		return;
+	}
+	if ( !Q_stricmp( action, "emote" ) ) {
+		RPX_CvarString( "ui_rpx_em_sel0", name, sizeof( name ) );
+		for ( i = 0; i < RP_NUM_EMOTES; i++ ) {
+			if ( !Q_stricmp( name, rpEmotes[i].name ) ) {
+				RPX_Queue( va( "emote %s", rpEmotes[i].name ) );
+				return;
+			}
+		}
+	} else if ( !Q_stricmp( action, "anim" ) ) {
+		RPX_CvarString( "ui_rpx_em_sel1", name, sizeof( name ) );
+		for ( i = 0; i < MAX_WORDED_EMOTES; i++ ) {
+			if ( animations[i].animation_name && !Q_stricmp( name, animations[i].animation_name ) ) {
+				RPX_Queue( va( "anim %s", animations[i].animation_name ) );
+				return;
+			}
+		}
+	} else if ( !Q_stricmp( action, "animnum" ) ) {
+		RPX_CvarString( "ui_rpx_em_sel2", name, sizeof( name ) );
+		i = name[0] ? GetIDForString( animTable, name ) : -1;
+		if ( i >= 0 && i < MAX_ANIMATIONS ) {
+			RPX_Queue( va( "anim %d", i ) );
+			return;
+		}
+	} else {
+		return;
+	}
+	RPX_Refuse( "Select one in the list first." );
+}
+
 void CG_Rpx_f( void ) {
 	char sub[32], arg[32];
 
@@ -1458,6 +1505,9 @@ void CG_Rpx_f( void ) {
 			RPX_Msg( "Clearing all shader remaps" );
 		} else if ( !Q_stricmp( arg, "pickshader" ) ) {
 			RPX_ShaderPick();
+		} else if ( !Q_stricmp( arg, "emote" ) || !Q_stricmp( arg, "anim" ) || !Q_stricmp( arg, "animnum" )
+			|| !Q_stricmp( arg, "wehug" ) || !Q_stricmp( arg, "wekiss" ) ) {	// GLX_U: [Emotes Menu]
+			RPX_Emote( arg );
 		} else if ( !Q_stricmp( arg, "undo" ) ) {
 			RPX_Queue( "entundo" );		// through the queue, so it keeps to the flood gap too
 		} else if ( !Q_stricmp( arg, "stop" ) ) {

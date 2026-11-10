@@ -506,7 +506,7 @@
 			{
 				"1"
 			}
-			descText			"Spawn props, effects, NPCs and vehicles, play music and sounds"
+			descText			"Spawn props, effects, NPCs and vehicles, play music, sounds and emotes"
 
 			mouseEnter
 			{
@@ -1123,6 +1123,54 @@
 				hide			extrasPresetsButton_glow ;
 				close			ingame_galaxyrp ;
 				open			ingame_rpx_presets
+			}
+		}
+
+		itemDef
+		{
+			name				extrasEmotesButton_glow
+			style				WINDOW_STYLE_SHADER
+			rect				160 300 150 24
+			background			"gfx/menus/menu_blendbox2"
+			forecolor			1 1 1 1
+			visible				0
+			decoration
+		}
+
+		// GLX_U: [Emotes Menu] Emotes: /emote, /anim, /wehug and /wekiss with a preview (ingame_rpx_emotes.menu);
+		// logged in only, as everything in this tab, and for every player: no admin power
+		itemDef
+		{
+			name				extrasEmotesButton
+			group				extrasControls
+			text				"Emotes"
+			type				ITEM_TYPE_BUTTON
+			style				WINDOW_STYLE_EMPTY
+			rect				160 300 150 24
+			font				3
+			textscale			0.6
+			textalignx			15
+			textaligny			5
+			textalign			ITEM_ALIGN_LEFT
+			textstyle			3
+			forecolor			1 .682 0 1
+			visible				0
+			descText			"Play emotes and animations on your character, with a preview"
+
+			mouseEnter
+			{
+				show			extrasEmotesButton_glow
+			}
+			mouseExit
+			{
+				hide			extrasEmotesButton_glow
+			}
+			action
+			{
+				play			"sound/interface/button1.wav" ;
+				hide			extrasEmotesButton_glow ;
+				close			ingame_galaxyrp ;
+				open			ingame_rpx_emotes
 			}
 		}
 

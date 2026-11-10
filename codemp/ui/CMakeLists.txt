@@ -41,6 +41,7 @@ set(MPUIGameFiles
 	"${MPDir}/game/bg_local.h"
 	"${MPDir}/game/bg_public.h"
 	"${MPDir}/game/bg_saga.h"
+	"${MPDir}/game/bg_rpemotes.h" # GLX_U: [Emotes Menu]
 	"${MPDir}/game/bg_weapons.h"
 	"${MPDir}/game/surfaceflags.h"
 	)
@@ -74,6 +75,7 @@ set(MPUIUIFiles
 	"${MPDir}/ui/ui_main.c"
 	"${MPDir}/ui/ui_rpextras.c"
 	"${MPDir}/ui/ui_rpshaders.c"
+	"${MPDir}/ui/ui_rpemotes.c"
 	"${MPDir}/ui/ui_rpdialog.c"
 	"${MPDir}/ui/ui_saber.c"
 	"${MPDir}/ui/ui_shared.c"

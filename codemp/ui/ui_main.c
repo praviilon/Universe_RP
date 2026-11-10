@@ -3050,6 +3050,10 @@ static void UI_OwnerDraw(float x, float y, float w, float h, float text_x, float
 	if ( UI_RpShOwnerDraw( ownerDraw, &rect, scale, color, iMenuFont ) ) {
 		return;
 	}
+	// GLX_U: [Emotes Menu] its preview of the player's character -- ui_rpemotes.c
+	if ( UI_RpEmOwnerDraw( ownerDraw, &rect, scale, color, iMenuFont ) ) {
+		return;
+	}
 
   switch (ownerDraw)
   {
@@ -6147,6 +6151,11 @@ static void UI_RunMenuScript(char **args)
 		{
 			return;
 		}
+		// GLX_U: [Emotes Menu] its scripts (rpxEm...) -- ui_rpemotes.c; before the rpx ones, as above
+		if ( UI_RpEmScript( name, args ) )
+		{
+			return;
+		}
 		// GalaxyRP: [Extras] the Extras menus' scripts (rpx...) -- ui_rpextras.c
 		if ( UI_RpxScript( name, args ) )
 		{
@@ -8372,6 +8381,10 @@ static int UI_FeederCount(float feederID)
 	{
 		return UI_RpShRightCount();
 	}
+	if ( (int)feederID == FEEDER_RPX_EMOTES )	// GLX_U: [Emotes Menu] ui_rpemotes.c
+	{
+		return UI_RpEmCount();
+	}
 
 	switch ( (int)feederID )
 	{
@@ -8676,6 +8689,10 @@ static const char *UI_FeederItemText(float feederID, int index, int column,
 	if ( (int)feederID == FEEDER_RPX_SHNEW )
 	{
 		return UI_RpShRightText( index );
+	}
+	if ( (int)feederID == FEEDER_RPX_EMOTES )	// GLX_U: [Emotes Menu] ui_rpemotes.c
+	{
+		return UI_RpEmText( index );
 	}
 
 	if (feederID == FEEDER_SABER_SINGLE_INFO)
@@ -9281,6 +9298,10 @@ qboolean UI_FeederSelection(float feederFloat, int index, itemDef_t *item)
 	if ( feederID == FEEDER_RPX_SHNEW )
 	{
 		return UI_RpShRightSelection( index );
+	}
+	if ( feederID == FEEDER_RPX_EMOTES )	// GLX_U: [Emotes Menu] ui_rpemotes.c
+	{
+		return UI_RpEmSelection( index );
 	}
 
 	if (feederID == FEEDER_Q3HEADS)

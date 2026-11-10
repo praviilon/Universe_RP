@@ -428,6 +428,12 @@ const char	*UI_RpShRightText( int index );
 qboolean	UI_RpShRightSelection( int index );
 qboolean	UI_RpShScript( const char *name, char **args );
 qboolean	UI_RpShOwnerDraw( int ownerDraw, rectDef_t *rect, float scale, vec4_t color, int iMenuFont );
+// GLX_U: [Emotes Menu] ui_rpemotes.c
+int			UI_RpEmCount( void );
+const char	*UI_RpEmText( int index );
+qboolean	UI_RpEmSelection( int index );
+qboolean	UI_RpEmScript( const char *name, char **args );
+qboolean	UI_RpEmOwnerDraw( int ownerDraw, rectDef_t *rect, float scale, vec4_t color, int iMenuFont );
 char		*UI_Cvar_VariableString( const char *var_name );
 
 

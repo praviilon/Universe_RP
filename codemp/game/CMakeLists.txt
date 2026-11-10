@@ -134,6 +134,7 @@ set(MPGameGameFiles
 	"${MPDir}/game/bg_public.h"
 	"${RPDir}/game/rp_public.h" # GalaxyRP headers
 	"${MPDir}/game/bg_saga.h"
+	"${MPDir}/game/bg_rpemotes.h" # GLX_U: [Emotes Menu]
 	"${MPDir}/game/bg_vehicles.h"
 	"${MPDir}/game/bg_weapons.h"
 	"${MPDir}/game/chars.h"

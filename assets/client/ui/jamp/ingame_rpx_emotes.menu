@@ -1,0 +1,644 @@
+//----------------------------------------------------------------------------------------------
+// ingame_rpx_emotes: the Emotes menu of the Extras.
+// GLX_U: [Emotes Menu] made by a generator, like the other ingame_rpx_*.menu; the Emotes button of the Extras tab
+// of ingame_galaxyrp.menu opens it. /emote, /anim, /wehug and /wekiss, with a preview of the player's own
+// character: the lists, the preview and the rpxEm scripts are ui_rpemotes.c; the commands the buttons send are
+// built in cg_rpextras.c from the names the server takes too (game/bg_rpemotes.h).
+//----------------------------------------------------------------------------------------------
+{
+	menuDef
+	{
+		name                "ingame_rpx_emotes"
+		visible             0
+		fullscreen          0
+		outOfBoundsClick
+		rect                10 20 620 440
+		focusColor          1 1 1 1
+		disableColor        .5 .5 .5 1
+		style               1
+		border              1
+		descX               310
+		descY               424
+		descScale           0.8
+		descColor           1 .682 0 .8
+		descAlignment       ITEM_ALIGN_CENTER
+
+		onOpen
+		{
+			uiScript		rpxEmOpen
+		}
+		onClose
+		{
+			uiScript		rpxEmClose
+		}
+		onESC
+		{
+			play			"sound/interface/button1.wav" ;
+			close			ingame_rpx_emotes
+		}
+
+		itemDef
+		{
+			name                rpx_background
+			style               WINDOW_STYLE_SHADER
+			rect                0 0 620 440
+			background          "gfx/menus/menu_box_ingame"
+			forecolor           1 1 1 1
+			visible             1
+			decoration
+		}
+		itemDef
+		{
+			name                rpx_title
+			style               WINDOW_STYLE_SHADER
+			background          "gfx/menus/menu_blendbox"
+			text                "^9Universe ^7RP^3 Extras: ^7Emotes"
+			rect                20 5 580 28
+			textalign           ITEM_ALIGN_CENTER
+			textalignx          290
+			textaligny          2
+			font                3
+			textscale           0.9
+			forecolor           .549 .854 1 1
+			visible             1
+			decoration
+		}
+		itemDef
+		{
+			name                rpx_back
+			type                ITEM_TYPE_BUTTON
+			style               WINDOW_STYLE_FILLED
+			rect                12 405 90 24
+			text                "Back"
+			textalign           ITEM_ALIGN_CENTER
+			textalignx          45
+			textaligny          2
+			font                2
+			textscale           0.7
+			forecolor           1 .682 0 1
+			backcolor           0 0 0 .6
+			border              1
+			bordercolor         1 .682 0 .6
+			visible             1
+			descText            "Back to the Universe RP menu"
+			mouseEnter
+			{
+				setitemcolor rpx_back bordercolor 1 1 1 1
+			}
+			mouseExit
+			{
+				setitemcolor rpx_back bordercolor 1 .682 0 .6
+			}
+			action
+			{
+				play "sound/interface/button1.wav" ;
+				setcvar ui_rpx_back 1 ;
+				close ingame_rpx_emotes ;
+				open ingame_galaxyrp
+			}
+		}
+		itemDef
+		{
+			name                rpx_msg
+			type                ITEM_TYPE_TEXT
+			style               WINDOW_STYLE_EMPTY
+			rect                110 415 500 14
+			cvar                "ui_rpx_msg"
+			textalign           ITEM_ALIGN_LEFT
+			textalignx          0
+			textaligny          0
+			font                2
+			textscale           0.6
+			forecolor           1 1 .4 1
+			visible             1
+			decoration
+		}
+		itemDef
+		{
+			name                rpx_tab_emotes
+			type                ITEM_TYPE_BUTTON
+			style               WINDOW_STYLE_FILLED
+			rect                12 40 100 20
+			text                "Emotes"
+			textalign           ITEM_ALIGN_CENTER
+			textalignx          50
+			textaligny          0
+			font                2
+			textscale           0.7
+			forecolor           1 .682 0 1
+			backcolor           0 0 0 .6
+			border              1
+			bordercolor         1 .682 0 .6
+			visible             1
+			descText            "/emote: an animation and then its own ending"
+			mouseEnter
+			{
+				setitemcolor rpx_tab_emotes bordercolor 1 1 1 1
+			}
+			mouseExit
+			{
+				setitemcolor rpx_tab_emotes bordercolor 1 .682 0 .6
+			}
+			action
+			{
+				play "sound/interface/button1.wav" ;
+				uiScript rpxEmTab 0
+			}
+		}
+		itemDef
+		{
+			name                rpx_tab_anims
+			type                ITEM_TYPE_BUTTON
+			style               WINDOW_STYLE_FILLED
+			rect                116 40 100 20
+			text                "Animations"
+			textalign           ITEM_ALIGN_CENTER
+			textalignx          50
+			textaligny          0
+			font                2
+			textscale           0.7
+			forecolor           1 .682 0 1
+			backcolor           0 0 0 .6
+			border              1
+			bordercolor         1 .682 0 .6
+			visible             1
+			descText            "/anim: the named animations, held until you move"
+			mouseEnter
+			{
+				setitemcolor rpx_tab_anims bordercolor 1 1 1 1
+			}
+			mouseExit
+			{
+				setitemcolor rpx_tab_anims bordercolor 1 .682 0 .6
+			}
+			action
+			{
+				play "sound/interface/button1.wav" ;
+				uiScript rpxEmTab 1
+			}
+		}
+		itemDef
+		{
+			name                rpx_tab_all
+			type                ITEM_TYPE_BUTTON
+			style               WINDOW_STYLE_FILLED
+			rect                220 40 110 20
+			text                "All animations"
+			textalign           ITEM_ALIGN_CENTER
+			textalignx          55
+			textaligny          0
+			font                2
+			textscale           0.7
+			forecolor           1 .682 0 1
+			backcolor           0 0 0 .6
+			border              1
+			bordercolor         1 .682 0 .6
+			visible             1
+			descText            "/anim by number: every animation your character's animation file has"
+			mouseEnter
+			{
+				setitemcolor rpx_tab_all bordercolor 1 1 1 1
+			}
+			mouseExit
+			{
+				setitemcolor rpx_tab_all bordercolor 1 .682 0 .6
+			}
+			action
+			{
+				play "sound/interface/button1.wav" ;
+				uiScript rpxEmTab 2
+			}
+		}
+		itemDef
+		{
+			name                rpx_tab_emotes_on
+			style               WINDOW_STYLE_FILLED
+			rect                14 58 96 2
+			backcolor           1 1 1 1
+			visible             1
+			decoration
+			cvarTest            "ui_rpx_em_tab"
+			showCvar
+			{
+				"0"
+			}
+		}
+		itemDef
+		{
+			name                rpx_tab_anims_on
+			style               WINDOW_STYLE_FILLED
+			rect                118 58 96 2
+			backcolor           1 1 1 1
+			visible             1
+			decoration
+			cvarTest            "ui_rpx_em_tab"
+			showCvar
+			{
+				"1"
+			}
+		}
+		itemDef
+		{
+			name                rpx_tab_all_on
+			style               WINDOW_STYLE_FILLED
+			rect                222 58 106 2
+			backcolor           1 1 1 1
+			visible             1
+			decoration
+			cvarTest            "ui_rpx_em_tab"
+			showCvar
+			{
+				"2"
+			}
+		}
+		itemDef
+		{
+			name                rpx_filter
+			type                ITEM_TYPE_EDITFIELD
+			style               0
+			text                "Filter: "
+			cvar                "ui_rpx_filter_emotes"
+			maxchars            30
+			maxPaintChars       30
+			rect                12 64 318 18
+			textalign           ITEM_ALIGN_LEFT
+			textalignx          0
+			textaligny          -2
+			font                2
+			textscale           0.6
+			forecolor           1 1 1 1
+			outlinecolor        1 .5 .5 .5
+			backcolor           0 0 0 .6
+			border              1
+			bordercolor         .5 .5 .5 .6
+			visible             1
+			descText            "Show only the names with this in them (on Animations, the category too)"
+		}
+		itemDef
+		{
+			name                rpx_list
+			type                ITEM_TYPE_LISTBOX
+			style               WINDOW_STYLE_FILLED
+			rect                12 84 318 270
+			elementwidth        298
+			elementheight       15
+			elementtype         LISTBOX_TEXT
+			feeder              FEEDER_RPX_EMOTES
+			font                2
+			textscale           0.55
+			textstyle           0
+			textalign           0
+			textaligny          0
+			columns             1 4 292 292
+			border              1
+			bordercolor         1 .682 0 .6
+			forecolor           1 1 1 1
+			backcolor           0 0 0 .6
+			outlinecolor        1 .682 0 .35
+			visible             1
+			descText            "Select one to preview it, double-click to play it. Red: your character's animation file lacks it"
+			doubleclick
+			{
+				uiScript rpxEmDouble
+			}
+			mouseEnter
+			{
+				setitemcolor rpx_list bordercolor 1 1 1 1
+			}
+			mouseExit
+			{
+				setitemcolor rpx_list bordercolor 1 .682 0 .6
+			}
+		}
+		itemDef
+		{
+			name                rpx_info
+			type                ITEM_TYPE_TEXT
+			style               WINDOW_STYLE_EMPTY
+			rect                12 358 318 14
+			cvar                "ui_rpx_em_info"
+			textalign           ITEM_ALIGN_LEFT
+			textalignx          0
+			textaligny          0
+			font                2
+			textscale           0.55
+			forecolor           .8 .8 .8 1
+			visible             1
+			decoration
+		}
+		itemDef
+		{
+			name                rpx_preview
+			type                ITEM_TYPE_OWNERDRAW
+			ownerdraw           UI_RPX_EMPREVIEW
+			style               WINDOW_STYLE_FILLED
+			rect                342 40 266 250
+			font                2
+			textscale           0.7
+			forecolor           .8 .8 .8 1
+			backcolor           0 0 0 .6
+			border              1
+			bordercolor         1 .682 0 .6
+			visible             1
+			decoration
+		}
+		itemDef
+		{
+			name                rpx_yaw
+			type                ITEM_TYPE_INTSLIDER
+			text                "Turn"
+			cvarint             "ui_rpx_em_yaw" 0 -180 180
+			rect                392 296 105 18
+			textalign           ITEM_ALIGN_RIGHT
+			textalignx          0
+			textaligny          -2
+			font                2
+			textscale           0.7
+			forecolor           1 1 1 1
+			visible             1
+			descText            "Preview only: turn your character around (degrees)"
+			action
+			{
+				play "sound/interface/button1.wav"
+			}
+		}
+		itemDef
+		{
+			name                rpx_yaw_value
+			type                ITEM_TYPE_EDITFIELD
+			style               0
+			text                " "
+			cvar                "ui_rpx_em_yaw"
+			maxchars            4
+			maxPaintChars       4
+			rect                492 296 42 18
+			textalign           ITEM_ALIGN_LEFT
+			textalignx          0
+			textaligny          -2
+			font                2
+			textscale           0.7
+			forecolor           1 .682 0 1
+			outlinecolor        1 .5 .5 .5
+			backcolor           0 0 0 .6
+			border              1
+			bordercolor         .5 .5 .5 .6
+			visible             1
+			descText            "Preview only: turn your character around (degrees)"
+		}
+		itemDef
+		{
+			name                rpx_zoom
+			type                ITEM_TYPE_INTSLIDER
+			text                "Zoom"
+			cvarint             "ui_rpx_em_zoom" 100 25 400
+			rect                392 318 105 18
+			textalign           ITEM_ALIGN_RIGHT
+			textalignx          0
+			textaligny          -2
+			font                2
+			textscale           0.7
+			forecolor           1 1 1 1
+			visible             1
+			descText            "Preview only: zoom in or out"
+			action
+			{
+				play "sound/interface/button1.wav"
+			}
+		}
+		itemDef
+		{
+			name                rpx_zoom_value
+			type                ITEM_TYPE_NUMERICFIELD
+			style               0
+			text                " "
+			cvar                "ui_rpx_em_zoom"
+			maxchars            4
+			maxPaintChars       4
+			rect                492 318 42 18
+			textalign           ITEM_ALIGN_LEFT
+			textalignx          0
+			textaligny          -2
+			font                2
+			textscale           0.7
+			forecolor           1 .682 0 1
+			outlinecolor        1 .5 .5 .5
+			backcolor           0 0 0 .6
+			border              1
+			bordercolor         .5 .5 .5 .6
+			visible             1
+			descText            "Preview only: zoom in or out"
+		}
+		itemDef
+		{
+			name                rpx_view
+			type                ITEM_TYPE_BUTTON
+			style               WINDOW_STYLE_FILLED
+			rect                544 296 64 18
+			text                "Reset"
+			textalign           ITEM_ALIGN_CENTER
+			textalignx          32
+			textaligny          0
+			font                2
+			textscale           0.6
+			forecolor           1 .682 0 1
+			backcolor           0 0 0 .6
+			border              1
+			bordercolor         1 .682 0 .6
+			visible             1
+			descText            "The preview turned and zoomed back"
+			mouseEnter
+			{
+				setitemcolor rpx_view bordercolor 1 1 1 1
+			}
+			mouseExit
+			{
+				setitemcolor rpx_view bordercolor 1 .682 0 .6
+			}
+			action
+			{
+				play "sound/interface/button1.wav" ;
+				uiScript rpxEmView
+			}
+		}
+		itemDef
+		{
+			name                rpx_replay
+			type                ITEM_TYPE_BUTTON
+			style               WINDOW_STYLE_FILLED
+			rect                544 318 64 18
+			text                "Replay"
+			textalign           ITEM_ALIGN_CENTER
+			textalignx          32
+			textaligny          0
+			font                2
+			textscale           0.6
+			forecolor           1 .682 0 1
+			backcolor           0 0 0 .6
+			border              1
+			bordercolor         1 .682 0 .6
+			visible             1
+			descText            "The preview from its start"
+			mouseEnter
+			{
+				setitemcolor rpx_replay bordercolor 1 1 1 1
+			}
+			mouseExit
+			{
+				setitemcolor rpx_replay bordercolor 1 .682 0 .6
+			}
+			action
+			{
+				play "sound/interface/button1.wav" ;
+				uiScript rpxEmReplay
+			}
+		}
+		itemDef
+		{
+			name                rpx_play
+			type                ITEM_TYPE_BUTTON
+			style               WINDOW_STYLE_FILLED
+			rect                342 344 266 26
+			text                "Play"
+			textalign           ITEM_ALIGN_CENTER
+			textalignx          133
+			textaligny          2
+			font                2
+			textscale           0.8
+			forecolor           1 .682 0 1
+			backcolor           0 0 0 .6
+			border              1
+			bordercolor         1 .682 0 .6
+			visible             1
+			descText            "Plays it on your character; the menu closes. Jump, crouch or a key ends a held one"
+			mouseEnter
+			{
+				setitemcolor rpx_play bordercolor 1 1 1 1
+			}
+			mouseExit
+			{
+				setitemcolor rpx_play bordercolor 1 .682 0 .6
+			}
+			action
+			{
+				play "sound/interface/button1.wav" ;
+				uiScript rpxEmPlay
+			}
+		}
+		itemDef
+		{
+			name                rpx_hug
+			type                ITEM_TYPE_BUTTON
+			style               WINDOW_STYLE_FILLED
+			rect                342 376 128 22
+			text                "Hug"
+			textalign           ITEM_ALIGN_CENTER
+			textalignx          64
+			textaligny          2
+			font                2
+			textscale           0.7
+			forecolor           1 .682 0 1
+			backcolor           0 0 0 .6
+			border              1
+			bordercolor         1 .682 0 .6
+			visible             1
+			descText            "Hugs the player right in front of you (/wehug). Look at them first"
+			cvarTest            "ui_rpx_em_tab"
+			showCvar
+			{
+				"0"
+			}
+			mouseEnter
+			{
+				setitemcolor rpx_hug bordercolor 1 1 1 1
+			}
+			mouseExit
+			{
+				setitemcolor rpx_hug bordercolor 1 .682 0 .6
+			}
+			action
+			{
+				play "sound/interface/button1.wav" ;
+				uiScript rpxEmHug
+			}
+		}
+		itemDef
+		{
+			name                rpx_kiss
+			type                ITEM_TYPE_BUTTON
+			style               WINDOW_STYLE_FILLED
+			rect                480 376 128 22
+			text                "Kiss"
+			textalign           ITEM_ALIGN_CENTER
+			textalignx          64
+			textaligny          2
+			font                2
+			textscale           0.7
+			forecolor           1 .682 0 1
+			backcolor           0 0 0 .6
+			border              1
+			bordercolor         1 .682 0 .6
+			visible             1
+			descText            "Kisses the player right in front of you (/wekiss). Look at them first"
+			cvarTest            "ui_rpx_em_tab"
+			showCvar
+			{
+				"0"
+			}
+			mouseEnter
+			{
+				setitemcolor rpx_kiss bordercolor 1 1 1 1
+			}
+			mouseExit
+			{
+				setitemcolor rpx_kiss bordercolor 1 .682 0 .6
+			}
+			action
+			{
+				play "sound/interface/button1.wav" ;
+				uiScript rpxEmKiss
+			}
+		}
+		itemDef
+		{
+			name                rpx_held1
+			type                ITEM_TYPE_TEXT
+			style               WINDOW_STYLE_EMPTY
+			rect                342 380 266 14
+			text                "The pose is held until you move."
+			textalign           ITEM_ALIGN_LEFT
+			textalignx          0
+			textaligny          0
+			font                2
+			textscale           0.55
+			forecolor           .8 .8 .8 1
+			visible             1
+			decoration
+			cvarTest            "ui_rpx_em_tab"
+			showCvar
+			{
+				"1"
+			}
+		}
+		itemDef
+		{
+			name                rpx_held2
+			type                ITEM_TYPE_TEXT
+			style               WINDOW_STYLE_EMPTY
+			rect                342 380 266 14
+			text                "The pose is held until you move."
+			textalign           ITEM_ALIGN_LEFT
+			textalignx          0
+			textaligny          0
+			font                2
+			textscale           0.55
+			forecolor           .8 .8 .8 1
+			visible             1
+			decoration
+			cvarTest            "ui_rpx_em_tab"
+			showCvar
+			{
+				"2"
+			}
+		}
+	}
+}

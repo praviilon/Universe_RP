@@ -210,6 +210,14 @@ static const char * const rpxSoundChannels[] = {
 	X( "ui_rpx_sh_pickn",		"0" )		/* cgame: raised with each one found */ \
 	X( "ui_rpx_sh_thumb0",		"" )		/* cgame: "<shader handle> <name>" for the Old thumbnail */ \
 	X( "ui_rpx_sh_thumb1",		"" )		/* cgame: the same for New */ \
+	X( "ui_rpx_em_tab",			"0" )		/* GLX_U: Emotes: 0 emotes, 1 named animations, 2 all animations */ \
+	X( "ui_rpx_em_sel0",		"" )		/* each tab's selected row: an emote, a named animation, */ \
+	X( "ui_rpx_em_sel1",		"" )		/* an animation's own name (BOTH_STAND1 ...) */ \
+	X( "ui_rpx_em_sel2",		"" ) \
+	X( "ui_rpx_filter_emotes",	"" )		/* the open tab's filter */ \
+	X( "ui_rpx_em_yaw",			"0" )		/* the preview: turned, -180 to 180 */ \
+	X( "ui_rpx_em_zoom",		"100" )		/* percent */ \
+	X( "ui_rpx_em_info",		"" )		/* ui: how many the list has */ \
 	X( "ui_rpx_status",			"" )		/* cgame: loading, or why a listing failed */ \
 	X( "ui_rpx_serial",			"0" )		/* cgame: raised each time it writes the list file */ \
 	X( "ui_rpx_file",			"rpx/list.dat" )	/* cgame: which of rpxListFiles it wrote */ \

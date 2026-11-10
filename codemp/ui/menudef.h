@@ -135,6 +135,7 @@ along with this program; if not, see <http://www.gnu.org/licenses/>.
 #define FEEDER_RPX_ANIMS					0x31			// GLX_U: [Extras] GLM Props' named animations (ui_rpextras.c)
 #define FEEDER_RPX_SHMAP					0x32			// GLX_U: [Shader Remaps Menu] the map's shaders, or the remaps in force (ui_rpshaders.c)
 #define FEEDER_RPX_SHNEW					0x33			// GLX_U: [Shader Remaps Menu] what to remap to
+#define FEEDER_RPX_EMOTES					0x34			// GLX_U: [Emotes Menu] the emotes, the named animations or all of the model's (ui_rpemotes.c)
 
 
 // Xbox specific, hope no one minds
@@ -388,6 +389,7 @@ along with this program; if not, see <http://www.gnu.org/licenses/>.
 #define UI_RPX_GSKIN		309		// GLX_U: the GLM Props menu's skin line
 #define UI_RPX_SHOLD		310		// GLX_U: the Shader Remaps menu's thumbnail of the shader to remap
 #define UI_RPX_SHNEW		311		// GLX_U: the Shader Remaps menu's thumbnail of what to remap it to
+#define UI_RPX_EMPREVIEW	312		// GLX_U: the Emotes menu's preview of the player's character
 
 #define VOICECHAT_GETFLAG			"getflag"				// command someone to get the flag
 #define VOICECHAT_OFFENSE			"offense"				// command someone to go on offense
