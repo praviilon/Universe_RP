@@ -412,6 +412,7 @@ int			UI_RpxAnimFeederCount( void );			// GLX_U: [Extras] GLM Props' animations
 const char	*UI_RpxAnimFeederItemText( int index );
 qboolean	UI_RpxAnimFeederSelection( int index );
 qboolean	UI_RpxScript( const char *name, char **args );
+qboolean	RP_ListRowInView( itemDef_t *item, int index );	// GLX_U fix: [Extras] ui_rpextras.c
 // GLX_U: [Dialogues] ui_rpdialog.c
 void		UI_RpDialogOpen( void );
 void		UI_RpDialogClose( void );

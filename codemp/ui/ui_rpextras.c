@@ -230,6 +230,28 @@ static int RPX_SelectedRow( void ) {
 	return rpxView[item->cursorPos];
 }
 
+/*
+GLX_U fix: [Extras] whether a row of a list box is in view, from where the list starts and how many rows its box holds
+(as Item_ListBox_Paint() draws them: the box's height less 2, a row each elementHeight). The Extras lists' select helpers
+(RPX_SetListCursor() here, RPSH_SetCursor() in ui_rpshaders.c, RPEM_SetCursor() in ui_rpemotes.c) scroll a selected row
+into view when it is not. They judged it from listPtr->endPos, the last row the list drew in its last frame -- but a
+list made again is put back to the top first and its row selected again before any frame is drawn, so a row that was
+in the old view was taken as in view, and stayed highlighted out of sight (after Preview or Pick from world in Shader
+Remaps, on reopening an Extras menu whose listing arrives after it shows).
+*/
+qboolean RP_ListRowInView( itemDef_t *item, int index ) {
+	listBoxDef_t *listPtr = item->typeData.listbox;
+	int rows = 1;
+
+	if ( listPtr->elementHeight > 0 ) {
+		rows = (int)( ( item->window.rect.h - 2 ) / listPtr->elementHeight );
+	}
+	if ( rows < 1 ) {
+		rows = 1;
+	}
+	return ( index >= listPtr->startPos && index < listPtr->startPos + rows ) ? qtrue : qfalse;
+}
+
 static void RPX_SetListCursor( int index ) {
 	itemDef_t *item = RPX_ListItem();
 	listBoxDef_t *listPtr;
@@ -242,7 +264,7 @@ static void RPX_SetListCursor( int index ) {
 	listPtr->cursorPos = ( index >= 0 ) ? index : 0;
 	if ( index < 0 ) {
 		listPtr->startPos = 0;
-	} else if ( index < listPtr->startPos || listPtr->endPos <= 0 || index > listPtr->endPos ) {
+	} else if ( !RP_ListRowInView( item, index ) ) {
 		int max = Item_ListBox_MaxScroll( item );
 
 		listPtr->startPos = ( index > 3 ) ? index - 3 : 0;

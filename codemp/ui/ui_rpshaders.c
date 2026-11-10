@@ -223,7 +223,7 @@ static void RPSH_SetCursor( int feeder, int index ) {
 	listPtr->cursorPos = ( index >= 0 ) ? index : 0;
 	if ( index < 0 ) {
 		listPtr->startPos = 0;
-	} else if ( index < listPtr->startPos || listPtr->endPos <= 0 || index > listPtr->endPos ) {
+	} else if ( !RP_ListRowInView( item, index ) ) {
 		int max = Item_ListBox_MaxScroll( item );
 
 		listPtr->startPos = ( index > 3 ) ? index - 3 : 0;
@@ -231,6 +231,17 @@ static void RPSH_SetCursor( int feeder, int index ) {
 			listPtr->startPos = max;
 		}
 	}
+}
+
+// GLX_U: [Shader Remaps Menu] a list's highlight removed, the list left where it is scrolled
+static void RPSH_Unselect( int feeder ) {
+	itemDef_t *item = RPSH_List( feeder );
+
+	if ( !item || !item->typeData.listbox ) {
+		return;
+	}
+	item->cursorPos = -1;
+	item->typeData.listbox->cursorPos = 0;
 }
 
 /*
@@ -991,6 +1002,33 @@ static void RPSH_EnterRight( int row ) {
 }
 
 /*
+GLX_U: [Shader Remaps Menu] the right list's highlight follows New: the row that is New when New is a file of the folder
+shown and the filter leaves it in the list (scrolled into view if it is out of view), none otherwise (the list stays
+where it is). Run when the list is made again (the menu opened -- so a file chosen before Preview is shown again --,
+another folder, the filter) and when New changes (a click there, a remap selected in Current remaps, Pick from world,
+typing); the folder, the filter, Old and New are never changed by it.
+*/
+static void RPSH_ReselectRight( void ) {
+	char newName[MAX_QPATH];
+	int dirLen = strlen( rpshRightDir ), i;
+
+	RPSH_Cvar( "ui_rpx_sh_new", newName, sizeof( newName ) );
+	if ( dirLen && !Q_stricmpn( newName, rpshRightDir, dirLen ) && newName[dirLen] == '/' ) {
+		const char *leaf = newName + dirLen + 1;
+
+		for ( i = 0; i < rpshRightViewNum; i++ ) {
+			int row = rpshRightView[i];
+
+			if ( row >= 0 && !( rpshRight[row].flags & RPSH_DIR ) && !Q_stricmp( rpshRight[row].name, leaf ) ) {
+				RPSH_SetCursor( FEEDER_RPX_SHNEW, i );
+				return;
+			}
+		}
+	}
+	RPSH_Unselect( FEEDER_RPX_SHNEW );
+}
+
+/*
 ===========================================================================
 Old and New, the preview
 ===========================================================================
@@ -1104,7 +1142,7 @@ static void RPSH_CheckMap( void ) {
 static void RPSH_Sync( void ) {
 	static char cs[MAX_STRING_CHARS * 4 + 16];
 	char buf[MAX_QPATH * 2];
-	qboolean leftChanged = qfalse, infoChanged = qfalse;
+	qboolean leftChanged = qfalse, infoChanged = qfalse, rightChanged = qfalse;
 	int mode, pickN;
 
 	if ( rpshSyncTime == uiInfo.uiDC.realTime ) {
@@ -1155,7 +1193,14 @@ static void RPSH_Sync( void ) {
 		rpshPickSeen = pickN;
 		RPSH_Cvar( "ui_rpx_sh_pick", pick, sizeof( pick ) );
 		if ( pick[0] ) {
+			int r = RPSH_FindRemap( pick );
+
 			trap->Cvar_Set( "ui_rpx_sh_old", pick );
+			// GLX_U: [Shader Remaps Menu] remapped: New is what it is remapped to, as selecting it in Current remaps
+			// gives; not remapped, New stays as the player had it (an X=X entry is not kept: no remap)
+			if ( r >= 0 ) {
+				trap->Cvar_Set( "ui_rpx_sh_new", rpshRemaps[r].newName );
+			}
 			if ( rpshLeftMode != 0 || rpshLeftFilter[0] ) {
 				// shown in the map's list, unfiltered, so it can be selected there
 				trap->Cvar_Set( "ui_rpx_sh_view", "0" );
@@ -1184,12 +1229,21 @@ static void RPSH_Sync( void ) {
 		RPSH_LoadRight( buf );
 		RPSH_Cvar( "ui_rpx_filter_shnew", rpshRightFilter, sizeof( rpshRightFilter ) );
 		RPSH_BuildRight();
+		rightChanged = qtrue;
 	} else {
 		RPSH_Cvar( "ui_rpx_filter_shnew", buf, sizeof( rpshRightFilter ) );
 		if ( strcmp( buf, rpshRightFilter ) ) {
 			Q_strncpyz( rpshRightFilter, buf, sizeof( rpshRightFilter ) );
 			RPSH_BuildRight();
+			rightChanged = qtrue;
 		}
+	}
+
+	// GLX_U: [Shader Remaps Menu] the right list's highlight on New (RPSH_ReselectRight())
+	RPSH_Cvar( "ui_rpx_sh_new", buf, MAX_QPATH );
+	if ( rightChanged || strcmp( buf, rpshNewSeen ) ) {
+		Q_strncpyz( rpshNewSeen, buf, sizeof( rpshNewSeen ) );
+		RPSH_ReselectRight();
 	}
 
 	// the line under Old

@@ -233,7 +233,7 @@ static void RPEM_SetCursor( int index ) {
 	listPtr->cursorPos = ( index >= 0 ) ? index : 0;
 	if ( index < 0 ) {
 		listPtr->startPos = 0;
-	} else if ( index < listPtr->startPos || listPtr->endPos <= 0 || index > listPtr->endPos ) {
+	} else if ( !RP_ListRowInView( item, index ) ) {
 		int max = Item_ListBox_MaxScroll( item );
 
 		listPtr->startPos = ( index > 3 ) ? index - 3 : 0;

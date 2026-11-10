@@ -764,10 +764,10 @@ static void RP_SA_PrintShader( const char *shader, const char *where, float dist
 	char remap[MAX_QPATH];
 
 	Com_Printf( "^3Shader: ^7%s ^5(%s, %i units)\n", RP_SA_Clean( shader ), where, (int)dist );
-	if ( RP_SA_RemappedTo( shader, remap, sizeof( remap ) ) )
+	// GLX_U: [Shader Aim] and what it is remapped to, if it is; nothing more (the /remap and /shaderlist hint is gone).
+	// An entry pointing at itself (/remap X X) is no remap, as the Shader Remaps menu takes it.
+	if ( RP_SA_RemappedTo( shader, remap, sizeof( remap ) ) && Q_stricmp( remap, shader ) )
 		Com_Printf( "^7Remapped to: ^3%s\n", RP_SA_Clean( remap ) );
-	else
-		Com_Printf( "^3/remap %s <new shader>  ^7(/shaderlist lists loaded shaders)\n", RP_SA_Clean( shader ) );
 }
 
 static void RP_SA_PrintModel( const char *path, const char *where, float dist )
