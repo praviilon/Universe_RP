@@ -22270,7 +22270,7 @@ static void zyk_print_lines( gentity_t *ent, const char * const *lines, int coun
 
 void Cmd_EntitiesAndRemaps_f( gentity_t *ent ) {
 	static char entlist_line[512];
-	const char *lines[64];	// 56 now
+	const char *lines[64];	// 57 now
 	int n = 0;
 
 	if (!check_admin_command(ent, ADM_ENTITYSYSTEM, qtrue))
@@ -22325,6 +22325,7 @@ void Cmd_EntitiesAndRemaps_f( gentity_t *ent ) {
 	lines[n++] = "^5Other\n";
 	lines[n++] = "^3/entuse <name>: ^7Uses every entity with that targetname, as a trigger or a button would: spawners, lights, effects, doors. NPCs and vehicles are left alone.\n";
 	lines[n++] = "^3/enttrigger <entity id (optional)>: ^7Activates the entity you aim at, or that id, as a level 5 Stun Baton does: a door, lift or button opens even when locked or inactive, anything else is used. Account locks do not stop it.\n";
+	lines[n++] = "^3/entflags <player name or ID>: ^7Lists the target_flag flags that player holds on this map, for testing quests.\n";
 	lines[n++] = "^3/entslots: ^7Shows how full the map's model, effect and sound slots are, and how many can be reused.\n";
 	lines[n++] = "^3/list md3^7, ^3/list glm ^7and ^3/list effects^7: Show the .md3 and .glm model files and the effect files the server has, for props.\n";
 	lines[n++] = "^3/settings 6: ^7Entity Bounds -- draws the box of the entity you aim at, and marks nearby spawn points, targets and other point entities. The map's static models are drawn and marked in ^1red^7.\n";
