@@ -344,6 +344,20 @@ static void RPX_List( int kind ) {
 	RPX_CurrentFolder( kind, folder, sizeof( folder ) );
 
 	l = RPX_FindListing( kind, folder );
+	if ( RPX_IsPresetKind( kind ) ) {
+		// GLX_U: [Presets Menu] never from what is kept: the server is asked each time, also when it is being asked
+		if ( l ) {
+			if ( rpx_arenaUsed == l->start + l->size ) {
+				rpx_arenaUsed = l->start;	// the last one written: its room is free again
+			}
+			memmove( l, l + 1, ( rpx_cache + rpx_numCached - ( l + 1 ) ) * sizeof( *l ) );
+			rpx_numCached--;
+			l = NULL;
+		}
+		if ( rpx_fetch.active && rpx_fetch.kind == kind ) {
+			rpx_fetch.active = qfalse;
+		}
+	}
 	if ( l ) {
 		rpx_fetch.active = qfalse;	// whatever was on its way is not what the menu shows now
 		RPX_Status( l->truncated ? "^3There are more here than one listing can hold, so some are missing." : "" );
@@ -1345,6 +1359,37 @@ static void RPX_ShaderThumb( int slot, const char *name ) {
 	trap->Cvar_Set( slot ? "ui_rpx_sh_thumb1" : "ui_rpx_sh_thumb0", va( "%d %s", handle, name ) );
 }
 
+/*
+GLX_U: [Presets Menu] the Presets menu's Load, Save and Delete (action 0, 1, 2): /entload, /entsave, /entdeletefile
+or, on the Remaps tab, /remapload, /remapsave, /remapdeletefile, of the menu's name. The name is letters and
+digits only, as the commands take it (zyk_check_user_input(), g_cmds.c), so nothing else can ride in the command.
+*/
+static void RPX_Preset( int action ) {
+	static const char * const cmds[2][3] = {
+		{ "entload", "entsave", "entdeletefile" },
+		{ "remapload", "remapsave", "remapdeletefile" },
+	};
+	static const char * const doing[3] = { "Loading", "Saving", "Deleting" };
+	char name[RPX_NAME_LEN * 2];
+	int mode = RPX_CvarInt( "ui_rpx_presetmode" ) ? 1 : 0;
+	int i;
+
+	RPX_CvarString( "ui_rpx_pr_name", name, sizeof( name ) );
+	for ( i = 0; name[i]; i++ ) {
+		char ch = name[i];
+
+		if ( !( ( ch >= 'A' && ch <= 'Z' ) || ( ch >= 'a' && ch <= 'z' ) || ( ch >= '0' && ch <= '9' ) ) ) {
+			break;
+		}
+	}
+	if ( name[i] || i < 1 || i > RPX_PRESET_NAME_MAX || action < 0 || action > 2 ) {
+		RPX_Refuse( "A preset name is 1 to 63 letters and digits." );
+		return;
+	}
+	RPX_Queue( va( "%s %s", cmds[mode][action], name ) );
+	RPX_Msg( va( "%s the %s preset %s", doing[action], mode ? "remap" : "entity", name ) );
+}
+
 void CG_Rpx_f( void ) {
 	char sub[32], arg[32];
 
@@ -1398,6 +1443,12 @@ void CG_Rpx_f( void ) {
 		} else if ( !Q_stricmp( arg, "fxstop" ) ) {
 			rpx_fx.windowEnd = 0;
 			rpx_fx.pendingId = 0;
+		} else if ( !Q_stricmp( arg, "presetload" ) ) {	// GLX_U: [Presets Menu]
+			RPX_Preset( 0 );
+		} else if ( !Q_stricmp( arg, "presetsave" ) ) {
+			RPX_Preset( 1 );
+		} else if ( !Q_stricmp( arg, "presetdelete" ) ) {
+			RPX_Preset( 2 );
 		} else if ( !Q_stricmp( arg, "remap" ) ) {	// GLX_U: [Shader Remaps Menu]
 			RPX_ShaderRemap();
 		} else if ( !Q_stricmp( arg, "remapremove" ) ) {

@@ -1,0 +1,587 @@
+//----------------------------------------------------------------------------------------------
+// ingame_rpx_presets: the Presets menu of the Extras.
+// GLX_U: [Presets Menu] made by a generator, like the other ingame_rpx_*.menu; the Presets button of the Extras
+// tab of ingame_galaxyrp.menu opens it. This map's entity and remap presets, in one list with two tabs (the
+// server lists them: /rpxlist entpresets and remappresets, g_rplist.c), to load, save and delete: the list, the
+// tabs and the rpxPreset scripts are ui_rpextras.c; the commands the buttons send are built in cg_rpextras.c.
+//----------------------------------------------------------------------------------------------
+{
+	menuDef
+	{
+		name                "ingame_rpx_presets"
+		visible             0
+		fullscreen          0
+		outOfBoundsClick
+		rect                10 20 620 440
+		focusColor          1 1 1 1
+		disableColor        .5 .5 .5 1
+		style               1
+		border              1
+		descX               310
+		descY               424
+		descScale           0.8
+		descColor           1 .682 0 .8
+		descAlignment       ITEM_ALIGN_CENTER
+
+		onOpen
+		{
+			uiScript		rpxOpen presets ingame_rpx_presets
+		}
+		onClose
+		{
+			uiScript		rpxClose
+		}
+		onESC
+		{
+			play			"sound/interface/button1.wav" ;
+			close			ingame_rpx_presets
+		}
+
+		itemDef
+		{
+			name                rpx_background
+			style               WINDOW_STYLE_SHADER
+			rect                0 0 620 440
+			background          "gfx/menus/menu_box_ingame"
+			forecolor           1 1 1 1
+			visible             1
+			decoration
+		}
+		itemDef
+		{
+			name                rpx_title
+			style               WINDOW_STYLE_SHADER
+			background          "gfx/menus/menu_blendbox"
+			text                "^9Universe ^7RP^3 Extras: ^7Presets"
+			rect                20 5 580 28
+			textalign           ITEM_ALIGN_CENTER
+			textalignx          290
+			textaligny          2
+			font                3
+			textscale           0.9
+			forecolor           .549 .854 1 1
+			visible             1
+			decoration
+		}
+		itemDef
+		{
+			name                rpx_back
+			type                ITEM_TYPE_BUTTON
+			style               WINDOW_STYLE_FILLED
+			rect                12 405 90 24
+			text                "Back"
+			textalign           ITEM_ALIGN_CENTER
+			textalignx          45
+			textaligny          2
+			font                2
+			textscale           0.7
+			forecolor           1 .682 0 1
+			backcolor           0 0 0 .6
+			border              1
+			bordercolor         1 .682 0 .6
+			visible             1
+			descText            "Back to the Universe RP menu"
+			mouseEnter
+			{
+				setitemcolor rpx_back bordercolor 1 1 1 1
+			}
+			mouseExit
+			{
+				setitemcolor rpx_back bordercolor 1 .682 0 .6
+			}
+			action
+			{
+				play "sound/interface/button1.wav" ;
+				setcvar ui_rpx_back 1 ;
+				close ingame_rpx_presets ;
+				open ingame_galaxyrp
+			}
+		}
+		itemDef
+		{
+			name                rpx_msg
+			type                ITEM_TYPE_TEXT
+			style               WINDOW_STYLE_EMPTY
+			rect                110 415 500 14
+			cvar                "ui_rpx_msg"
+			textalign           ITEM_ALIGN_LEFT
+			textalignx          0
+			textaligny          0
+			font                2
+			textscale           0.6
+			forecolor           1 1 .4 1
+			visible             1
+			decoration
+		}
+		itemDef
+		{
+			name                rpx_tab_ent
+			type                ITEM_TYPE_BUTTON
+			style               WINDOW_STYLE_FILLED
+			rect                12 40 103 20
+			text                "Entities"
+			textalign           ITEM_ALIGN_CENTER
+			textalignx          51
+			textaligny          0
+			font                2
+			textscale           0.7
+			forecolor           1 .682 0 1
+			backcolor           0 0 0 .6
+			border              1
+			bordercolor         1 .682 0 .6
+			visible             1
+			descText            "The entity presets saved for this map"
+			mouseEnter
+			{
+				setitemcolor rpx_tab_ent bordercolor 1 1 1 1
+			}
+			mouseExit
+			{
+				setitemcolor rpx_tab_ent bordercolor 1 .682 0 .6
+			}
+			action
+			{
+				play "sound/interface/button1.wav" ;
+				uiScript rpxPresetMode 0
+			}
+		}
+		itemDef
+		{
+			name                rpx_tab_remap
+			type                ITEM_TYPE_BUTTON
+			style               WINDOW_STYLE_FILLED
+			rect                119 40 103 20
+			text                "Remaps"
+			textalign           ITEM_ALIGN_CENTER
+			textalignx          51
+			textaligny          0
+			font                2
+			textscale           0.7
+			forecolor           1 .682 0 1
+			backcolor           0 0 0 .6
+			border              1
+			bordercolor         1 .682 0 .6
+			visible             1
+			descText            "The shader remap presets saved for this map"
+			mouseEnter
+			{
+				setitemcolor rpx_tab_remap bordercolor 1 1 1 1
+			}
+			mouseExit
+			{
+				setitemcolor rpx_tab_remap bordercolor 1 .682 0 .6
+			}
+			action
+			{
+				play "sound/interface/button1.wav" ;
+				uiScript rpxPresetMode 1
+			}
+		}
+		itemDef
+		{
+			name                rpx_filter
+			type                ITEM_TYPE_EDITFIELD
+			style               0
+			text                "Filter: "
+			cvar                "ui_rpx_filter_entpresets"
+			maxchars            30
+			maxPaintChars       30
+			rect                12 64 400 18
+			textalign           ITEM_ALIGN_LEFT
+			textalignx          0
+			textaligny          -2
+			font                2
+			textscale           0.6
+			forecolor           1 1 1 1
+			outlinecolor        1 .5 .5 .5
+			backcolor           0 0 0 .6
+			border              1
+			bordercolor         .5 .5 .5 .6
+			visible             1
+			descText            "Show only the names with this in them"
+		}
+		itemDef
+		{
+			name                rpx_list
+			type                ITEM_TYPE_LISTBOX
+			style               WINDOW_STYLE_FILLED
+			rect                12 84 400 270
+			elementwidth        380
+			elementheight       15
+			elementtype         LISTBOX_TEXT
+			feeder              FEEDER_RPX_LIST
+			font                2
+			textscale           0.55
+			textstyle           0
+			textalign           0
+			textaligny          0
+			columns             1 4 374 374
+			border              1
+			bordercolor         1 .682 0 .6
+			forecolor           1 1 1 1
+			backcolor           0 0 0 .6
+			outlinecolor        1 .682 0 .35
+			visible             1
+			descText            "Select a preset to load, overwrite or delete"
+			mouseEnter
+			{
+				setitemcolor rpx_list bordercolor 1 1 1 1
+			}
+			mouseExit
+			{
+				setitemcolor rpx_list bordercolor 1 .682 0 .6
+			}
+		}
+		itemDef
+		{
+			name                rpx_info
+			type                ITEM_TYPE_TEXT
+			style               WINDOW_STYLE_EMPTY
+			rect                12 358 400 14
+			cvar                "ui_rpx_info"
+			textalign           ITEM_ALIGN_LEFT
+			textalignx          0
+			textaligny          0
+			font                2
+			textscale           0.55
+			forecolor           .8 .8 .8 1
+			visible             1
+			decoration
+		}
+		itemDef
+		{
+			name                rpx_status
+			type                ITEM_TYPE_TEXT
+			style               WINDOW_STYLE_EMPTY
+			rect                12 372 400 14
+			cvar                "ui_rpx_status"
+			textalign           ITEM_ALIGN_LEFT
+			textalignx          0
+			textaligny          0
+			font                2
+			textscale           0.55
+			forecolor           1 1 .4 1
+			visible             1
+			decoration
+		}
+		itemDef
+		{
+			name                rpx_namelabel
+			type                ITEM_TYPE_TEXT
+			style               WINDOW_STYLE_EMPTY
+			rect                432 66 180 14
+			text                "Preset name:"
+			textalign           ITEM_ALIGN_LEFT
+			textalignx          0
+			textaligny          0
+			font                2
+			textscale           0.6
+			forecolor           1 .682 0 1
+			visible             1
+			decoration
+		}
+		itemDef
+		{
+			name                rpx_name
+			type                ITEM_TYPE_EDITFIELD
+			style               0
+			text                ""
+			cvar                "ui_rpx_pr_name"
+			maxchars            63
+			maxPaintChars       26
+			rect                432 84 180 18
+			textalign           ITEM_ALIGN_LEFT
+			textalignx          0
+			textaligny          -2
+			font                2
+			textscale           0.6
+			forecolor           1 1 1 1
+			outlinecolor        1 .5 .5 .5
+			backcolor           0 0 0 .6
+			border              1
+			bordercolor         .5 .5 .5 .6
+			visible             1
+			descText            "Select one in the list, or type a new name: letters and digits only"
+		}
+		itemDef
+		{
+			name                rpx_load
+			type                ITEM_TYPE_BUTTON
+			style               WINDOW_STYLE_FILLED
+			rect                432 114 180 26
+			text                "Load"
+			textalign           ITEM_ALIGN_CENTER
+			textalignx          90
+			textaligny          2
+			font                2
+			textscale           0.8
+			forecolor           1 .682 0 1
+			backcolor           0 0 0 .6
+			border              1
+			bordercolor         1 .682 0 .6
+			visible             1
+			descText            "Loads the preset of that name"
+			mouseEnter
+			{
+				setitemcolor rpx_load bordercolor 1 1 1 1
+			}
+			mouseExit
+			{
+				setitemcolor rpx_load bordercolor 1 .682 0 .6
+			}
+			action
+			{
+				play "sound/interface/button1.wav" ;
+				uiScript rpxPreset load
+			}
+		}
+		itemDef
+		{
+			name                rpx_save
+			type                ITEM_TYPE_BUTTON
+			style               WINDOW_STYLE_FILLED
+			rect                432 146 180 26
+			text                "Save"
+			textalign           ITEM_ALIGN_CENTER
+			textalignx          90
+			textaligny          2
+			font                2
+			textscale           0.8
+			forecolor           1 .682 0 1
+			backcolor           0 0 0 .6
+			border              1
+			bordercolor         1 .682 0 .6
+			visible             1
+			descText            "Saves what the map has now under that name. default loads with the map"
+			mouseEnter
+			{
+				setitemcolor rpx_save bordercolor 1 1 1 1
+			}
+			mouseExit
+			{
+				setitemcolor rpx_save bordercolor 1 .682 0 .6
+			}
+			action
+			{
+				play "sound/interface/button1.wav" ;
+				uiScript rpxPreset save
+			}
+		}
+		itemDef
+		{
+			name                rpx_delete
+			type                ITEM_TYPE_BUTTON
+			style               WINDOW_STYLE_FILLED
+			rect                432 178 180 26
+			text                "Delete"
+			textalign           ITEM_ALIGN_CENTER
+			textalignx          90
+			textaligny          2
+			font                2
+			textscale           0.8
+			forecolor           1 .682 0 1
+			backcolor           0 0 0 .6
+			border              1
+			bordercolor         1 .682 0 .6
+			visible             1
+			descText            "Deletes the preset of that name from the server. Press twice"
+			mouseEnter
+			{
+				setitemcolor rpx_delete bordercolor 1 1 1 1
+			}
+			mouseExit
+			{
+				setitemcolor rpx_delete bordercolor 1 .682 0 .6
+			}
+			action
+			{
+				play "sound/interface/button1.wav" ;
+				uiScript rpxPreset delete
+			}
+		}
+		itemDef
+		{
+			name                rpx_hint00
+			type                ITEM_TYPE_TEXT
+			style               WINDOW_STYLE_EMPTY
+			rect                432 214 180 14
+			text                "Entities tab:"
+			textalign           ITEM_ALIGN_LEFT
+			textalignx          0
+			textaligny          0
+			font                2
+			textscale           0.5
+			forecolor           1 .682 0 1
+			visible             1
+			decoration
+			cvarTest            "ui_rpx_presetmode"
+			showCvar
+			{
+				"0"
+			}
+		}
+		itemDef
+		{
+			name                rpx_hint01
+			type                ITEM_TYPE_TEXT
+			style               WINDOW_STYLE_EMPTY
+			rect                432 228 180 14
+			text                "Load replaces everything placed"
+			textalign           ITEM_ALIGN_LEFT
+			textalignx          0
+			textaligny          0
+			font                2
+			textscale           0.5
+			forecolor           .8 .8 .8 1
+			visible             1
+			decoration
+			cvarTest            "ui_rpx_presetmode"
+			showCvar
+			{
+				"0"
+			}
+		}
+		itemDef
+		{
+			name                rpx_hint02
+			type                ITEM_TYPE_TEXT
+			style               WINDOW_STYLE_EMPTY
+			rect                432 242 180 14
+			text                "on the map (press twice)."
+			textalign           ITEM_ALIGN_LEFT
+			textalignx          0
+			textaligny          0
+			font                2
+			textscale           0.5
+			forecolor           .8 .8 .8 1
+			visible             1
+			decoration
+			cvarTest            "ui_rpx_presetmode"
+			showCvar
+			{
+				"0"
+			}
+		}
+		itemDef
+		{
+			name                rpx_hint03
+			type                ITEM_TYPE_TEXT
+			style               WINDOW_STYLE_EMPTY
+			rect                432 256 180 14
+			text                "Save keeps what is placed now."
+			textalign           ITEM_ALIGN_LEFT
+			textalignx          0
+			textaligny          0
+			font                2
+			textscale           0.5
+			forecolor           .8 .8 .8 1
+			visible             1
+			decoration
+			cvarTest            "ui_rpx_presetmode"
+			showCvar
+			{
+				"0"
+			}
+		}
+		itemDef
+		{
+			name                rpx_hint10
+			type                ITEM_TYPE_TEXT
+			style               WINDOW_STYLE_EMPTY
+			rect                432 214 180 14
+			text                "Remaps tab:"
+			textalign           ITEM_ALIGN_LEFT
+			textalignx          0
+			textaligny          0
+			font                2
+			textscale           0.5
+			forecolor           1 .682 0 1
+			visible             1
+			decoration
+			cvarTest            "ui_rpx_presetmode"
+			showCvar
+			{
+				"1"
+			}
+		}
+		itemDef
+		{
+			name                rpx_hint11
+			type                ITEM_TYPE_TEXT
+			style               WINDOW_STYLE_EMPTY
+			rect                432 228 180 14
+			text                "Load adds to the remaps in force."
+			textalign           ITEM_ALIGN_LEFT
+			textalignx          0
+			textaligny          0
+			font                2
+			textscale           0.5
+			forecolor           .8 .8 .8 1
+			visible             1
+			decoration
+			cvarTest            "ui_rpx_presetmode"
+			showCvar
+			{
+				"1"
+			}
+		}
+		itemDef
+		{
+			name                rpx_hint12
+			type                ITEM_TYPE_TEXT
+			style               WINDOW_STYLE_EMPTY
+			rect                432 242 180 14
+			text                "Shaders > Current remaps >"
+			textalign           ITEM_ALIGN_LEFT
+			textalignx          0
+			textaligny          0
+			font                2
+			textscale           0.5
+			forecolor           .8 .8 .8 1
+			visible             1
+			decoration
+			cvarTest            "ui_rpx_presetmode"
+			showCvar
+			{
+				"1"
+			}
+		}
+		itemDef
+		{
+			name                rpx_hint13
+			type                ITEM_TYPE_TEXT
+			style               WINDOW_STYLE_EMPTY
+			rect                432 256 180 14
+			text                "Reset all clears them first."
+			textalign           ITEM_ALIGN_LEFT
+			textalignx          0
+			textaligny          0
+			font                2
+			textscale           0.5
+			forecolor           .8 .8 .8 1
+			visible             1
+			decoration
+			cvarTest            "ui_rpx_presetmode"
+			showCvar
+			{
+				"1"
+			}
+		}
+		itemDef
+		{
+			name                rpx_hintdef
+			type                ITEM_TYPE_TEXT
+			style               WINDOW_STYLE_EMPTY
+			rect                432 284 180 14
+			text                "The name default loads with the map."
+			textalign           ITEM_ALIGN_LEFT
+			textalignx          0
+			textaligny          0
+			font                2
+			textscale           0.5
+			forecolor           .8 .8 .8 1
+			visible             1
+			decoration
+		}
+	}
+}

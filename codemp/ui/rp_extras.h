@@ -47,6 +47,8 @@ typedef enum {
 	RPX_MUSIC,
 	RPX_SOUNDS,
 	RPX_GLMS,		// GLX_U: [Extras] the GLM Props menu's .glm models
+	RPX_ENTPRESETS,	// GLX_U: [Presets Menu] this map's entity presets
+	RPX_REMAPPRESETS,	// and its remap presets
 	RPX_NUM_KINDS
 } rpxKindNum_t;
 
@@ -64,7 +66,14 @@ static const struct {
 	{ "music",		"music",	"",				"" },
 	{ "sounds",		"sound",	"",				"" },
 	{ "glms",		"models",	"players",		".glm" },
+	{ "entpresets",	NULL,		"",				"" },
+	{ "remappresets", NULL,		"",				"" },
 };
+
+// GLX_U: [Presets Menu] the two preset lists: the server's own files, which change with every save and delete, so
+// cgame keeps neither (it keeps the other listings until the map changes)
+#define RPX_IsPresetKind( kind )	( (kind) == RPX_ENTPRESETS || (kind) == RPX_REMAPPRESETS )
+#define RPX_PRESET_NAME_MAX			63		// letters and digits; what a listing carries (the commands take 64)
 
 // the /playsound channels, in the order the Sounds menu lists them (Cmd_ZykSound_f in g_cmds.c)
 static const char * const rpxSoundChannels[] = {
@@ -182,6 +191,11 @@ static const char * const rpxSoundChannels[] = {
 	X( "ui_rpx_sp_vdock",		"0" )		/* vehicles: spawnflags 2, fighters hang until boarded */ \
 	X( "ui_rpx_sp_lift",		"0" )		/* units out from the surface aimed at (/entaddaim aimoffset) */ \
 	X( "ui_rpx_s_chan",			"0" ) \
+	X( "ui_rpx_presetmode",		"0" )		/* GLX_U: Presets: 0 entity presets, 1 remap presets */ \
+	X( "ui_rpx_pr_name",		"" )		/* the preset to load, save or delete: selected, or typed */ \
+	X( "ui_rpx_sel_entpresets",	"" ) \
+	X( "ui_rpx_sel_remappresets", "" ) \
+	X( "ui_rpx_filter_entpresets", "" )	/* both tabs' filter */ \
 	X( "ui_rpx_sh_old",			"" )		/* GLX_U: Shader Remaps: the shader to remap */ \
 	X( "ui_rpx_sh_new",			"" )		/* what to remap it to: picked in the right list, or typed */ \
 	X( "ui_rpx_sh_dir",			"textures" )	/* the right list's folder; "" the top */ \

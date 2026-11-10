@@ -1130,6 +1130,113 @@ static void RP_ListTypes( gentity_t *ent, qboolean vehicles, const char *text, i
 
 /*
 ===========================================================================
+GLX_U: [Presets Menu] the entity and remap presets saved for this map
+===========================================================================
+
+What /entload and /remapload can load: the <name>.txt files of entities/<map>/ or remaps/<map>/ in the mod's
+folder, for /list entpresets and /list remappresets and for the Presets menu of the Extras (/rpxlist). Unlike
+every other listing these are the server's own files, and both need the Entities and Remaps admin power, as the
+preset commands do.
+
+The names come from the engine's file listing and are kept only when the preset commands would take them
+(letters and digits, as zyk_check_user_input(), and short enough for a listing to carry) and when the file opens
+at the very path those commands use (they use fopen, not the engine's file system): a name that exists only
+inside a pk3, or in a folder the commands do not read, is not a preset. A server started outside its own folder
+lists nothing here; the commands work as before.
+*/
+extern qboolean check_admin_command( gentity_t *ent, int admin_command, qboolean with_message );	// g_cmds.c
+
+#define RP_PRESET_NAME_MAX	( MAX_QPATH - 1 )	// what the menus' listing carries; the commands take ZYK_PRESET_NAME_MAX
+
+static char				rp_presetStore[0x10000];
+static rpListEntry_t	rp_presetEntries[RP_LIST_MAX_ENTRIES];
+static rpListSet_t		rp_presets = { rp_presetStore, sizeof( rp_presetStore ), 0, rp_presetEntries, RP_LIST_MAX_ENTRIES, 0, qfalse, 0 };
+
+static qboolean RP_PresetNameOk( const char *name, int len ) {
+	int i;
+
+	if ( len < 1 || len > RP_PRESET_NAME_MAX ) {
+		return qfalse;
+	}
+	for ( i = 0; i < len; i++ ) {
+		char c = name[i];
+
+		if ( !( ( c >= 'A' && c <= 'Z' ) || ( c >= 'a' && c <= 'z' ) || ( c >= '0' && c <= '9' ) ) ) {
+			return qfalse;
+		}
+	}
+	return qtrue;
+}
+
+// this map's presets of one kind into rp_presets, sorted; mapOut gets the map's name
+static rpListSet_t *RP_ListBuildPresets( qboolean remaps, char *mapOut, int mapOutSize ) {
+	char serverinfo[MAX_INFO_STRING] = { 0 };
+	char mapname[128];
+	const char *dir = remaps ? "remaps" : "entities";
+	rpListSet_t *set = &rp_presets;
+	int n, i, used = 0;
+
+	RP_ListReset( set );
+	trap->GetServerinfo( serverinfo, sizeof( serverinfo ) );
+	Q_strncpyz( mapname, Info_ValueForKey( serverinfo, "mapname" ), sizeof( mapname ) );
+	if ( mapOut ) {
+		Q_strncpyz( mapOut, mapname, mapOutSize );
+	}
+	if ( !mapname[0] || strlen( mapname ) >= MAX_QPATH || strstr( mapname, ".." ) ) {
+		return set;
+	}
+
+	n = RP_ListGetFiles( va( "%s/%s", dir, mapname ), ".txt", set );
+	for ( i = 0; i < n; i++ ) {
+		const char *name = rp_listRaw + used;
+		int len = strlen( name );
+		char base[MAX_QPATH];
+		FILE *f;
+
+		used += len + 1;
+		if ( len <= 4 || Q_stricmp( name + len - 4, ".txt" ) || !RP_PresetNameOk( name, len - 4 ) ) {
+			continue;	// a file of a subfolder (a pk3 gives those too), or not a name the commands take
+		}
+		memcpy( base, name, len - 4 );
+		base[len - 4] = '\0';
+		f = fopen( va( RP_MOD_FOLDER "/%s/%s/%s.txt", dir, mapname, base ), "r" );
+		if ( !f ) {
+			continue;
+		}
+		fclose( f );
+		RP_ListAdd( set, base, qfalse );
+	}
+	RP_ListSortUnique( set );
+	return set;
+}
+
+// /list entpresets [page], /list remappresets [page]
+static void RP_ListPresets( gentity_t *ent, qboolean remaps, int page ) {
+	static const char defaultShown[] = "default ^7(loads with the map)";
+	char mapname[128];
+	char title[256];
+	rpListSet_t *set = RP_ListBuildPresets( remaps, mapname, sizeof( mapname ) );
+	int i;
+
+	if ( set->num == 0 ) {
+		trap->SendServerCommand( ent - g_entities, va( "print \"^7No %s presets saved for this map (see ^3/%s^7).\n\"",
+			remaps ? "remap" : "entity", remaps ? "remapsave" : "entsave" ) );
+		return;
+	}
+	for ( i = 0; i < set->num; i++ ) {
+		rp_viewEntries[i] = set->entries[i];
+		if ( !Q_stricmp( rp_viewEntries[i].name, "default" ) ) {
+			rp_viewEntries[i].name = defaultShown;
+		}
+	}
+	Com_sprintf( title, sizeof( title ), "%s presets of %.64s", remaps ? "Remap" : "Entity", mapname );
+	RP_ListPrintPage( ent, rp_viewEntries, set->num, page, title, remaps ? "/list remappresets" : "/list entpresets",
+		remaps ? "^7Load one with ^3/remapload <name>^7.\n" : "^7Load one with ^3/entload <name>^7. It replaces what is placed on the map.\n",
+		NULL, set->truncated, 0 );
+}
+
+/*
+===========================================================================
 Commands
 ===========================================================================
 */
@@ -1165,6 +1272,38 @@ qboolean RP_ListCommand( gentity_t *ent, const char *what ) {
 		} else if ( !Q_stricmp( what, "vehicles" ) || !Q_stricmp( what, "vehicle" ) ) {
 			types = qtrue;
 			vehicles = qtrue;
+		} else if ( !Q_stricmp( what, "entpresets" ) || !Q_stricmp( what, "remappresets" ) ) {
+			// GLX_U: [Presets Menu] this map's presets: [page] only, and the one /list kind with an admin power
+			qboolean remaps = !Q_stricmp( what, "remappresets" ) ? qtrue : qfalse;
+
+			if ( !check_admin_command( ent, ADM_ENTITYSYSTEM, qtrue ) ) {
+				return qtrue;
+			}
+			if ( argc > 3 ) {
+				trap->SendServerCommand( ent - g_entities, va( "print \"^7Usage: ^3/list %s <page (optional)>\n\"", remaps ? "remappresets" : "entpresets" ) );
+				return qtrue;
+			}
+			if ( argc == 3 ) {
+				trap->Argv( 2, a2, sizeof( a2 ) );
+				page = RP_ListParsePage( a2 );
+				if ( page <= 0 ) {
+					trap->SendServerCommand( ent - g_entities, "print \"^7Invalid page number.\n\"" );
+					return qtrue;
+				}
+			}
+			if ( level.rp_list_fs_next_time > level.time + RP_LIST_FS_GAP ) {
+				level.rp_list_fs_next_time = 0;	// only a guard, as in RP_ListCooldown()
+			}
+			if ( level.time < level.rp_list_fs_next_time ) {
+				trap->SendServerCommand( ent - g_entities, "print \"^7The server is busy with another listing. Try again in a moment.\n\"" );
+				return qtrue;
+			}
+			if ( RP_ListCooldown( ent ) ) {
+				return qtrue;
+			}
+			level.rp_list_fs_next_time = level.time + RP_LIST_FS_GAP;
+			RP_ListPresets( ent, remaps, page );
+			return qtrue;
 		} else {
 			return qfalse;
 		}
@@ -1332,6 +1471,8 @@ static const rpxKind_t rpx_kinds[] = {
 	{ "npcs",		-1 },
 	{ "vehicles",	-2 },
 	{ "glms",		5 },	// GLX_U: [Extras] GLM Props: the /list glm source
+	{ "entpresets",		-3 },	// GLX_U: [Presets Menu] this map's entity presets (RP_ListBuildPresets())
+	{ "remappresets",	-4 },	// GLX_U: [Presets Menu] and its remap presets
 };
 
 typedef struct {
@@ -1543,11 +1684,23 @@ void RP_ListDataCommand( gentity_t *ent ) {
 		}
 	}
 
+	// GLX_U: [Presets Menu] the presets are the server's own files: the admin power the preset commands need
+	if ( kind->source <= -3 && !check_admin_command( ent, ADM_ENTITYSYSTEM, qfalse ) ) {
+		RPX_Reply( ent, kind->name, req, "err \"You need the Entities and Remaps admin power.\"" );
+		return;
+	}
+
 	slot = RPX_FindSlot( k, folder );
+	// GLX_U: [Presets Menu] and they change with every save and delete: a listing asked for from its start is
+	// built again; only the rest of a long one (offset above 0) comes from what was built
+	if ( slot && kind->source <= -3 && offset == 0 ) {
+		slot->used = qfalse;
+		slot = NULL;
+	}
 	if ( !slot ) {
 		gclient_t *cl = ent->client;
 
-		if ( kind->source >= 0 ) {
+		if ( kind->source >= 0 || kind->source <= -3 ) {
 			if ( level.rp_list_fs_next_time > level.time + RP_LIST_FS_GAP ) {
 				level.rp_list_fs_next_time = 0;	// only a guard, as in RP_ListCooldown()
 			}
@@ -1577,6 +1730,9 @@ void RP_ListDataCommand( gentity_t *ent ) {
 				return;
 			}
 			slot = RPX_Pack( k, folder, &rp_files, qfalse );
+		} else if ( kind->source <= -3 ) {
+			level.rp_list_fs_next_time = level.time + RP_LIST_FS_GAP;
+			slot = RPX_Pack( k, "", RP_ListBuildPresets( kind->source == -4 ? qtrue : qfalse, NULL, 0 ), qtrue );
 		} else {
 			slot = RPX_Pack( k, "", RP_ListTypeSet( kind->source == -2 ? qtrue : qfalse ), qtrue );
 		}

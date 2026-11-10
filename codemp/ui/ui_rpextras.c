@@ -67,6 +67,14 @@ static char			rpxFilterSeen[64];
 static int			rpxSyncTime = -1;
 static int			rpxPendingNav = -2;		// a row to open at the next sync (-1 is ".."); -2 for none
 
+// GLX_U: [Presets Menu] an action waiting for its second press ("<action> <tab> <name>"), and when it was first
+// pressed; and when the list is asked for again after a Save or a Delete
+#define RPX_PRESET_CONFIRM	4000
+#define RPX_PRESET_REFRESH	1200
+static char			rpxPresetConfirm[RPX_NAME_LEN + 32];
+static int			rpxPresetConfirmAt;
+static int			rpxPresetRefreshAt;
+
 static struct {
 	char		path[MAX_QPATH];
 	qhandle_t	model;
@@ -164,6 +172,9 @@ static const char *RPX_FilterCvar( int kind ) {
 	if ( kind == RPX_VEHICLES ) {
 		kind = RPX_NPCS;
 	}
+	if ( kind == RPX_REMAPPRESETS ) {	// GLX_U: [Presets Menu] as do its two tabs
+		kind = RPX_ENTPRESETS;
+	}
 	return va( "ui_rpx_filter_%s", rpxKinds[kind].name );
 }
 
@@ -260,6 +271,18 @@ static void RPX_UpdateInfo( void ) {
 		}
 	}
 	RPX_Folder( rpxKind, folder, sizeof( folder ) );
+	if ( RPX_IsPresetKind( rpxKind ) ) {	// GLX_U: [Presets Menu]
+		const char *what = ( rpxKind == RPX_REMAPPRESETS ) ? "Remap presets of this map" : "Entity presets of this map";
+
+		if ( !rpxLoaded ) {
+			trap->Cvar_Set( "ui_rpx_info", what );
+		} else if ( rpxFilterSeen[0] ) {
+			trap->Cvar_Set( "ui_rpx_info", va( "%s: %d of %d shown", what, rpxViewNum, rpxNum ) );
+		} else {
+			trap->Cvar_Set( "ui_rpx_info", va( "%s: %d", what, rpxNum ) );
+		}
+		return;
+	}
 	if ( !rpxKinds[rpxKind].root ) {
 		where = ( rpxKind == RPX_VEHICLES ) ? "Vehicle types" : "NPC types";
 	} else {
@@ -515,6 +538,15 @@ static void RPX_Sync( void ) {
 		RPX_Navigate( row );
 	}
 
+	// GLX_U: [Presets Menu] a Save or a Delete went a moment ago: what the server has now (the list stays as
+	// it is until the answer comes)
+	if ( rpxPresetRefreshAt && uiInfo.uiDC.realTime >= rpxPresetRefreshAt ) {
+		rpxPresetRefreshAt = 0;
+		if ( RPX_IsPresetKind( rpxKind ) ) {
+			trap->Cmd_ExecuteText( EXEC_APPEND, va( "rpx list %s\n", rpxKinds[rpxKind].name ) );
+		}
+	}
+
 	serial = atoi( RPX_CvarStr( "ui_rpx_serial" ) );
 	if ( serial != rpxSerialSeen ) {
 		rpxSerialSeen = serial;
@@ -552,6 +584,9 @@ const char *UI_RpxFeederItemText( int index ) {
 	if ( rpxEntries[row].folder ) {
 		return va( "^5%s", rpxEntries[row].name );
 	}
+	if ( RPX_IsPresetKind( rpxKind ) && !Q_stricmp( rpxEntries[row].name, "default" ) ) {	// GLX_U: [Presets Menu]
+		return va( "%s  ^3(loads with the map)", rpxEntries[row].name );
+	}
 	return rpxEntries[row].name;
 }
 
@@ -568,6 +603,10 @@ qboolean UI_RpxFeederSelection( int index ) {
 		name = rpxEntries[row].name;
 	}
 	RPX_ShowSelected( name );
+	if ( RPX_IsPresetKind( rpxKind ) && name[0] ) {	// GLX_U: [Presets Menu] the selected preset is the one to act on
+		trap->Cvar_Set( "ui_rpx_pr_name", name );
+		rpxPresetConfirm[0] = '\0';
+	}
 	if ( strcmp( name, RPX_CvarStr( va( "ui_rpx_sel_%s", rpxKinds[rpxKind].name ) ) ) ) {
 		trap->Cvar_Set( va( "ui_rpx_sel_%s", rpxKinds[rpxKind].name ), name );
 		RPX_Msg( "" );
@@ -597,6 +636,7 @@ static int RPX_KindForMenu( const char *word ) {
 	if ( !Q_stricmp( word, "npcs" ) || !Q_stricmp( word, "spawners" ) ) return atoi( RPX_CvarStr( "ui_rpx_npcmode" ) ) ? RPX_VEHICLES : RPX_NPCS;
 	if ( !Q_stricmp( word, "music" ) ) return RPX_MUSIC;
 	if ( !Q_stricmp( word, "sounds" ) ) return RPX_SOUNDS;
+	if ( !Q_stricmp( word, "presets" ) ) return atoi( RPX_CvarStr( "ui_rpx_presetmode" ) ) ? RPX_REMAPPRESETS : RPX_ENTPRESETS;	// GLX_U: [Presets Menu]
 	return -1;
 }
 
@@ -619,6 +659,8 @@ static void RPX_Open( int kind, const char *menu ) {
 	rpxSyncTime = -1;
 	RPX_CheckMap();
 	RPX_Cvar( RPX_FilterCvar( kind ), rpxFilterSeen, sizeof( rpxFilterSeen ) );
+	rpxPresetConfirm[0] = '\0';	// GLX_U: [Presets Menu] nothing waits for a second press, or for a refresh
+	rpxPresetRefreshAt = 0;
 	RPX_Msg( "" );
 	RPX_StopFxPreview();
 
@@ -649,6 +691,74 @@ static void RPX_CloseMenus( void ) {
 	trap->Key_ClearStates();
 	trap->Cvar_Set( "cl_paused", "0" );
 	Menus_CloseAll();
+}
+
+/*
+GLX_U: [Presets Menu] Load, Save or Delete of the name in the menu's field. What cannot be taken back is pressed
+twice within RPX_PRESET_CONFIRM: loading entities (it replaces what is placed on the map), saving over a preset
+the list has, deleting. cgame builds and sends the command (rpx do preset...); after a Save or a Delete the list
+is asked for again, which is also how a failure shows.
+*/
+static void RPX_PresetAction( const char *action ) {
+	char name[RPX_NAME_LEN * 2], key[RPX_NAME_LEN + 32];
+	qboolean remaps = ( rpxKind == RPX_REMAPPRESETS ) ? qtrue : qfalse;
+	qboolean isLoad = !Q_stricmp( action, "load" ) ? qtrue : qfalse;
+	qboolean isSave = !Q_stricmp( action, "save" ) ? qtrue : qfalse;
+	qboolean isDelete = !Q_stricmp( action, "delete" ) ? qtrue : qfalse;
+	qboolean exists = qfalse;
+	const char *ask = NULL;
+	int i;
+
+	if ( !isLoad && !isSave && !isDelete ) {
+		return;
+	}
+	RPX_Cvar( "ui_rpx_pr_name", name, sizeof( name ) );
+	for ( i = 0; name[i]; i++ ) {
+		char ch = name[i];
+
+		if ( !( ( ch >= 'A' && ch <= 'Z' ) || ( ch >= 'a' && ch <= 'z' ) || ( ch >= '0' && ch <= '9' ) ) ) {
+			break;
+		}
+	}
+	if ( !name[0] ) {
+		RPX_Msg( isSave ? "^3Type a name for the preset first." : "^3Select a preset in the list first." );
+		return;
+	}
+	if ( name[i] || i > RPX_PRESET_NAME_MAX ) {
+		RPX_Msg( "^3A preset name is 1 to 63 letters and digits." );
+		return;
+	}
+	for ( i = 0; i < rpxNum; i++ ) {
+		if ( !Q_stricmp( rpxEntries[i].name, name ) ) {
+			exists = qtrue;
+			break;
+		}
+	}
+	if ( !isSave && rpxLoaded && !exists ) {
+		RPX_Msg( va( "^3There is no %s preset %s on this map.", remaps ? "remap" : "entity", name ) );
+		return;
+	}
+
+	if ( isLoad && !remaps ) {
+		ask = va( "^3This replaces everything placed on the map. Press Load again to load %s.", name );
+	} else if ( isSave && exists ) {
+		ask = va( "^3%s exists. Press Save again to overwrite it.", name );
+	} else if ( isDelete ) {
+		ask = va( "^3Press Delete again to delete %s.", name );
+	}
+	Com_sprintf( key, sizeof( key ), "%s %d %s", action, remaps, name );
+	if ( ask && ( Q_stricmp( key, rpxPresetConfirm ) || uiInfo.uiDC.realTime - rpxPresetConfirmAt >= RPX_PRESET_CONFIRM ) ) {
+		Q_strncpyz( rpxPresetConfirm, key, sizeof( rpxPresetConfirm ) );
+		rpxPresetConfirmAt = uiInfo.uiDC.realTime;
+		RPX_Msg( ask );
+		return;
+	}
+	rpxPresetConfirm[0] = '\0';
+
+	trap->Cmd_ExecuteText( EXEC_APPEND, va( "rpx do preset%s\n", isLoad ? "load" : isSave ? "save" : "delete" ) );
+	if ( !isLoad ) {
+		rpxPresetRefreshAt = uiInfo.uiDC.realTime + RPX_PRESET_REFRESH;
+	}
 }
 
 static qboolean RPX_LocalFileExists( const char *path ) {
@@ -1214,6 +1324,22 @@ qboolean UI_RpxScript( const char *name, char **args ) {
 			} else if ( !Q_stricmp( arg, "lights" ) ) {
 				RPX_OpenNoList( arg2 );
 			}
+		}
+	} else if ( !Q_stricmp( name, "rpxPresetMode" ) ) {	// GLX_U: [Presets Menu] its tabs: 0 entities, 1 remaps
+		if ( String_Parse( args, &arg ) && RPX_IsPresetKind( rpxKind ) ) {
+			int kind = atoi( arg ) ? RPX_REMAPPRESETS : RPX_ENTPRESETS;
+
+			trap->Cvar_Set( "ui_rpx_presetmode", ( kind == RPX_REMAPPRESETS ) ? "1" : "0" );
+			rpxPresetConfirm[0] = '\0';
+			rpxPresetRefreshAt = 0;
+			if ( kind != rpxKind ) {
+				trap->Cvar_Set( "ui_rpx_pr_name", RPX_CvarStr( va( "ui_rpx_sel_%s", rpxKinds[kind].name ) ) );
+				RPX_Open( kind, rpxMenu );
+			}
+		}
+	} else if ( !Q_stricmp( name, "rpxPreset" ) ) {	// GLX_U: [Presets Menu] load, save, delete
+		if ( String_Parse( args, &arg ) && RPX_IsPresetKind( rpxKind ) ) {
+			RPX_PresetAction( arg );
 		}
 	} else if ( !Q_stricmp( name, "rpxNpcMode" ) ) {
 		if ( String_Parse( args, &arg ) && ( rpxKind == RPX_NPCS || rpxKind == RPX_VEHICLES ) ) {

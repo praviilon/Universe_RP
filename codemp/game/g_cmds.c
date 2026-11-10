@@ -13520,6 +13520,8 @@ void Cmd_ListAccount_f( gentity_t *ent ) {
 ^2/list maps <page>: ^7lists every map file on the server\n\
 ^2/list npcs <text> <page>: ^7lists the NPC types, or those with that text in their name\n\
 ^2/list vehicles <text> <page>: ^7lists the vehicle types, or those with that text in their name\n\
+^2/list entpresets <page>: ^7lists this map's entity presets (needs the Entities and Remaps admin power)\n\
+^2/list remappresets <page>: ^7lists this map's remap presets (needs the Entities and Remaps admin power)\n\
 ^7The folder, text and page are all optional.\n\n\"");
 			}
 			else if (zyk_skill_category_name(arg1))
@@ -13741,7 +13743,7 @@ void Cmd_ListAccount_f( gentity_t *ent ) {
 ^3/where: ^7Displays your current coordinates.\n\n\"");
 			}
 			else if (RP_ListCommand(ent, arg1))
-			{ // GalaxyRP: [Listings] /list md3, glm, effects, sounds, music, maps, npcs, vehicles -- g_rplist.c
+			{ // GalaxyRP: [Listings] /list md3, glm, effects, sounds, music, maps, npcs, vehicles (GLX_U: entpresets, remappresets) -- g_rplist.c
 			}
 			else if (Q_stricmp( arg1, "chat" ) == 0)
 			{
@@ -22268,7 +22270,7 @@ static void zyk_print_lines( gentity_t *ent, const char * const *lines, int coun
 
 void Cmd_EntitiesAndRemaps_f( gentity_t *ent ) {
 	static char entlist_line[512];
-	const char *lines[64];	// 54 now
+	const char *lines[64];	// 56 now
 	int n = 0;
 
 	if (!check_admin_command(ent, ADM_ENTITYSYSTEM, qtrue))
@@ -22309,6 +22311,7 @@ void Cmd_EntitiesAndRemaps_f( gentity_t *ent ) {
 	lines[n++] = "^3/entsave <filename>: ^7Saves current entities into a preset file. Use ^3default ^7name to make it load with the map.\n";
 	lines[n++] = "^3/entload <filename>: ^7Loads entities from a preset file.\n";
 	lines[n++] = "^3/entdeletefile <filename>: ^7Deletes entity preset file.\n";
+	lines[n++] = "^3/list entpresets: ^7Lists the entity presets saved for this map.\n";
 
 	// DAJ_RP: [Locks] g_locks.c
 	lines[n++] = "^5Locks\n";
@@ -22339,6 +22342,7 @@ void Cmd_EntitiesAndRemaps_f( gentity_t *ent ) {
 	lines[n++] = "^3/remapsave <file name>: ^7Saves current remaps in a preset file. Use ^3default ^7name to make it load with the map.\n";
 	lines[n++] = "^3/remapload <file name>: ^7Loads remaps from preset file.\n";
 	lines[n++] = "^3/remapdeletefile <file name>: ^7Deletes remap preset file.\n";
+	lines[n++] = "^3/list remappresets: ^7Lists the remap presets saved for this map.\n";
 	lines[n++] = "^3/remapreset: ^7Clears all shader remaps in the map. Does not undo remaps built into the map itself.\n\n";
 
 	zyk_print_lines( ent, lines, n );

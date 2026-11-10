@@ -1073,6 +1073,59 @@
 			}
 		}
 
+		itemDef
+		{
+			name				extrasPresetsButton_glow
+			style				WINDOW_STYLE_SHADER
+			rect				160 275 150 24
+			background			"gfx/menus/menu_blendbox2"
+			forecolor			1 1 1 1
+			visible				0
+			decoration
+		}
+
+		// GLX_U: [Presets Menu] Presets: this map's entity and remap presets (ingame_rpx_presets.menu)
+		itemDef
+		{
+			name				extrasPresetsButton
+			group				extrasControls
+			text				"Presets"
+			type				ITEM_TYPE_BUTTON
+			style				WINDOW_STYLE_EMPTY
+			rect				160 275 150 24
+			font				3
+			textscale			0.6
+			textalignx			15
+			textaligny			5
+			textalign			ITEM_ALIGN_LEFT
+			textstyle			3
+			forecolor			1 .682 0 1
+			visible				0
+			descText			"Load, save and delete this map's entity and remap presets"
+			// GLX_U: [Extras Admin Grey] greyed and unclickable without the Entities and Remaps admin power
+			cvarTest			"ui_rpx_adm_ent"
+			enableCvar
+			{
+				"1"
+			}
+
+			mouseEnter
+			{
+				show			extrasPresetsButton_glow
+			}
+			mouseExit
+			{
+				hide			extrasPresetsButton_glow
+			}
+			action
+			{
+				play			"sound/interface/button1.wav" ;
+				hide			extrasPresetsButton_glow ;
+				close			ingame_galaxyrp ;
+				open			ingame_rpx_presets
+			}
+		}
+
 
 		itemDef
 		{
