@@ -1284,7 +1284,7 @@ Scripts
 
 	rpxShOpen			the menu's onOpen
 	rpxShEnter			a double click in the right list: a folder is opened
-	rpxShView <0|1>		the left list: the map's shaders, or the remaps in force
+	rpxShView <0|1>		the left list's tabs: the map's shaders, or the remaps in force
 	rpxShPick			Pick from world
 	rpxShPreview		Preview: the remap on this game only, the strip in the menu's place
 	rpxShPreviewEnd		the strip's onClose: the preview taken back
@@ -1322,7 +1322,8 @@ qboolean UI_RpShScript( const char *name, char **args ) {
 			}
 		}
 	} else if ( !Q_stricmp( name, "rpxShView" ) ) {
-		if ( String_Parse( args, &arg ) ) {
+		// the two tabs; the one already open does nothing, so a filter typed there stays
+		if ( String_Parse( args, &arg ) && ( atoi( arg ) ? 1 : 0 ) != ( RPSH_CvarInt( "ui_rpx_sh_view" ) ? 1 : 0 ) ) {
 			trap->Cvar_Set( "ui_rpx_sh_view", atoi( arg ) ? "1" : "0" );
 			trap->Cvar_Set( "ui_rpx_filter_shmap", "" );
 			rpshResetAsked = 0;

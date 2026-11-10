@@ -111,39 +111,39 @@
 		}
 		itemDef
 		{
-			name                rpx_pick
+			name                rpx_tab_map
 			type                ITEM_TYPE_BUTTON
 			style               WINDOW_STYLE_FILLED
-			rect                12 38 140 20
-			text                "Pick from world"
+			rect                12 38 142 20
+			text                "Map shaders"
 			textalign           ITEM_ALIGN_CENTER
-			textalignx          70
+			textalignx          71
 			textaligny          0
 			font                2
-			textscale           0.6
+			textscale           0.7
 			forecolor           1 .682 0 1
 			backcolor           0 0 0 .6
 			border              1
 			bordercolor         1 .682 0 .6
 			visible             1
-			descText            "Selects the shader of the map surface under your crosshair"
+			descText            "The shaders this map's surfaces use"
 			mouseEnter
 			{
-				setitemcolor rpx_pick bordercolor 1 1 1 1
+				setitemcolor rpx_tab_map bordercolor 1 1 1 1
 			}
 			mouseExit
 			{
-				setitemcolor rpx_pick bordercolor 1 .682 0 .6
+				setitemcolor rpx_tab_map bordercolor 1 .682 0 .6
 			}
 			action
 			{
 				play "sound/interface/button1.wav" ;
-				uiScript rpxShPick
+				uiScript rpxShView 0
 			}
 		}
 		itemDef
 		{
-			name                rpx_viewremaps
+			name                rpx_tab_remaps
 			type                ITEM_TYPE_BUTTON
 			style               WINDOW_STYLE_FILLED
 			rect                158 38 142 20
@@ -152,25 +152,20 @@
 			textalignx          71
 			textaligny          0
 			font                2
-			textscale           0.6
+			textscale           0.7
 			forecolor           1 .682 0 1
 			backcolor           0 0 0 .6
 			border              1
 			bordercolor         1 .682 0 .6
 			visible             1
-			descText            "Shows the remaps in force instead of the map's shaders"
-			cvarTest            "ui_rpx_sh_view"
-			showCvar
-			{
-				"0"
-			}
+			descText            "The remaps in force: select one to remove it"
 			mouseEnter
 			{
-				setitemcolor rpx_viewremaps bordercolor 1 1 1 1
+				setitemcolor rpx_tab_remaps bordercolor 1 1 1 1
 			}
 			mouseExit
 			{
-				setitemcolor rpx_viewremaps bordercolor 1 .682 0 .6
+				setitemcolor rpx_tab_remaps bordercolor 1 .682 0 .6
 			}
 			action
 			{
@@ -180,39 +175,30 @@
 		}
 		itemDef
 		{
-			name                rpx_viewmap
-			type                ITEM_TYPE_BUTTON
+			name                rpx_tab_map_on
 			style               WINDOW_STYLE_FILLED
-			rect                158 38 142 20
-			text                "Map shaders"
-			textalign           ITEM_ALIGN_CENTER
-			textalignx          71
-			textaligny          0
-			font                2
-			textscale           0.6
-			forecolor           1 .682 0 1
-			backcolor           0 0 0 .6
-			border              1
-			bordercolor         1 .682 0 .6
+			rect                14 56 138 2
+			backcolor           1 1 1 1
 			visible             1
-			descText            "Back to the shaders of this map"
+			decoration
+			cvarTest            "ui_rpx_sh_view"
+			showCvar
+			{
+				"0"
+			}
+		}
+		itemDef
+		{
+			name                rpx_tab_remaps_on
+			style               WINDOW_STYLE_FILLED
+			rect                160 56 138 2
+			backcolor           1 1 1 1
+			visible             1
+			decoration
 			cvarTest            "ui_rpx_sh_view"
 			showCvar
 			{
 				"1"
-			}
-			mouseEnter
-			{
-				setitemcolor rpx_viewmap bordercolor 1 1 1 1
-			}
-			mouseExit
-			{
-				setitemcolor rpx_viewmap bordercolor 1 .682 0 .6
-			}
-			action
-			{
-				play "sound/interface/button1.wav" ;
-				uiScript rpxShView 0
 			}
 		}
 		itemDef
@@ -514,6 +500,38 @@
 			forecolor           1 .682 0 1
 			visible             1
 			decoration
+		}
+		itemDef
+		{
+			name                rpx_pick
+			type                ITEM_TYPE_BUTTON
+			style               WINDOW_STYLE_FILLED
+			rect                98 354 140 22
+			text                "Pick from world"
+			textalign           ITEM_ALIGN_CENTER
+			textalignx          70
+			textaligny          2
+			font                2
+			textscale           0.6
+			forecolor           1 .682 0 1
+			backcolor           0 0 0 .6
+			border              1
+			bordercolor         1 .682 0 .6
+			visible             1
+			descText            "Selects the shader of the map surface under your crosshair"
+			mouseEnter
+			{
+				setitemcolor rpx_pick bordercolor 1 1 1 1
+			}
+			mouseExit
+			{
+				setitemcolor rpx_pick bordercolor 1 .682 0 .6
+			}
+			action
+			{
+				play "sound/interface/button1.wav" ;
+				uiScript rpxShPick
+			}
 		}
 		itemDef
 		{
