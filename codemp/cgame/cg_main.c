@@ -314,6 +314,7 @@ void CG_MiscEnt( void ) {
 
 	staticmodel = &cgs.miscStaticModels[cgs.numMiscStaticModels++];
 	staticmodel->model = modelIndex;
+	RP_ShaderAimNoteStatic( cgs.numMiscStaticModels - 1, data->mModel );	// GLX_U: [Shader Aim] its path, for /shaderaim
 	AnglesToAxis( data->mAngles, staticmodel->axes );
 	for ( i = 0; i < 3; i++ ) {
 		VectorScale( staticmodel->axes[i], data->mScale[i], staticmodel->axes[i] );
@@ -2793,6 +2794,7 @@ Called before every level change or subsystem restart
 void CG_Shutdown( void )
 {
 	CG_RpAutoWalkStop( qfalse );	// GLX_U: [AutoWalk] leaving the map: the engine would keep the buttons held
+	RP_ShaderAimFree();	// GLX_U: [Shader Aim] the map's surfaces, if /shaderaim read them
 
 	BG_ClearAnimsets(); //free all dynamic allocations made through the engine
 

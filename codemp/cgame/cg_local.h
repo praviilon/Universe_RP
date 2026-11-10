@@ -1884,6 +1884,11 @@ void CG_RpDialogCmd( void );
 void CG_RpDialogCloseCmd( void );
 void CG_Rpx_f( void );
 
+// GLX_U: [Shader Aim] /shaderaim, the client's half -- cg_shaderaim.c
+void RP_ShaderAim_f( void );
+void RP_ShaderAimFree( void );
+void RP_ShaderAimNoteStatic( int index, const char *path );
+
 // GLX_U: [Chat] the chat input box -- cg_rpchat.c
 qboolean CG_RpChatActive( void );
 qboolean CG_RpChatSwap( char *conCommand, int size );

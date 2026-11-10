@@ -16295,6 +16295,46 @@ void Cmd_Remap_f( gentity_t *ent ) {
 
 /*
 ==================
+Cmd_ShaderAim_f
+
+GLX_U: [Shader Aim] /shaderaim: the shader under the admin's aim, the name /remap takes. Nothing on the
+server knows which shader a surface has (a trace gives none), but the admin's own client has the map and
+draws it, so the server only checks the power and asks that one client to look ("rpshaderaim",
+RP_ShaderAim_f in cgame/cg_shaderaim.c), which prints the answer in its own console. A client without
+the Universe RP client game prints "Unknown client game command: rpshaderaim" instead (harmless).
+==================
+*/
+#define RP_SHADERAIM_COOLDOWN	1000
+
+void Cmd_ShaderAim_f( gentity_t *ent ) {
+	static int nextTime[MAX_CLIENTS];
+	int clientNum = ent - g_entities;
+
+	if ( !check_admin_command( ent, ADM_ENTITYSYSTEM, qtrue ) )
+	{
+		return;
+	}
+
+	if ( clientNum < 0 || clientNum >= MAX_CLIENTS )
+	{
+		return;
+	}
+	if ( nextTime[clientNum] > level.time + RP_SHADERAIM_COOLDOWN )
+	{
+		nextTime[clientNum] = 0;	// level.time starts again with each map
+	}
+	if ( level.time < nextTime[clientNum] )
+	{
+		return;	// one a second: each one has the client read and search the map
+	}
+	nextTime[clientNum] = level.time + RP_SHADERAIM_COOLDOWN;
+
+	trap->SendServerCommand( clientNum, "print \"Looking up the shader under your aim...\n\"" );
+	trap->SendServerCommand( clientNum, "rpshaderaim" );
+}
+
+/*
+==================
 Cmd_RemapList_f
 ==================
 */
@@ -22195,7 +22235,7 @@ static void zyk_print_lines( gentity_t *ent, const char * const *lines, int coun
 
 void Cmd_EntitiesAndRemaps_f( gentity_t *ent ) {
 	static char entlist_line[512];
-	const char *lines[64];	// 51 now
+	const char *lines[64];	// 53 now
 	int n = 0;
 
 	if (!check_admin_command(ent, ADM_ENTITYSYSTEM, qtrue))
@@ -22258,6 +22298,8 @@ void Cmd_EntitiesAndRemaps_f( gentity_t *ent ) {
 	lines[n++] = "^7Props: ^3misc_model_breakable^7 (model, modelscale, light, color; spawnflags 1 solid, 2 animated), ^3misc_model_ghoul^7 (a .glm model), ^3rp_light^7 (light, color), ^3fx_runner^7 (fxFile). Model and effect files must be on the server. See ^3/enthelp^7.\n";
 
 	lines[n++] = "\n^3--------Shader Remaps--------\n";
+	lines[n++] = "^3/shaderaim: ^7Shows the shader of the map surface or brush entity you aim at, or a model's shaders. Needs the Universe RP client.\n";
+	lines[n++] = "^3/shaderlist: ^7Your own game's list of every shader it has loaded, in your console.\n";
 	lines[n++] = "^3/remap <shader> <new shader>: ^7Remaps shader in the map.\n";
 	lines[n++] = "^3/remaplist <page number>: ^7Lists already remapped shaders in the map, eight per page.\n";
 	lines[n++] = "^3/remapsave <file name>: ^7Saves current remaps in a preset file. Use ^3default ^7name to make it load with the map.\n";
@@ -26977,6 +27019,7 @@ command_t commands[] = {
 	{ "rpxlist",			Cmd_RpxList_f,				0 },
 	{ "scale",				Cmd_Scale_f,				CMD_LOGGEDIN | CMD_NOINTERMISSION },
 	{ "scripts",			Cmd_Scripts_f,				CMD_LOGGEDIN | CMD_NOINTERMISSION },	// GLX_U: [Lua] rp_lua_admin.c
+	{ "shaderaim",			Cmd_ShaderAim_f,			CMD_LOGGEDIN | CMD_NOINTERMISSION },	// GLX_U: [Shader Aim]
 	{ "silence",			Cmd_Silence_f,				CMD_LOGGEDIN | CMD_NOINTERMISSION },
 	{ "skilldown",			Cmd_RpModeDown_f,			CMD_LOGGEDIN | CMD_NOINTERMISSION },
 	{ "skillup",			Cmd_RpModeUp_f,				CMD_LOGGEDIN | CMD_NOINTERMISSION },

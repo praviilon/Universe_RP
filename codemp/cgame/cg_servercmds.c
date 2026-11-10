@@ -2178,6 +2178,7 @@ static serverCommand_t	commands[] = {
 	{ "rpdlg",				CG_RpDialogCmd },	// GLX_U: [Dialogues] a dialogue to show, cg_rpdialog.c
 	{ "rpdlgclose",			CG_RpDialogCloseCmd },
 	{ "rpsettings",			CG_RpSettings_f },	// GLX_U: [Settings Menu] the settings for the Settings menu
+	{ "rpshaderaim",		RP_ShaderAim_f },	// GLX_U: [Shader Aim] /shaderaim, after the server checked the power, cg_shaderaim.c
 	{ "sb",					CG_SiegeBriefingDisplay_f },
 	{ "scl",				CG_SiegeClassSelect_f },
 	{ "scores",				CG_ParseScores },
