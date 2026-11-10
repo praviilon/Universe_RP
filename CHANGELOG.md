@@ -2,6 +2,23 @@
 
 
 
+## [3.10.0]
+
+### Added
+- Shader Remaps menu: a new "Shaders" button in the Extras lists the map's textures and shaders (ones missing from your game in red), with "Pick from world" to select the one you aim at. Choose what to remap it to from your own game's textures and shaders, preview it on your screen only, then apply it for everyone; the current remaps can be removed one by one or all at once. Universe RP client only.
+- Presets menu: a new "Presets" button in the Extras lists the entity and remap presets saved for this map, to load, save or delete with a click. Loading entities, overwriting a preset and deleting ask for a second press.
+- `/shaderaim` prints the shader of the map surface or brush entity you aim at, or a model's shaders, with the `/remap` line to change it. Universe RP client only.
+- `/remapremove <shader>` takes back a single shader remap, without clearing the others as `/remapreset` does.
+- `/list entpresets` and `/list remappresets` list the presets saved for the current map. Unlike the other `/list` types, they need the Entities and Remaps admin power.
+
+### Changed
+- Extras buttons a player has no admin power for are now greyed out and can't be clicked: the entity menus without Entities and Remaps, NPCs & Vehicles without NPC management, and the Music menu's "Play for everyone" without Music. Universe RP client only.
+- New menu sounds for clicking, hovering and leaving a menu. Universe RP client only.
+- `/entitiesandremaps` help now also lists `/shaderaim`, `/shaderlist`, `/remapremove`, `/entflags` and the two preset listings.
+
+### Fixed
+- A very long model or saber name in a player's own settings no longer makes the Universe RP menu show their account data (skills, credits and so on) in the wrong places.
+
 ## [3.9.5]
 
 ### Added
