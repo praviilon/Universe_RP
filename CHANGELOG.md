@@ -11,6 +11,7 @@
 - `/shaderaim` prints the shader of the map surface or brush entity you aim at and what it is remapped to, or a model's shaders. Universe RP client only.
 - `/remapremove <shader>` takes back a single shader remap, without clearing the others as `/remapreset` does.
 - `/list entpresets` and `/list remappresets` list the presets saved for the current map. Unlike the other `/list` types, they need the Entities and Remaps admin power.
+- Underwater Breather, a fourth permanent shop upgrade (`/buy upgrade 4`, 20000 credits): the character takes no drowning damage under water. Lava, slime and harmful areas still hurt. `/upgradereset` removes it with the other three.
 
 ### Changed
 - Extras buttons a player has no admin power for are now greyed out and can't be clicked: the entity menus without Entities and Remaps, NPCs & Vehicles without NPC management, and the Music menu's "Play for everyone" without Music. Universe RP client only.
