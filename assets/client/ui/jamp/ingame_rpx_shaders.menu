@@ -458,7 +458,7 @@
 			name                rpx_oldlabel
 			type                ITEM_TYPE_TEXT
 			style               WINDOW_STYLE_EMPTY
-			rect                98 300 200 14
+			rect                98 300 38 14
 			text                "Old:"
 			textalign           ITEM_ALIGN_LEFT
 			textalignx          0
@@ -466,6 +466,22 @@
 			font                2
 			textscale           0.6
 			forecolor           1 .682 0 1
+			visible             1
+			decoration
+		}
+		itemDef
+		{
+			name                rpx_oldkind
+			type                ITEM_TYPE_TEXT
+			style               WINDOW_STYLE_EMPTY
+			rect                138 301 160 14
+			cvar                "ui_rpx_sh_oldkind"
+			textalign           ITEM_ALIGN_LEFT
+			textalignx          0
+			textaligny          0
+			font                2
+			textscale           0.5
+			forecolor           1 1 1 1
 			visible             1
 			decoration
 		}
@@ -554,7 +570,7 @@
 			name                rpx_newlabel
 			type                ITEM_TYPE_TEXT
 			style               WINDOW_STYLE_EMPTY
-			rect                406 300 200 14
+			rect                406 300 38 14
 			text                "New:"
 			textalign           ITEM_ALIGN_LEFT
 			textalignx          0
@@ -562,6 +578,22 @@
 			font                2
 			textscale           0.6
 			forecolor           1 .682 0 1
+			visible             1
+			decoration
+		}
+		itemDef
+		{
+			name                rpx_newkind
+			type                ITEM_TYPE_TEXT
+			style               WINDOW_STYLE_EMPTY
+			rect                446 301 162 14
+			cvar                "ui_rpx_sh_newkind"
+			textalign           ITEM_ALIGN_LEFT
+			textalignx          0
+			textaligny          0
+			font                2
+			textscale           0.5
+			forecolor           1 1 1 1
 			visible             1
 			decoration
 		}

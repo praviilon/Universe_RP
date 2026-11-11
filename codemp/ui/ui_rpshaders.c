@@ -62,11 +62,22 @@ typedef struct {
 	char	oldName[MAX_QPATH];
 	char	newName[MAX_QPATH];
 	char	time[16];
+	byte	oldKind, newKind;	// GLX_U: [Shader Remaps Menu] RPSH_KIND_*, worked out when the remaps are read
 } rpshRemap_t;
+
+/*
+GLX_U: [Shader Remaps Menu] what a shader name is on this game (RPSH_Kind()), shown in one colour everywhere -- as the
+Remap to list already showed it: yellow a script defines it, white only an image, red missing; a name with no folder
+(noshader, *white) is an engine name and is not judged. Also the word beside "Old:" and "New:".
+*/
+#define RPSH_KIND_NONE		0
+#define RPSH_KIND_IMAGE		1
+#define RPSH_KIND_SCRIPT	2
+#define RPSH_KIND_MISSING	3
 
 // the map's shaders
 static char			rpshMap[RPSH_MAX_MAP][MAX_QPATH];
-static byte			rpshMapMissing[RPSH_MAX_MAP];
+static byte			rpshMapKind[RPSH_MAX_MAP];		// GLX_U: [Shader Remaps Menu] RPSH_KIND_* (was missing or not)
 static int			rpshMapNum;
 static qboolean		rpshMapTried, rpshMapOk;
 
@@ -280,6 +291,37 @@ static int RPSH_FindScript( const char *name ) {
 		}
 	}
 	return -1;
+}
+
+// GLX_U: [Shader Remaps Menu] the kind of a shader name on this game (RPSH_KIND_*): a script's, else an image's, else
+// missing; a name with no folder is not judged. The scripts must have been read (RPSH_ReadScripts()).
+static int RPSH_Kind( const char *name ) {
+	if ( !name[0] || !strchr( name, '/' ) ) {
+		return RPSH_KIND_NONE;
+	}
+	if ( RPSH_FindScript( name ) >= 0 ) {
+		return RPSH_KIND_SCRIPT;
+	}
+	return RPSH_ImageExists( name ) ? RPSH_KIND_IMAGE : RPSH_KIND_MISSING;
+}
+
+// its colour in a list: yellow, red, else none (the lists' own white, as the Remap to list's images)
+static const char *RPSH_KindColor( int kind ) {
+	return ( kind == RPSH_KIND_SCRIPT ) ? "^3" : ( kind == RPSH_KIND_MISSING ) ? "^1" : "";
+}
+
+// the word beside "Old:" and "New:"
+static const char *RPSH_KindWord( int kind ) {
+	switch ( kind ) {
+	case RPSH_KIND_SCRIPT:
+		return "^3Scripted shader";
+	case RPSH_KIND_IMAGE:
+		return "^7Image";
+	case RPSH_KIND_MISSING:
+		return "^1Missing on your game";
+	default:
+		return "";
+	}
 }
 
 // one script file, read forward a piece at a time: the names outside any braces are its shaders; inside one, the
@@ -701,8 +743,9 @@ static void RPSH_ReadMap( void ) {
 	rpshMapOk = RPSH_ReadMapFile( va( "maps/%s.bsp", mapname ) );
 
 	// missing on this game: neither a script nor an image of that name
+	// GLX_U: [Shader Remaps Menu] and which of the two it is, kept for the list's colours
 	for ( i = 0; i < rpshMapNum; i++ ) {
-		rpshMapMissing[i] = ( strchr( rpshMap[i], '/' ) && RPSH_FindScript( rpshMap[i] ) < 0 && !RPSH_ImageExists( rpshMap[i] ) ) ? 1 : 0;
+		rpshMapKind[i] = (byte)RPSH_Kind( rpshMap[i] );
 	}
 }
 
@@ -750,6 +793,9 @@ static void RPSH_ParseRemaps( const char *cs ) {
 			memcpy( r->time, colon + 1, tl );
 			r->time[tl] = '\0';
 			if ( Q_stricmp( r->oldName, r->newName ) ) {
+				// GLX_U: [Shader Remaps Menu] the two names' kinds, once per change of the remaps
+				r->oldKind = (byte)RPSH_Kind( r->oldName );
+				r->newKind = (byte)RPSH_Kind( r->newName );
 				rpshRemapNum++;
 			}
 		}
@@ -1049,8 +1095,18 @@ static void RPSH_UpdateOldInfo( void ) {
 		trap->Cvar_Set( "ui_rpx_sh_oldinfo", va( "Remapped to: ^7%s", rpshRemaps[i].newName ) );
 		return;
 	}
+	// GLX_U: [Shader Remaps Menu] "Missing on your game" is now the word beside "Old:" (RPSH_UpdateOldKind())
+	trap->Cvar_Set( "ui_rpx_sh_oldinfo", "" );
+}
+
+// GLX_U: [Shader Remaps Menu] the word beside "Old:": a map shader's kind from the map's list, any other name checked
+static void RPSH_UpdateOldKind( void ) {
+	char oldName[MAX_QPATH];
+	int i;
+
+	RPSH_Cvar( "ui_rpx_sh_old", oldName, sizeof( oldName ) );
 	i = RPSH_FindMapShader( oldName );
-	trap->Cvar_Set( "ui_rpx_sh_oldinfo", ( i >= 0 && rpshMapMissing[i] ) ? "^1Missing on your game" : "" );
+	trap->Cvar_Set( "ui_rpx_sh_oldkind", RPSH_KindWord( i >= 0 ? rpshMapKind[i] : RPSH_Kind( oldName ) ) );
 }
 
 // the preview taken back: the shader remapped to itself (the engine clears a remap then), then to what the
@@ -1242,6 +1298,10 @@ static void RPSH_Sync( void ) {
 	// GLX_U: [Shader Remaps Menu] the right list's highlight on New (RPSH_ReselectRight())
 	RPSH_Cvar( "ui_rpx_sh_new", buf, MAX_QPATH );
 	if ( rightChanged || strcmp( buf, rpshNewSeen ) ) {
+		if ( strcmp( buf, rpshNewSeen ) ) {
+			// GLX_U: [Shader Remaps Menu] the word beside "New:", when New changes
+			trap->Cvar_Set( "ui_rpx_sh_newkind", RPSH_KindWord( RPSH_Kind( buf ) ) );
+		}
 		Q_strncpyz( rpshNewSeen, buf, sizeof( rpshNewSeen ) );
 		RPSH_ReselectRight();
 	}
@@ -1254,6 +1314,7 @@ static void RPSH_Sync( void ) {
 	}
 	if ( infoChanged ) {
 		RPSH_UpdateOldInfo();
+		RPSH_UpdateOldKind();	// GLX_U: [Shader Remaps Menu]
 	}
 }
 
@@ -1275,9 +1336,10 @@ const char *UI_RpShLeftText( int index ) {
 	if ( rpshLeftMode == 1 ) {
 		const rpshRemap_t *r = &rpshRemaps[rpshLeft[index]];
 
-		return va( "%s ^3-> ^7%s", r->oldName, r->newName );
+		// GLX_U: [Shader Remaps Menu] each name in its kind's colour, the arrow white (yellow is a scripted name now)
+		return va( "%s%s ^7-> %s%s", RPSH_KindColor( r->oldKind ), r->oldName, RPSH_KindColor( r->newKind ), r->newName );
 	}
-	return va( "%s%s", rpshMapMissing[rpshLeft[index]] ? "^1" : "", rpshMap[rpshLeft[index]] );
+	return va( "%s%s", RPSH_KindColor( rpshMapKind[rpshLeft[index]] ), rpshMap[rpshLeft[index]] );
 }
 
 qboolean UI_RpShLeftSelection( int index ) {

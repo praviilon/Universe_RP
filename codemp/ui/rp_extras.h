@@ -208,6 +208,8 @@ static const char * const rpxSoundChannels[] = {
 	X( "ui_rpx_sh_leftinfo",	"" )		/* ui: how many the left list has */ \
 	X( "ui_rpx_sh_path",		"" )		/* ui: the right list's folder and how many files */ \
 	X( "ui_rpx_sh_oldinfo",		"" )		/* ui: the Old shader is remapped now, or missing on this game */ \
+	X( "ui_rpx_sh_oldkind",		"" )		/* GLX_U: ui: beside "Old:", scripted shader, image or missing */ \
+	X( "ui_rpx_sh_newkind",		"" )		/* GLX_U: ui: beside "New:", the same */ \
 	X( "ui_rpx_sh_prevtext",	"" )		/* ui: the preview strip's line */ \
 	X( "ui_rpx_sh_pick",		"" )		/* cgame: the shader Pick from world found */ \
 	X( "ui_rpx_sh_pickn",		"0" )		/* cgame: raised with each one found */ \
