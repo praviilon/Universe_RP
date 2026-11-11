@@ -244,6 +244,7 @@ void SP_misc_model_static( void ) {
 
 	staticmodel		= &cgs.miscStaticModels[cgs.numMiscStaticModels++];
 	staticmodel->model	= modelIndex;
+	RP_ShaderAimNoteStatic( cgs.numMiscStaticModels - 1, model );	// GLX_U: [Shader Aim] its path, for /shaderaim, as CG_MiscEnt() does
 	AnglesToAxis( angles, staticmodel->axes );
 	for( i = 0; i < 3; i++ ) {
 		VectorScale( staticmodel->axes[i], vScale[i], staticmodel->axes[i] );
