@@ -40,6 +40,7 @@ message, never a read outside what was read.
 #define RP_SA_MAX_MODEL_BYTES	(64 * 1024 * 1024)	// a model file larger than this is not read
 #define RP_SA_DEBOUNCE_MSEC		1000
 #define RP_SA_TIE				1.0f				// a surface wins over a model's box this close behind
+#define RP_SA_G2_REACH			512.0f				// GLX_U: [Shader Aim] a Ghoul2 model is tried this near the aim, at least
 
 typedef struct {
 	int			shader;			// index in the map's shader list
@@ -801,8 +802,121 @@ typedef struct {
 	char			where[64];			// RP_SA_SURFACE: "world" or the brush entity; RP_SA_MODEL: the entity or "static model"
 	const char		*modelPath;			// RP_SA_MODEL
 	int				num;				// RP_SA_PLAYER, RP_SA_ENTITY: the entity
+	qboolean		body;				// GLX_U: [Shader Aim] RP_SA_PLAYER: a corpse (ET_BODY)
 	float			dist;
 } rpSaHit_t;
+
+/*
+GLX_U: [Shader Aim] Ghoul2 models
+
+A .glm model has no bounds the renderer gives (R_ModelBounds reads only md3s and brush models), so a Ghoul2 prop,
+player or NPC was found only by the trace, which hits only what is solid, and by its box: a non-solid
+misc_model_ghoul was seen through. Each one the aim passes near is now traced against its real, animated
+triangles with the engine's G2API_CollisionDetect, as CG_G2TraceCollide (cg_players.c) does for saber hits.
+*/
+typedef enum { RP_SA_G2_NONE, RP_SA_G2_PROP, RP_SA_G2_CHAR, RP_SA_G2_BODY } rpSaG2Kind_t;
+
+// what a Ghoul2 entity is to the aim; NONE for one not drawn or without a Ghoul2 instance
+static rpSaG2Kind_t RP_SA_Ghoul2Kind( const entityState_t *es )
+{
+	const centity_t *cent = &cg_entities[es->number];
+	rpSaG2Kind_t kind;
+
+	if ( es->eFlags & EF_NODRAW )
+		return RP_SA_G2_NONE;
+	if ( es->eType == ET_BODY )
+		kind = RP_SA_G2_BODY;
+	else if ( es->number < MAX_CLIENTS || es->eType == ET_PLAYER || es->eType == ET_NPC )
+		kind = RP_SA_G2_CHAR;
+	else if ( es->eType == ET_GENERAL && es->modelGhoul2 == 1 && es->solid != SOLID_BMODEL && es->modelindex > 0 && es->modelindex < MAX_MODELS )
+		kind = RP_SA_G2_PROP;	// misc_model_ghoul and the like: drawn from the .glm in CS_MODELS (CG_General)
+	else
+		return RP_SA_G2_NONE;
+	if ( !cent->ghoul2 || !trap->G2_HaveWeGhoul2Models( cent->ghoul2 ) )
+		return RP_SA_G2_NONE;
+	return kind;
+}
+
+// a ray (d of unit length) through a sphere somewhere between 0 and tmax along it
+static qboolean RP_SA_RaySphere( const vec3_t o, const vec3_t d, float tmax, const vec3_t c, float r )
+{
+	vec3_t v;
+	float tc, d2, h;
+
+	VectorSubtract( c, o, v );
+	tc = DotProduct( v, d );
+	d2 = DotProduct( v, v ) - tc * tc;
+	if ( d2 > r * r )
+		return qfalse;
+	h = sqrtf( r * r - d2 );
+	return ( tc + h >= 0.0f && tc - h <= tmax ) ? qtrue : qfalse;
+}
+
+// the nearest hit of the aim on a Ghoul2 entity's triangles, as a distance along dir, or -1
+static float RP_SA_Ghoul2Hit( const entityState_t *es, rpSaG2Kind_t kind, const vec3_t eye, const vec3_t dir, float tmax )
+{
+	centity_t *cent = &cg_entities[es->number];
+	CollisionRecord_t recs[MAX_G2_COLLISIONS];
+	vec3_t angles, start, end, rel;
+	float radius, scale = 1.0f, best = -1.0f;
+	int k;
+
+	// only one the aim passes near is tried: within its drawn radius (g2radius, times its largest scale) or
+	// RP_SA_G2_REACH of its origin, whichever is more -- a model can reach past its radius (a misc_model_ghoul
+	// with no "radius" key gets its box's), and players send none
+	for ( k = 0; k < 3; k++ )
+	{
+		if ( cent->modelScale[k] > scale )
+			scale = cent->modelScale[k];
+	}
+	radius = (float)es->g2radius * scale;
+	if ( radius < RP_SA_G2_REACH )
+		radius = RP_SA_G2_REACH;
+	if ( !RP_SA_RaySphere( eye, dir, tmax, cent->lerpOrigin, radius ) )
+		return -1.0f;
+
+	// turned as drawn: a prop by all its angles (CG_General), a player, NPC or corpse by its yaw (CG_G2TraceCollide)
+	if ( kind == RP_SA_G2_PROP )
+		VectorCopy( cent->lerpAngles, angles );
+	else
+		VectorSet( angles, 0.0f, cent->lerpAngles[YAW], 0.0f );
+	VectorCopy( eye, start );
+	VectorMA( eye, tmax, dir, end );
+	memset( recs, 0, sizeof( recs ) );
+	for ( k = 0; k < MAX_G2_COLLISIONS; k++ )
+		recs[k].mEntityNum = -1;
+	trap->G2API_CollisionDetect( recs, cent->ghoul2, angles, cent->lerpOrigin, cg.time, es->number, start, end, cent->modelScale, 0, 0, 0.0f );
+
+	for ( k = 0; k < MAX_G2_COLLISIONS; k++ )
+	{
+		float t;
+
+		if ( recs[k].mEntityNum != es->number )
+			continue;
+		VectorSubtract( recs[k].mCollisionPosition, eye, rel );
+		t = DotProduct( rel, dir );
+		if ( t > 0.0f && t <= tmax && ( best < 0.0f || t < best ) )
+			best = t;
+	}
+	return best;
+}
+
+// the axis of a model entity, scaled as CG_General draws it: a misc_model_breakable's per-axis "modelscale_vec"
+// (CG_RpVectorScale, the three scales in origin2), else iModelScale
+static void RP_SA_ScaleAxis( const entityState_t *es, matrix3_t axis )
+{
+	float s[3];
+	int k;
+
+	if ( CG_RpVectorScale( es ) )
+		VectorCopy( es->origin2, s );
+	else if ( es->iModelScale > 0 )
+		s[0] = s[1] = s[2] = es->iModelScale / 100.0f;
+	else
+		return;
+	for ( k = 0; k < 3; k++ )
+		VectorScale( axis[k], s[k], axis[k] );
+}
 
 /*
 RP_SA_Lookup
@@ -820,6 +934,8 @@ static void RP_SA_Lookup( rpSaHit_t *hit )
 	const char *modelPath = NULL;
 	char modelWhere[64];
 	int playerHit = -1;
+	qboolean playerBody = qfalse;	// GLX_U: [Shader Aim] playerHit is a corpse
+	int traceEnt = -1;				// GLX_U: [Shader Aim] the entity the trace found, when it counts
 	int i;
 	trace_t tr;
 
@@ -865,12 +981,20 @@ static void RP_SA_Lookup( rpSaHit_t *hit )
 
 	// 3. model entities: a solid one, a player or an NPC by the trace, any other by its model's bounds
 	CG_Trace( &tr, eye, vec3_origin, vec3_origin, end, ps->clientNum, MASK_SHOT );
-	if ( tr.fraction < 1.0f && tr.entityNum < ENTITYNUM_WORLD && cg_entities[tr.entityNum].currentState.solid != SOLID_BMODEL )
+	// GLX_U: [Shader Aim] a Ghoul2 one is left to its triangles below, not its box
+	if ( tr.fraction < 1.0f && tr.entityNum < ENTITYNUM_WORLD && RP_SA_Ghoul2Kind( &cg_entities[tr.entityNum].currentState ) == RP_SA_G2_NONE )
+		traceEnt = tr.entityNum;
+	if ( traceEnt >= 0 && cg_entities[traceEnt].currentState.solid != SOLID_BMODEL )
 	{
 		const entityState_t *es = &cg_entities[tr.entityNum].currentState;
 
 		if ( tr.entityNum < MAX_CLIENTS || es->eType == ET_PLAYER || es->eType == ET_NPC )
 			playerHit = tr.entityNum;
+		else if ( es->eType == ET_BODY )
+		{
+			playerHit = tr.entityNum;
+			playerBody = qtrue;
+		}
 		modelDist = tr.fraction * RP_SA_RANGE;
 	}
 	for ( i = 0; i < cg.snap->numEntities; i++ )
@@ -882,9 +1006,35 @@ static void RP_SA_Lookup( rpSaHit_t *hit )
 		matrix3_t axis;
 		float t;
 
-		// the types drawn from their modelindex: an item's model, or the model in CS_MODELS
-		if ( es->solid == SOLID_BMODEL || ( es->eFlags & EF_NODRAW ) || es->number < MAX_CLIENTS )
+		if ( ( es->eFlags & EF_NODRAW ) || es->number < MAX_CLIENTS )
 			continue;
+
+		// GLX_U: [Shader Aim] a mover's second model (a func_* "model2" key), drawn as CG_Mover does: at the
+		// mover's place and angles, scaled by iModelScale -- its brushes are looked at above
+		if ( es->eType == ET_MOVER && es->modelindex2 > 0 && es->modelindex2 < MAX_MODELS && ( h = cgs.gameModels[es->modelindex2] ) != 0 )
+		{
+			trap->R_ModelBounds( h, mins, maxs );
+			AnglesToAxis( cent->lerpAngles, axis );
+			if ( es->iModelScale > 0 )
+			{
+				VectorScale( axis[0], es->iModelScale / 100.0f, axis[0] );
+				VectorScale( axis[1], es->iModelScale / 100.0f, axis[1] );
+				VectorScale( axis[2], es->iModelScale / 100.0f, axis[2] );
+			}
+			if ( RP_SA_RayOrientedBox( eye, dir, modelDist, cent->lerpOrigin, axis, mins, maxs, &t ) && t <= modelDist )
+			{
+				modelDist = t;
+				modelPath = CG_ConfigString( CS_MODELS + es->modelindex2 );
+				playerHit = -1;
+				Com_sprintf( modelWhere, sizeof( modelWhere ), "#%i, model2", es->number );
+			}
+		}
+
+		// the types drawn from their modelindex: an item's model, or the model in CS_MODELS
+		if ( es->solid == SOLID_BMODEL )
+			continue;
+		if ( RP_SA_Ghoul2Kind( es ) != RP_SA_G2_NONE )
+			continue;	// GLX_U: [Shader Aim] by its triangles, below
 		if ( es->eType == ET_ITEM )
 		{
 			if ( es->modelindex < 1 || es->modelindex >= bg_numItems )
@@ -907,12 +1057,7 @@ static void RP_SA_Lookup( rpSaHit_t *hit )
 			VectorClear( maxs );
 		}
 		AnglesToAxis( cent->lerpAngles, axis );
-		if ( es->iModelScale > 0 )
-		{
-			VectorScale( axis[0], es->iModelScale / 100.0f, axis[0] );
-			VectorScale( axis[1], es->iModelScale / 100.0f, axis[1] );
-			VectorScale( axis[2], es->iModelScale / 100.0f, axis[2] );
-		}
+		RP_SA_ScaleAxis( es, axis );	// GLX_U: [Shader Aim] and a breakable's per-axis scale
 		if ( !RP_SA_RayOrientedBox( eye, dir, modelDist, cent->lerpOrigin, axis, mins, maxs, &t ) )
 		{
 			// a solid model the trace found but the renderer gives no bounds for
@@ -928,6 +1073,33 @@ static void RP_SA_Lookup( rpSaHit_t *hit )
 			modelPath = path;
 			playerHit = -1;
 			Com_sprintf( modelWhere, sizeof( modelWhere ), "#%i", es->number );
+		}
+	}
+
+	// GLX_U: [Shader Aim] Ghoul2 props, players, NPCs and corpses, by their triangles; one behind the nearest
+	// surface or model so far is not tried
+	for ( i = 0; i < cg.snap->numEntities; i++ )
+	{
+		const entityState_t *es = &cg.snap->entities[i];
+		rpSaG2Kind_t kind = RP_SA_Ghoul2Kind( es );
+		float t;
+
+		if ( kind == RP_SA_G2_NONE )
+			continue;
+		t = RP_SA_Ghoul2Hit( es, kind, eye, dir, ( best < modelDist ? best + RP_SA_TIE : modelDist ) );
+		if ( t < 0.0f || t > modelDist )
+			continue;
+		modelDist = t;
+		if ( kind == RP_SA_G2_PROP )
+		{
+			modelPath = CG_ConfigString( CS_MODELS + es->modelindex );
+			playerHit = -1;
+			Com_sprintf( modelWhere, sizeof( modelWhere ), "#%i", es->number );
+		}
+		else
+		{
+			playerHit = es->number;
+			playerBody = ( kind == RP_SA_G2_BODY ) ? qtrue : qfalse;
 		}
 	}
 
@@ -967,6 +1139,7 @@ static void RP_SA_Lookup( rpSaHit_t *hit )
 	{
 		hit->kind = RP_SA_PLAYER;
 		hit->num = playerHit;
+		hit->body = playerBody;
 		hit->dist = modelDist;
 	}
 	else if ( modelPath )
@@ -976,10 +1149,10 @@ static void RP_SA_Lookup( rpSaHit_t *hit )
 		Q_strncpyz( hit->where, modelWhere, sizeof( hit->where ) );
 		hit->dist = modelDist;
 	}
-	else if ( tr.fraction < 1.0f && tr.entityNum < ENTITYNUM_WORLD && tr.entityNum != ENTITYNUM_NONE )
+	else if ( traceEnt >= 0 )	// GLX_U: [Shader Aim] the trace's entity, unless it was a Ghoul2 one's box
 	{
 		hit->kind = RP_SA_ENTITY;
-		hit->num = tr.entityNum;
+		hit->num = traceEnt;
 		hit->dist = tr.fraction * RP_SA_RANGE;
 	}
 }
@@ -1017,7 +1190,7 @@ void RP_ShaderAim_f( void )
 		RP_SA_PrintShader( hit.shader, hit.where, hit.dist );
 		break;
 	case RP_SA_PLAYER:
-		Com_Printf( "^3Player/NPC #%i ^5(%i units)^7: its textures come from its model and skin.\n", hit.num, (int)hit.dist );
+		Com_Printf( "^3Player/NPC %s#%i ^5(%i units)^7: its textures come from its model and skin.\n", hit.body ? "body " : "", hit.num, (int)hit.dist );
 		break;
 	case RP_SA_MODEL:
 		RP_SA_PrintModel( hit.modelPath, hit.where, hit.dist );
@@ -1057,7 +1230,7 @@ qboolean RP_ShaderAimPick( char *out, int outSize, char *remap, int remapSize, c
 			remap[0] = '\0';	// an entry pointing at itself (/remap X X) is no remap
 		return qtrue;
 	case RP_SA_PLAYER:
-		Q_strncpyz( why, "That is a player or an NPC: its textures come from its model and skin.", whySize );
+		Q_strncpyz( why, hit.body ? "That is a body: its textures come from its model and skin." : "That is a player or an NPC: its textures come from its model and skin.", whySize );
 		break;
 	case RP_SA_MODEL:
 		Q_strncpyz( why, "That is a model, not a map surface: /shaderaim names its shaders.", whySize );
