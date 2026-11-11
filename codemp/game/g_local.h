@@ -1228,6 +1228,7 @@ typedef struct clientPersistant_s {
 	// character on the same account. Already saved/loaded generically alongside every other skill (the
 	// NUM_OF_SKILLS load loops and the UniqueSkill column in update_skills_query/update_character_query),
 	// so no new DB read/write path was needed for the migration.
+	// GLX_U: [Shop] bit 3 is the Underwater Breather (/buy upgrade 4): no drowning, see P_WorldEffects() (g_active.c).
 	int skill_levels[NUM_OF_SKILLS];
 
 	int max_rpg_health; // zyk: max health the player can have in RPG Mode. This is set to STAT_MAX_HEALTH for RPG players

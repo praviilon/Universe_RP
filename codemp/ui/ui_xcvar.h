@@ -279,6 +279,8 @@ XCVAR_DEF( ui_rp_skill_60_level,			"0",					NULL,				CVAR_ARCHIVE | CVAR_INTERNA
 XCVAR_DEF( ui_zyk_upgrade_1_owned,			"0",					NULL,				CVAR_ARCHIVE|CVAR_INTERNAL )
 XCVAR_DEF( ui_zyk_upgrade_2_owned,			"0",					NULL,				CVAR_ARCHIVE|CVAR_INTERNAL )
 XCVAR_DEF( ui_zyk_upgrade_3_owned,			"0",					NULL,				CVAR_ARCHIVE|CVAR_INTERNAL )
+// GLX_U: [Shop] the Underwater Breather, /buy upgrade 4
+XCVAR_DEF( ui_zyk_upgrade_4_owned,			"0",					NULL,				CVAR_ARCHIVE|CVAR_INTERNAL )
 // GLX_U: [Extras Admin Grey] whether the player has the Entities and Remaps, NPC management and Music admin
 // powers: the last three fields of the zykmod payload (CG_ZykMod), 0 at start and logout (CG_RpExtrasAdminClear).
 // Not archived: they belong to one account on one server. ingame_galaxyrp.menu's Extras buttons and

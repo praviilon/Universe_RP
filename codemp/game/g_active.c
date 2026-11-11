@@ -204,7 +204,11 @@ void P_WorldEffects( gentity_t *ent ) {
 	// climbed out. Now his air stays topped up and the ramp reset, as with DF_NO_DROWN. Speeders and
 	// animals do not seal their riders and still drown them; a destroyed vehicle stops protecting, in
 	// G_Damage() and here alike.
-	if ( waterlevel == 3 && !(dmflags.integer & DF_NO_DROWN) && !P_SealedInVehicle( ent ) ) {
+	//
+	// GLX_U: [Shop] and so does a logged-in character with the Underwater Breather (skill_levels[38] bit 3,
+	// /buy upgrade 4): no drowning damage and no gurgle, his air kept full. Lava, slime and trigger_hurt still hurt.
+	if ( waterlevel == 3 && !(dmflags.integer & DF_NO_DROWN) && !P_SealedInVehicle( ent )
+		&& !(ent->client->sess.amrpgmode == 2 && (ent->client->pers.skill_levels[38] & (1 << 3))) ) {
 		#ifdef BASE_COMPAT
 			// envirosuit give air
 			if ( envirosuit )

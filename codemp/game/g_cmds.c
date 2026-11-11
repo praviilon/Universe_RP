@@ -13364,7 +13364,7 @@ void Cmd_ListAccount_f( gentity_t *ent ) {
 ^3/removexp <player name>: ^7Removes one xp from the player.\n\
 ^3/skillup <player name> <skill number> <number of levels (optional)>: ^7upgrades a skill.\n\
 ^3/skilldown <player name> <skill number> <number of levels (optional)>: ^7downgrades a skill.\n\
-^3/upgradereset <player name or ID>: ^7Removes the three permanent shop upgrades from the player's character, so they can be bought again.\n\" ");
+^3/upgradereset <player name or ID>: ^7Removes the permanent shop upgrades from the player's character, so they can be bought again.\n\" ");
 				// GLX_U: [Shop] split here: /upgradereset took the block above past 1022 characters
 				trap->SendServerCommand(ent - g_entities, "print \"^3/god: ^7Makes you invincible.\n\
 ^3/notarget <player name (optional)>: ^7Makes NPCs, turrets and seekers ignore you, or another player.\n\
@@ -13772,7 +13772,8 @@ void Cmd_Stuff_f( gentity_t *ent ) {
 				trap->SendServerCommand( ent-g_entities, "print \"\n"
 					"^31 - Holdable Items Upgrade: ^7Buy: 30000\n"
 					"^32 - Impact Reducer: ^7Buy: 40000\n"
-					"^33 - Stun Baton Upgrade: ^7Buy: 15000\n\n\"");
+					"^33 - Stun Baton Upgrade: ^7Buy: 15000\n"
+					"^34 - Underwater Breather: ^7Buy: 20000\n\n\"");	// GLX_U: [Shop] upgrade 4
 				return;
 			}
 
@@ -13793,6 +13794,10 @@ void Cmd_Stuff_f( gentity_t *ent ) {
 				// target, with or without this upgrade -- see G_Damage's centralized decloak hook).
 				// DAJ_RP: [Skills] the doors and elevators moved to Stun Baton skill level 5; the upgrade keeps the slow
 				trap->SendServerCommand( ent-g_entities, "print \"\n^3Stun Baton Upgrade: ^7each stun baton hit halves the enemy's movement speed for 1.5 seconds. Opening doors and moving elevators comes with Stun Baton skill level 5\n\n\"");
+			}
+			else if (value == 4)
+			{ // GLX_U: [Shop] Underwater Breather, skill_levels[38] bit 3 (P_WorldEffects, g_active.c)
+				trap->SendServerCommand( ent-g_entities, "print \"\n^3Underwater Breather: ^7you don't drown: no drowning damage under water. Lava, slime and harmful areas still hurt\n\n\"");
 			}
 			else
 			{
@@ -13842,7 +13847,8 @@ void Cmd_Buy_f( gentity_t *ent ) {
 	int upgrade_costs[NUMBER_OF_SHOP_UPGRADES] = {
 		30000,	// upgrade 1: Holdable Items Upgrade
 		40000,	// upgrade 2: Impact Reducer
-		15000 };	// upgrade 3: Stun Baton Upgrade
+		15000,	// upgrade 3: Stun Baton Upgrade
+		20000 };	// upgrade 4: Underwater Breather (GLX_U: [Shop])
 
 	if (trap->Argc() < 3)
 	{
@@ -13909,6 +13915,11 @@ void Cmd_Buy_f( gentity_t *ent ) {
 			trap->SendServerCommand( ent-g_entities, "print \"You already have the Stun Baton Upgrade.\n\"" );
 			return;
 		}
+		else if (value == 4 && ent->client->pers.skill_levels[38] & (1 << 3))
+		{ // GLX_U: [Shop] Underwater Breather, bit 3
+			trap->SendServerCommand( ent-g_entities, "print \"You already have the Underwater Breather.\n\"" );
+			return;
+		}
 
 		cost = upgrade_costs[value-1];
 	}
@@ -13948,6 +13959,10 @@ void Cmd_Buy_f( gentity_t *ent ) {
 		else if (value == 3)
 		{
 			ent->client->pers.skill_levels[38] |= (1 << 2);
+		}
+		else if (value == 4)
+		{ // GLX_U: [Shop] Underwater Breather
+			ent->client->pers.skill_levels[38] |= (1 << 3);
 		}
 	}
 	else
@@ -20573,7 +20588,7 @@ void Cmd_AdminList_f( gentity_t *ent ) {
 		}
 		else if (command_number == ADM_SKILL)
 		{
-			trap->SendServerCommand(ent - g_entities, "print \"\nUse ^3/skillup ^7or ^3/skilldown <player name> <skill number> <number of levels (optional)> ^7to increase or decrease the skill levels of a player respectively.\nUse ^3/upgradereset <player name or ID> ^7to remove the three permanent shop upgrades (Holdable Items Upgrade, Impact Reducer, Stun Baton Upgrade) from a player's character.\n\n\"");
+			trap->SendServerCommand(ent - g_entities, "print \"\nUse ^3/skillup ^7or ^3/skilldown <player name> <skill number> <number of levels (optional)> ^7to increase or decrease the skill levels of a player respectively.\nUse ^3/upgradereset <player name or ID> ^7to remove the permanent shop upgrades (Holdable Items Upgrade, Impact Reducer, Stun Baton Upgrade, Underwater Breather) from a player's character.\n\n\"");
 		}
 		else if (command_number == ADM_CREATECREDITS)
 		{
@@ -21339,7 +21354,8 @@ Every effect reads the bit when it happens, so nothing else needs undoing. No re
 ==================
 */
 void Cmd_UpgradeReset_f( gentity_t *ent ) {
-	static const char *upgrade_names[3] = { "Holdable Items Upgrade", "Impact Reducer", "Stun Baton Upgrade" };
+	// GLX_U: [Shop] the Underwater Breather is bit 3, so the four bits 0-3 are cleared
+	static const char *upgrade_names[NUMBER_OF_SHOP_UPGRADES] = { "Holdable Items Upgrade", "Impact Reducer", "Stun Baton Upgrade", "Underwater Breather" };
 	char arg1[MAX_STRING_CHARS];
 	char removed[128] = "";
 	gentity_t *target;
@@ -21373,7 +21389,7 @@ void Cmd_UpgradeReset_f( gentity_t *ent ) {
 		return;
 	}
 
-	for (i = 0; i < 3; i++)
+	for (i = 0; i < NUMBER_OF_SHOP_UPGRADES; i++)
 	{
 		if (target->client->pers.skill_levels[38] & (1 << i))
 		{
@@ -21387,7 +21403,7 @@ void Cmd_UpgradeReset_f( gentity_t *ent ) {
 		return;
 	}
 
-	target->client->pers.skill_levels[38] &= ~((1 << 0) | (1 << 1) | (1 << 2));
+	target->client->pers.skill_levels[38] &= ~((1 << NUMBER_OF_SHOP_UPGRADES) - 1);
 	update_skills_table_row_with_current_values(target);
 
 	trap->SendServerCommand(ent - g_entities, va("print \"Removed %s^7's shop upgrades: %s.\n\"", target->client->pers.netname, removed));
@@ -26574,7 +26590,9 @@ void Cmd_GalaxyRpUi_f(gentity_t* ent) {
 		// "You already have..." message.
 		{
 			int owned_bit;
-			int upgrade_bits_to_sync[] = { 0, 1, 2 };
+			// GLX_U: [Shop] bit 3, the Underwater Breather, right after the third (ui_zyk_upgrade_4_owned); the admin
+			// flags below stay last
+			int upgrade_bits_to_sync[] = { 0, 1, 2, 3 };
 
 			for (int i = 0; i < ARRAY_LEN(upgrade_bits_to_sync); i++) {
 				owned_bit = upgrade_bits_to_sync[i];

@@ -6475,6 +6475,34 @@
 			}
 		}
 
+		// GLX_U: [Shop] the Underwater Breather (/buy upgrade 4), the row under the Stun Baton Upgrade, greyed once
+		// owned (ui_zyk_upgrade_4_owned, skill_levels[38] bit 3), as the three above
+		itemDef
+		{
+			name				buyBreatherButton
+			group				buyControls
+			text				"Underwater Breather - 20000"
+			descText			""
+			type				1
+			font				3
+			textscale			.4
+			style				WINDOW_STYLE_FILLED
+			rect				320 95 180 12
+			textalign			ITEM_ALIGN_LEFT
+			forecolor			1 .682 0 1
+			visible				0
+			cvarTest			"ui_zyk_upgrade_4_owned"
+			disableCvar
+			{
+				"1"
+			}
+			action
+			{
+				exec			"buy upgrade 4"
+				play			"sound/interface/button1.wav" ;
+			}
+		}
+
 		itemDef 
 		{
 			name				buyAmmoButton_glow
