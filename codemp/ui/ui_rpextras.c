@@ -39,6 +39,8 @@ extern void Text_Paint( float x, float y, float scale, vec4_t color, const char 
 extern int Text_Width( const char *text, float scale, int iMenuFont );
 extern void Item_RunScript( itemDef_t *item, const char *s );
 extern void Menu_ShowItemByName( menuDef_t *menu, const char *p, qboolean bShow );
+extern qboolean Item_EnableShowViaCvar( itemDef_t *item, int flag );	// GLX_U: [Extras] ui_shared.c
+extern void Item_MouseLeave( itemDef_t *item );
 extern int Item_ListBox_MaxScroll( itemDef_t *item );
 extern void UI_DrawRect( float x, float y, float width, float height, const float *color );
 extern void UI_InsertG2Pointer( void *ghoul2 );
@@ -1305,6 +1307,66 @@ static void RPX_PreviewEffect( void ) {
 	trap->Cmd_ExecuteText( EXEC_APPEND, "rpx do fxpreview\n" );
 }
 
+/*
+GLX_U: [Extras] a button's "selected" look that outlives the mouse. The engine lights a button with its mouse-over flag
+(the hint at the bottom, drawn while it is set), its mouseEnter script (the Extras buttons' glow) and its focus flag
+(white, pulsing text), and clears them when the mouse leaves (Menu_HandleMouseMove()). A menu closed with the mouse on
+a button (Esc, or the button's own click) keeps them; and Menu_HandleMouseMove() skips an item greyed or hidden by its
+cvar before it looks at the mouse, so such an item is never left: after an admin's account gives way to one without
+the power, a greyed Extras button kept its glow and its hint for good (drawn over the other buttons' hints).
+*/
+
+// every item of the menu the engine skips for its cvar (greyed by enableCvar/disableCvar, hidden by showCvar/hideCvar)
+// that still has the mouse-over flag: its own mouseExit run and the flag cleared, as the mouse leaving would have done.
+// Run as a menu opens (its onOpen's script).
+void RPX_ClearStaleHover( menuDef_t *menu ) {
+	int i;
+
+	if ( !menu ) {
+		return;
+	}
+	for ( i = 0; i < menu->itemCount; i++ ) {
+		itemDef_t *item = menu->items[i];
+		qboolean skipped;
+
+		if ( !item || !( item->window.flags & WINDOW_MOUSEOVER ) ) {
+			continue;
+		}
+		skipped = ( ( item->cvarFlags & ( CVAR_ENABLE | CVAR_DISABLE ) ) && !Item_EnableShowViaCvar( item, CVAR_ENABLE ) )
+			|| ( ( item->cvarFlags & ( CVAR_SHOW | CVAR_HIDE ) ) && !Item_EnableShowViaCvar( item, CVAR_SHOW ) );
+		if ( skipped ) {
+			Item_MouseLeave( item );
+			item->window.flags &= ~WINDOW_MOUSEOVER;
+		}
+	}
+}
+
+// the Extras tab shown (its button clicked, or Back from an Extras menu): none of its buttons lit, greyed or not, as the
+// Shop button resets its strip -- focus cleared, a mouse-over let go (its mouseExit), its glow (<name>_glow) hidden.
+// The button under the mouse lights up again at the next mouse move.
+static void RPX_ExtrasTabReset( menuDef_t *menu ) {
+	int i;
+
+	if ( !menu ) {
+		return;
+	}
+	for ( i = 0; i < menu->itemCount; i++ ) {
+		itemDef_t *item = menu->items[i];
+
+		if ( !item || !item->window.group || Q_stricmp( item->window.group, "extrasControls" ) ) {
+			continue;
+		}
+		item->window.flags &= ~WINDOW_HASFOCUS;
+		if ( item->window.flags & WINDOW_MOUSEOVER ) {
+			Item_MouseLeave( item );
+			item->window.flags &= ~WINDOW_MOUSEOVER;
+		}
+		if ( item->window.name && item->window.name[0] && strlen( item->window.name ) < 64 ) {
+			Menu_ShowItemByName( menu, va( "%s_glow", item->window.name ), qfalse );
+		}
+	}
+}
+
 // the Galaxy RP menu opening (its onOpen): opened from an Extras menu's Back button, its Extras tab,
 // as the Extras button leaves it (the same lines as that button's action)
 static void RPX_BackTab( void ) {
@@ -1313,6 +1375,8 @@ static void RPX_BackTab( void ) {
 	// the Galaxy RP menu sends "zykmod" as it opens: cgame's own commands keep the flood gap from it
 	trap->Cvar_Set( "ui_rpx_sent", va( "%d", trap->Milliseconds() ) );
 
+	RPX_ClearStaleHover( menu );	// GLX_U: [Extras] on every open
+
 	if ( !menu || menu->itemCount <= 0 || atoi( RPX_CvarStr( "ui_rpx_back" ) ) != 1 ) {
 		return;
 	}
@@ -1320,6 +1384,7 @@ static void RPX_BackTab( void ) {
 	Menu_ShowItemByName( menu, "listControls", qfalse );
 	Menu_ShowItemByName( menu, "extrasControls", qtrue );
 	Item_RunScript( menu->items[0], "setitemcolor mainButtons forecolor 1 .682 0 1 ; setitemcolor extrasButton forecolor 1 1 1 1 ; setitemcolor extrasControls forecolor 1 .682 0 1" );
+	RPX_ExtrasTabReset( menu );	// GLX_U: [Extras] the button just used not left lit
 }
 
 /*
@@ -1339,6 +1404,7 @@ The Extras menus' uiScripts; qfalse when name is not one of them.
 	rpxLightSame										Lights: the colour when off is the colour when on
 	rpxClose											in each menu's onClose
 	rpxBackTab											in the Galaxy RP menu's onOpen
+	rpxExtrasTab										the Galaxy RP menu's Extras button: none of its buttons lit
 ==================
 */
 qboolean UI_RpxScript( const char *name, char **args ) {
@@ -1351,6 +1417,8 @@ qboolean UI_RpxScript( const char *name, char **args ) {
 	if ( !Q_stricmp( name, "rpxOpen" ) ) {
 		if ( String_Parse( args, &arg ) && String_Parse( args, &arg2 ) ) {
 			int kind = RPX_KindForMenu( arg );
+
+			RPX_ClearStaleHover( Menus_FindByName( arg2 ) );	// GLX_U: [Extras] as the menu opens
 
 			if ( kind >= 0 ) {
 				RPX_Open( kind, arg2 );
@@ -1536,6 +1604,8 @@ qboolean UI_RpxScript( const char *name, char **args ) {
 		trap->Cmd_ExecuteText( EXEC_APPEND, "rpx do stop\n" );
 	} else if ( !Q_stricmp( name, "rpxBackTab" ) ) {
 		RPX_BackTab();
+	} else if ( !Q_stricmp( name, "rpxExtrasTab" ) ) {	// GLX_U: [Extras] the Extras button's action
+		RPX_ExtrasTabReset( Menus_FindByName( "ingame_galaxyrp" ) );
 	} else {
 		return qfalse;
 	}

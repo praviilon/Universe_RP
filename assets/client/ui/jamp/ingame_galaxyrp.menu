@@ -552,6 +552,9 @@
 				setitemcolor		mainButtons 		forecolor 1 .682 0 1 ;
 				setitemcolor		extrasButton		forecolor 1 1 1 1 ;
 				setitemcolor		extrasControls		forecolor 1 .682 0 1 ;
+				// GLX_U: [Extras] and none of its buttons left lit, greyed or not (focus, hint, glow), as Shop
+				// resets its strip: RPX_ExtrasTabReset(), ui_rpextras.c
+				uiScript		rpxExtrasTab
 			}
 		}
 

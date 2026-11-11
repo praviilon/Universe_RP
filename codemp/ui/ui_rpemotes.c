@@ -807,6 +807,7 @@ qboolean UI_RpEmScript( const char *name, char **args ) {
 	}
 
 	if ( !Q_stricmp( name, "rpxEmOpen" ) ) {
+		RPX_ClearStaleHover( Menus_FindByName( RPEM_MENU ) );	// GLX_U: [Extras] as the menu opens
 		RPEM_Msg( "" );
 		rpemSyncTime = -1;
 		rpemTabSeen = -1;		// the list and the preview made again at the next sync, with the selection

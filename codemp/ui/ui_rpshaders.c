@@ -1417,6 +1417,7 @@ qboolean UI_RpShScript( const char *name, char **args ) {
 	}
 
 	if ( !Q_stricmp( name, "rpxShOpen" ) ) {
+		RPX_ClearStaleHover( Menus_FindByName( RPSH_MENU ) );	// GLX_U: [Extras] as the menu opens
 		rpshSyncTime = -1;
 		RPSH_CheckMap();
 		RPSH_EndPreview();		// should the strip have gone without its onClose
