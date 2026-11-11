@@ -6251,7 +6251,14 @@ static void PM_Footsteps( void ) {
 	}
 	// if not trying to move
 	else if ( !pm->cmd.forwardmove && !pm->cmd.rightmove ) {
-		if (  pm->xyspeed < 5 ) {
+		// GLX_U: [Swimming] or in water at least waist-deep once the legs' animation has finished. A move that
+		// stops movement while the legs show it (stiffenedUp in PmoveSingle: the kicks and getup rolls, the back
+		// attacks, ROLL_STAB, the force landings) clears the keys, so only this branch can change the legs back,
+		// and it waited for the player to be still. Water never lets him: there is no ground friction in it, and
+		// its drag, rounded away by the velocity snap, leaves 20-35 u/s for good -- so a player on the bottom
+		// stayed frozen in the move, drifting, until a wall stopped him. Off the bottom the swim anims above take
+		// over anyway; on land nothing changes.
+		if (  pm->xyspeed < 5 || ( pm->waterlevel > 1 && pm->ps->legsTimer <= 0 ) ) {
 			pm->ps->bobCycle = 0;	// start at beginning of cycle again
 			if ( pm->ps->clientNum >= MAX_CLIENTS &&
 				pm_entSelf &&
