@@ -2,6 +2,12 @@
 
 
 
+## [4.0.0]
+
+### Added
+- Vacuum Suit, a fifth permanent shop upgrade (`/buy upgrade 5`, 45000 credits): the character doesn't suffocate in open space (`trigger_space`), e.g. after ejecting from a fighter. Instead he floats and swims there as in water, with the swim animations and controls and a slight drift, and takes no fall damage when he hits a hull. `/upgradereset` removes it with the others.
+
+
 ## [3.10.0]
 
 ### Added
