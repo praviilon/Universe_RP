@@ -11,7 +11,8 @@ sends the command), so the menu lists exactly what the server takes. Moved here 
 #define BG_RPEMOTES_H
 
 // GLX_U: [RP Anims] 208: the StoryForce and JKG animations' 60 names and cuffback added (cuffed is BOTH_CUFFS now)
-#define MAX_WORDED_EMOTES 208	// GLX_U: [Anim] 13 of JA++'s emote animations and 2 style victories added
+// GLX_U: [Anim] 212: taunt, taunt2, taunt3 and taunt4 added, the stock /taunt's animations
+#define MAX_WORDED_EMOTES 212	// GLX_U: [Anim] 13 of JA++'s emote animations and 2 style victories added
 //alex: type for storing worde animations wo use with the emote system
 typedef struct worded_animation_s {
 	const char* animation_name;
@@ -215,6 +216,10 @@ static const worded_animation_t animations[MAX_WORDED_EMOTES] UNUSED_VAR = {
 	{"talk3",			BOTH_TALK6,					"Social"	},
 	{"talkbig",			BOTH_TALKEXAGGERATED1,		"Social"	},
 	{"talkbig2",		BOTH_TALKEXAGGERATED2,		"Social"	},
+	{"taunt",			BOTH_ENGAGETAUNT,			"Social"	},
+	{"taunt2",			BOTH_GESTURE1,				"Social"	},
+	{"taunt3",			BOTH_DUAL_TAUNT,			"Saber"		},
+	{"taunt4",			BOTH_STAFF_TAUNT,			"Saber"		},
 	{"torch",			BOTH_TORCH,					"Work"		},
 	{"torchdown",		BOTH_TORCHINSPECTDOWN,		"Work"		},
 	{"torchup",			BOTH_TORCHINSPECTUP,		"Work"		},
@@ -288,6 +293,11 @@ static const rp_emote_t rpEmotes[] UNUSED_VAR = {
 	{ "sleep",		BOTH_SLEEP1,			BOTH_SLEEP1GETUP,		RP_EMF_STATIC|RP_EMF_HOLD|RP_EMF_HOLSTER },		// amasleep
 	{ "surrender",	TORSO_SURRENDER_START,	TORSO_SURRENDER_STOP,	RP_EMF_HOLD|RP_EMF_HOLSTER },					// amsurrender
 	{ "lean",		BOTH_STAND10,			BOTH_STAND10TOSTAND1,	RP_EMF_STATIC|RP_EMF_HOLD|RP_EMF_HOLSTER },		// amwait
+	// GLX_U: [Emote] the stock /meditate as an emote, rooted like kneel and sleep. BOTH_MEDITATE has stock code of its
+	// own in PmoveSingle() (bg_pmove.c): it holds the pose and plays BOTH_MEDITATE_END on attack, a Force key, jump
+	// or crouch; it leaves this emote's HANDEXTEND_DODGE alone, so the jump is swallowed and the attack doesn't punch,
+	// as with the other rooted emotes (the stock /meditate hops or punches while it gets up)
+	{ "meditate",	BOTH_MEDITATE,			BOTH_MEDITATE_END,		RP_EMF_STATIC|RP_EMF_HOLD|RP_EMF_HOLSTER },		// /meditate (the stock command)
 };
 #define RP_NUM_EMOTES	( (int)ARRAY_LEN( rpEmotes ) )
 

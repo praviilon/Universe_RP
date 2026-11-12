@@ -827,6 +827,8 @@ qboolean BG_InStaticEmote( int anim )
 	case BOTH_SLEEP1GETUP:
 	case BOTH_STAND10:
 	case BOTH_STAND10TOSTAND1:
+	case BOTH_MEDITATE:		// GLX_U: [Emote] /emote meditate (the stock /meditate is HANDEXTEND_TAUNT: not this)
+	case BOTH_MEDITATE_END:
 		return qtrue;
 	}
 	return qfalse;

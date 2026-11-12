@@ -11,6 +11,8 @@
 # - /anim list's pages (anim_list_pages[]): each category on exactly one page, and no page over PAGE_BUDGET server
 #   commands -- a row each, 3 per heading, the closing line and the hint; a client is dropped past 128 unacknowledged
 #   ones.
+# - /emote's emotes (rpEmotes[]): names as above and unique, both animations anims.h's with frames, only RP_EMF_*
+#   flags, and a rooted one's (RP_EMF_STATIC) animations in BG_InStaticEmote() (bg_panimate.c), which roots them.
 #
 # Before the real tree, the test runs itself on small built-in trees of known cases, so it is known to still catch
 # each of these.
@@ -29,6 +31,7 @@ while args:
 
 LIST = 'codemp/game/bg_rpemotes.h'
 ANIMS = 'codemp/game/anims.h'
+PANIMATE = 'codemp/game/bg_panimate.c'
 CFG = 'assets/client/models/players/_humanoid/animation.cfg'
 PAGE_BUDGET = 100
 NAME_WIDTH = 33		# get_max_spaces_right() in g_cmds.c
@@ -95,7 +98,34 @@ def check_tree(root):
             cmds = sum(rows[h] for h in cats) + 3 * len(cats) + 2
             if cmds > PAGE_BUDGET:
                 out.append('page %d (%s) is %d server commands, over %d' % (p + 1, ', '.join(cats), cmds, PAGE_BUDGET))
-    return out, len(ents), len(headers), npages
+    # /emote's emotes
+    m = re.search(r'rpEmotes\[\][^{]*\{(.*?)\n\};', text, re.S)
+    emotes = re.findall(r'\{\s*"([^"]*)"\s*,\s*(\w+)\s*,\s*(\w+)\s*,\s*([\w|]+)\s*\}', m.group(1)) if m else []
+    if not emotes:
+        out.append('no rpEmotes[]')
+    pan = nocomments(open(os.path.join(root, PANIMATE)).read())
+    m = re.search(r'qboolean BG_InStaticEmote\s*\(\s*int anim\s*\)\s*\{(.*?)\n\}', pan, re.S)
+    static = set(re.findall(r'case\s+(\w+)\s*:', m.group(1))) if m else set()
+    seen = set()
+    for name, anim, leave, flags in emotes:
+        if not re.fullmatch(r'[a-z0-9]+', name) or name.isdigit():
+            out.append('emote %s: not a name' % name)
+        if name in seen:
+            out.append('emote %s twice' % name)
+        seen.add(name)
+        for a in (anim, leave):
+            if a not in enum:
+                out.append('emote %s: %s is not in %s' % (name, a, ANIMS))
+            elif a not in framed:
+                out.append('emote %s: %s has no frames in %s' % (name, a, CFG))
+        fl = flags.split('|')
+        if any(f not in ('RP_EMF_STATIC', 'RP_EMF_HOLD', 'RP_EMF_HOLSTER', '0') for f in fl):
+            out.append('emote %s: flags %s' % (name, flags))
+        if 'RP_EMF_STATIC' in fl:
+            for a in (anim, leave):
+                if a not in static:
+                    out.append('emote %s is rooted but %s is not in BG_InStaticEmote()' % (name, a))
+    return out, len(ents), len(headers), npages, len(emotes)
 
 
 def selftest():
@@ -107,7 +137,10 @@ def selftest():
            '#define MAX_EMOTE_CATEGORIES 2\n'
            'static const char anim_headers[MAX_EMOTE_CATEGORIES][50] UNUSED_VAR = {\n\t"Body",\n\t"Sit"\n};\n'
            '#define ANIM_LIST_PAGES 2\n'
-           'static const int anim_list_pages[ANIM_LIST_PAGES + 1] UNUSED_VAR = { 0, 1, MAX_EMOTE_CATEGORIES };\n')
+           'static const int anim_list_pages[ANIM_LIST_PAGES + 1] UNUSED_VAR = { 0, 1, MAX_EMOTE_CATEGORIES };\n'
+           'static const rp_emote_t rpEmotes[] UNUSED_VAR = {\n\t{ "kneel",\tBOTH_A,\tBOTH_B,\tRP_EMF_STATIC|RP_EMF_HOLD },\t// x\n'
+           '\t{ "wave",\tBOTH_C,\tBOTH_A,\t0 },\n};\n')
+    pan = 'qboolean BG_InStaticEmote( int anim )\n{\n\tswitch ( anim )\n\t{\n\tcase BOTH_A:\n\tcase BOTH_B:\t// x\n\t\treturn qtrue;\n\t}\n\treturn qfalse;\n}\n'
     anims = 'typedef enum {\n\tBOTH_A,\t//# one\n\tBOTH_B,\n\tBOTH_C,\n\tBOTH_D,\n\n\t//# #eol\n\tMAX_ANIMATIONS,\n} animNumber_t;\n'
     cfg = '// header\nBOTH_A\t\t0\t2\t-1\t20\nBOTH_B\t\t2\t3\t0\t10\nBOTH_C\t\t5\t1\t-1\t10\n'
     many = ''.join('\t{"b%03d",\t\t\tBOTH_A,\t\t"Body"\t},\n' % i for i in range(96))
@@ -123,12 +156,16 @@ def selftest():
         ('unknown category', {LIST: lst.replace('"Sit"\t}', '"Lie"\t}')}, 'category Lie is not a heading'),
         ('empty heading', {LIST: lst.replace('"Sit"\t}', '"Body"\t}')}, 'heading Sit has no names'),
         ('pages', {LIST: lst.replace('{ 0, 1, MAX', '{ 0, 2, MAX')}, 'does not split'),
+        ('emote twice', {LIST: lst.replace('"wave"', '"kneel"')}, 'emote kneel twice'),
+        ('emote animation', {LIST: lst.replace('BOTH_C,\tBOTH_A,\t0', 'BOTH_C,\tBOTH_D,\t0')}, 'emote wave: BOTH_D has no frames'),
+        ('emote flags', {LIST: lst.replace('\t0 },', '\tRP_EMF_FOO },')}, 'emote wave: flags'),
+        ('rooted, not in the list', {PANIMATE: pan.replace('\tcase BOTH_B:\t// x\n', '')}, 'BOTH_B is not in BG_InStaticEmote'),
         ('a page too big', {LIST: lst.replace('EMOTES 3', 'EMOTES 99').replace('\t{"bow"', many + '\t{"bow"')},
          'page 1 (Body) is 103 server commands'),
     ]
     for label, changes, expect in cases:
         with tempfile.TemporaryDirectory() as d:
-            files = {LIST: lst, ANIMS: anims, CFG: cfg}
+            files = {LIST: lst, ANIMS: anims, CFG: cfg, PANIMATE: pan}
             files.update(changes)
             for rel, text in files.items():
                 os.makedirs(os.path.dirname(os.path.join(d, rel)), exist_ok=True)
@@ -142,12 +179,12 @@ def selftest():
 
 
 fails, cases = selftest() if SELFTEST else (0, 0)
-probs, names, headers, pages = check_tree(ROOT)
+probs, names, headers, pages, emotes = check_tree(ROOT)
 for p in probs:
     print('FAIL', p)
 fails += len(probs)
 if fails:
     print('t_animnames: %d FAILED' % fails)
     sys.exit(1)
-print('t_animnames: ALL OK (%d names, %d categories, %d pages%s)' % (names, headers, pages,
+print('t_animnames: ALL OK (%d names, %d categories, %d pages, %d emotes%s)' % (names, headers, pages, emotes,
       ', self-test %d cases' % cases if SELFTEST else ''))

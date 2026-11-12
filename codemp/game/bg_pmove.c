@@ -12056,8 +12056,13 @@ void PmoveSingle (pmove_t *pmove) {
 				{
 					pm->ps->legsTimer = 100;
 				}
-				pm->ps->forceHandExtend = HANDEXTEND_TAUNT;
-				pm->ps->forceHandExtendTime = pm->cmd.serverTime + 100;
+				if ( !( pm->ps->forceHandExtend == HANDEXTEND_DODGE && BG_InStaticEmote( pm->ps->forceDodgeAnim ) ) )
+				{// GLX_U: [Emote] /emote meditate is a rooted emote (HANDEXTEND_DODGE, rpEmotes[]) and keeps its own
+				 // hand extend: RP_EmoteThink() ends an emote whose hand extend changes. The stock /meditate
+				 // (HANDEXTEND_TAUNT) as before
+					pm->ps->forceHandExtend = HANDEXTEND_TAUNT;
+					pm->ps->forceHandExtendTime = pm->cmd.serverTime + 100;
+				}
 			}
 			if ( pm->ps->legsTimer > 0 || pm->ps->torsoTimer > 0 )
 			{
