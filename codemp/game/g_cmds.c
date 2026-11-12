@@ -929,6 +929,18 @@ void show_animation_list(gentity_t* ent, int beginning_index, int end_index) {
 	return;
 }
 
+// GLX_U: [RP Anims] /anim list's page (1 to ANIM_LIST_PAGES, bg_rpemotes.h): its categories, then which page it is
+static void show_animation_page(gentity_t *ent, int page) {
+	char names[256] = "";
+
+	show_animation_list(ent, anim_list_pages[page - 1], anim_list_pages[page]);
+	for (int i = anim_list_pages[page - 1]; i < anim_list_pages[page]; i++) {
+		Q_strcat(names, sizeof(names), va("%s%s", names[0] ? ", " : "", anim_headers[i]));
+	}
+	trap->SendServerCommand(ent - g_entities, va("print \"^3Page %d/%d (%s). The pages: /anim list, /anim list 2, /anim list 3\n\"",
+		page, ANIM_LIST_PAGES, names));
+}
+
 // alex: plays an animation from anims.h by id OR a word (look for animation_t)
 // GLX_U: [Emote] /anim; it used to be /emote too, which becomes the JA++-style emotes
 void Cmd_Anim_f( gentity_t *ent )
@@ -1007,18 +1019,20 @@ void Cmd_Anim_f( gentity_t *ent )
 			trap->Argv(2, arg, sizeof(arg));
 			int page = atoi(arg);
 
-			if (page == 2) {
-				show_animation_list(ent, 1, MAX_EMOTE_CATEGORIES);	// GLX_U: [Anim] Movement, Blaster, Saber, Force
+			// GLX_U: [Anim] Movement, Blaster, Saber, Force
+			// GLX_U: [RP Anims] three pages now (anim_list_pages[], bg_rpemotes.h): Body, Social and Sit; Work, Leisure
+			// and Hurt; Movement, Blaster, Saber and Force. 1 is page 1 as well
+			if (page >= 1 && page <= ANIM_LIST_PAGES) {
+				show_animation_page(ent, page);
 			}
 			else {
-				trap->SendServerCommand(ent - g_entities, "print \"That is not a valid page: use /anim list or /anim list 2.\n\"");
+				trap->SendServerCommand(ent - g_entities, "print \"That is not a valid page: use /anim list, /anim list 2 or /anim list 3.\n\"");
 			}
 		}
 		else {
 			// GLX_U: [Anim] Body alone on page 1: every row is a server command, and a client is dropped past 128
 			// unacknowledged ones -- Body, Movement and Blaster together came to about 105
-			show_animation_list(ent, 0, 1);
-			trap->SendServerCommand(ent - g_entities, "print \"^3Page 1/2. To see the rest of the animations, do /anim list 2\n\"");
+			show_animation_page(ent, 1);
 		}
 
 		// GalaxyRP fix: [cleanup] both list branches now return here instead of only the
