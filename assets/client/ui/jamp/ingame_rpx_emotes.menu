@@ -530,7 +530,7 @@
 			type                ITEM_TYPE_BUTTON
 			style               WINDOW_STYLE_FILLED
 			rect                342 376 128 22
-			text                "Hug"
+			text                "Hug player"
 			textalign           ITEM_ALIGN_CENTER
 			textalignx          64
 			textaligny          2
@@ -567,7 +567,7 @@
 			type                ITEM_TYPE_BUTTON
 			style               WINDOW_STYLE_FILLED
 			rect                480 376 128 22
-			text                "Kiss"
+			text                "Kiss player"
 			textalign           ITEM_ALIGN_CENTER
 			textalignx          64
 			textaligny          2
