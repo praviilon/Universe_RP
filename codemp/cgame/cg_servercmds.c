@@ -2066,6 +2066,7 @@ char ui_cvars_in_order[100][100] = {
 	"ui_zyk_upgrade_2_owned",
 	"ui_zyk_upgrade_3_owned",
 	"ui_zyk_upgrade_4_owned",	// GLX_U: [Shop] the Underwater Breather, sent right after the third
+	"ui_zyk_upgrade_5_owned",	// GLX_U: [Shop] the Vacuum Suit, right after the fourth
 	// GLX_U: [Extras Admin Grey] last, whether the player has the Entities and Remaps, NPC management and Music
 	// admin powers, in the order Cmd_GalaxyRpUi_f (g_cmds.c) appends them: the Extras buttons of
 	// ingame_galaxyrp.menu and ingame_rpx_music.menu's "Play for everyone" are greyed without them
@@ -2101,7 +2102,8 @@ void CG_RpExtrasAdminClear( void )
 // net for whenever it isn't.
 // GLX_U: [Extras Admin Grey] + the three admin-power flags appended after the shop-upgrade ones = 75.
 // GLX_U: [Shop] + the Underwater Breather's owned flag, after the third shop-upgrade one = 76.
-#define ZYKMOD_EXPECTED_FIELD_COUNT 76
+// GLX_U: [Shop] + the Vacuum Suit's owned flag, after the fourth = 77.
+#define ZYKMOD_EXPECTED_FIELD_COUNT 77
 
 static void CG_ZykMod( void )
 { // zyk: receives account info of logged players

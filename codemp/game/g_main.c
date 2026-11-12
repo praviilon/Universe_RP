@@ -9011,6 +9011,9 @@ void G_RunFrame( int levelTime ) {
 				{ //no longer in space then I suppose
                     ent->client->inSpaceIndex = 0;
 				}
+				else if (RP_SpaceSuitProtects(ent))
+				{ // GLX_U: [Shop] the Vacuum Suit: no suffocation; he swims there instead (RP_SELF_FX_SPACE_SWIM)
+				}
 				else
 				{ //check for suffocation
                     if (ent->client->inSpaceSuffocation < level.time)

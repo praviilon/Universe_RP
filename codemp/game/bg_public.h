@@ -658,6 +658,10 @@ typedef enum {
 #define RP_SELF_FX_TK_LIFT		(1<<2)	// the first 1.5 s of a hold: he plays BOTH_FORCELEVITATE, then BOTH_FORCELEVITATEIDLE
 #define RP_SELF_FX_TK_THROW		(1<<3)	// a push on the held targets is pending: he plays BOTH_FORCELEVITATEWAVE
 #define RP_SELF_FX_TK_HELD		(1<<4)	// he is held by telekinesis: he plays BOTH_FORCELEVITATED(IDLE), not the choke
+// GLX_U: [Shop] the Vacuum Suit (/buy upgrade 5): he is in open space (a trigger_space) wearing it, so the shared
+// movement code lets him swim there as in water (PM_SwimLevel(), bg_pmove.c). Set by ClientThink_real() before the
+// move, so his own prediction reads the same bit; private, as the others.
+#define RP_SELF_FX_SPACE_SWIM	(1<<5)
 
 
 // playerState_t->persistant[] indexes

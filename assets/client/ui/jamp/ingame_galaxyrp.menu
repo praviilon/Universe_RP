@@ -6503,6 +6503,34 @@
 			}
 		}
 
+		// GLX_U: [Shop] the Vacuum Suit (/buy upgrade 5), the row under the Underwater Breather, greyed once owned
+		// (ui_zyk_upgrade_5_owned, skill_levels[38] bit 4), as the four above
+		itemDef
+		{
+			name				buyVacuumSuitButton
+			group				buyControls
+			text				"Vacuum Suit - 45000"
+			descText			""
+			type				1
+			font				3
+			textscale			.4
+			style				WINDOW_STYLE_FILLED
+			rect				320 110 180 12
+			textalign			ITEM_ALIGN_LEFT
+			forecolor			1 .682 0 1
+			visible				0
+			cvarTest			"ui_zyk_upgrade_5_owned"
+			disableCvar
+			{
+				"1"
+			}
+			action
+			{
+				exec			"buy upgrade 5"
+				play			"sound/interface/button1.wav" ;
+			}
+		}
+
 		itemDef 
 		{
 			name				buyAmmoButton_glow

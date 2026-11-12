@@ -1829,6 +1829,24 @@ void RP_NpcSpaceFrame( gentity_t *ent )
 	}
 }
 
+/*
+==================
+RP_SpaceSuitProtects
+
+GLX_U: [Shop] whether this player wears the Vacuum Suit (/buy upgrade 5, skill_levels[38] bit 4): a logged-in,
+living player. In open space he does not suffocate (G_RunFrame, g_main.c) and swims as in water
+(RP_SELF_FX_SPACE_SWIM, set in ClientThink_real). Players only: NPCs keep RP_NpcSpaceFrame().
+==================
+*/
+qboolean RP_SpaceSuitProtects( const gentity_t *ent )
+{
+	if ( !ent || !ent->client || ent->s.number >= MAX_CLIENTS || ent->health <= 0 )
+	{
+		return qfalse;
+	}
+	return ( ent->client->sess.amrpgmode == 2 && ( ent->client->pers.skill_levels[38] & ( 1 << 4 ) ) ) ? qtrue : qfalse;
+}
+
 void space_touch( gentity_t *self, gentity_t *other, trace_t *trace )
 {
 	if (!other || !other->inuse || !other->client )

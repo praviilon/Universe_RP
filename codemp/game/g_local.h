@@ -1229,6 +1229,8 @@ typedef struct clientPersistant_s {
 	// NUM_OF_SKILLS load loops and the UniqueSkill column in update_skills_query/update_character_query),
 	// so no new DB read/write path was needed for the migration.
 	// GLX_U: [Shop] bit 3 is the Underwater Breather (/buy upgrade 4): no drowning, see P_WorldEffects() (g_active.c).
+	// GLX_U: [Shop] bit 4 is the Vacuum Suit (/buy upgrade 5): no suffocation in open space, and he swims there --
+	// RP_SpaceSuitProtects() (g_trigger.c), EF_RP_SPACE_SWIM (bg_public.h).
 	int skill_levels[NUM_OF_SKILLS];
 
 	int max_rpg_health; // zyk: max health the player can have in RPG Mode. This is set to STAT_MAX_HEALTH for RPG players
@@ -3046,6 +3048,7 @@ void	RP_SpawnedRemove( gentity_t *e );	// an NPC taken away silently, gone next 
 void	G_EntitySound( gentity_t *ent, int channel, int soundIndex );
 // GalaxyRP: [Space] an NPC's per-frame trigger_space check -- see g_trigger.c
 void	RP_NpcSpaceFrame( gentity_t *ent );
+qboolean RP_SpaceSuitProtects( const gentity_t *ent );	// GLX_U: [Shop] the Vacuum Suit (g_trigger.c)
 void	TryUse( gentity_t *ent );
 // GalaxyRP: [Use hint] read-only companion to TryUse -- see its comment in g_utils.c
 qboolean G_CanUseInFrontOf( gentity_t *ent );

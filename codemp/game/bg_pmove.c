@@ -1087,6 +1087,27 @@ void PM_ClipVelocity( vec3_t in, vec3_t normal, vec3_t out, float overbounce ) {
 
 /*
 ==================
+PM_SwimLevel
+
+GLX_U: [Shop] the water level the movement goes by: 3 for a player swimming in open space in the Vacuum Suit
+(RP_SELF_FX_SPACE_SWIM, set by the server in ClientThink_real and read the same by his own prediction), else
+the real one. It is used only where the level decides how he moves -- the move itself, its drag, the swim
+animations, no ledge grab, no fall damage -- and nowhere it makes a sound or harms him: the splash and swim
+events, footsteps, the water jump and the server's drowning keep the real level, so space stays silent. Only
+in an ordinary move (PM_NORMAL): a stale bit on a spectator, a dead or a held player changes nothing.
+==================
+*/
+static int PM_SwimLevel( void )
+{
+	if ( pm->ps->pm_type == PM_NORMAL && ( pm->ps->stats[STAT_RP_SELF_FX] & RP_SELF_FX_SPACE_SWIM ) )
+	{
+		return 3;
+	}
+	return pm->waterlevel;
+}
+
+/*
+==================
 PM_Friction
 
 Handles both ground friction and water friction
@@ -1165,7 +1186,7 @@ static void PM_Friction( void ) {
 	else if ( pm_flying != FLY_NORMAL && pm_flying != FLY_VEHICLE )
 	{
 		// apply ground friction
-		if ( pm->waterlevel <= 1 ) {
+		if ( PM_SwimLevel() <= 1 ) {	// GLX_U: [Shop] and none for the Vacuum Suit's swim in space
 			if ( pml.walking && !(pml.groundTrace.surfaceFlags & SURF_SLICK) ) {
 				// if getting knocked back, no friction
 				if ( ! (pm->ps->pm_flags & PMF_TIME_KNOCKBACK) ) {
@@ -1230,8 +1251,9 @@ static void PM_Friction( void ) {
 	}
 
 	// apply water friction even if just wading
-	if ( pm->waterlevel ) {
-		drop += speed*pm_waterfriction*pm->waterlevel*pml.frametime;
+	// GLX_U: [Shop] and in open space in the Vacuum Suit, as at full depth (PM_SwimLevel)
+	if ( PM_SwimLevel() ) {
+		drop += speed*pm_waterfriction*PM_SwimLevel()*pml.frametime;
 	}
 	// If on a client then there is no friction
 	else if ( pm->ps->groundEntityNum < MAX_CLIENTS )
@@ -2114,7 +2136,7 @@ static void PM_CheckGrab( void )
 	qboolean moving = ( pm->ps->velocity[0] || pm->ps->velocity[1] ) ? qtrue : qfalse;
 	qboolean found = qfalse;
 
-	if ( pm->ps->groundEntityNum != ENTITYNUM_NONE || pm->waterlevel >= 2 || !PM_LedgeAllowed( pm->ps )
+	if ( pm->ps->groundEntityNum != ENTITYNUM_NONE || PM_SwimLevel() >= 2 || !PM_LedgeAllowed( pm->ps )	// GLX_U: [Shop] PM_SwimLevel
 		|| (pm->ps->pm_flags & PMF_STUCK_TO_WALL) || BG_InLedgeMove( pm->ps->legsAnim )
 		|| BG_InGrappleMove( pm->ps->torsoAnim ) || BG_InGrappleMove( pm->ps->legsAnim )
 		|| BG_InSpecialJump( pm->ps->legsAnim ) || BG_FlippingAnim( pm->ps->legsAnim )
@@ -3522,6 +3544,10 @@ static void PM_WaterMove( void ) {
 		wishvel[0] = 0;
 		wishvel[1] = 0;
 		wishvel[2] = -60;		// sink towards bottom
+		if ( pm->waterlevel < 2 && PM_SwimLevel() > 1 )
+		{ // GLX_U: [Shop] in open space in the Vacuum Suit there is no bottom: he floats, with the drag's slight drift
+			wishvel[2] = 0;
+		}
 	} else {
 		for (i=0 ; i<3 ; i++)
 			wishvel[i] = scale * pml.forward[i]*pm->cmd.forwardmove + scale * pml.right[i]*pm->cmd.rightmove;
@@ -4692,7 +4718,8 @@ static void PM_CrashLand( void ) {
 	}
 
 	// never take falling damage if completely underwater
-	if ( pm->waterlevel == 3 ) {
+	// GLX_U: [Shop] nor swimming in open space in the Vacuum Suit (PM_SwimLevel): he can hit a hull at a fighter's speed
+	if ( PM_SwimLevel() == 3 ) {
 		return;
 	}
 
@@ -6236,7 +6263,7 @@ static void PM_Footsteps( void ) {
 	else if ( pm->ps->groundEntityNum == ENTITYNUM_NONE ) {
 
 		// airborne leaves position in cycle intact, but doesn't advance
-		if ( pm->waterlevel > 1 )
+		if ( PM_SwimLevel() > 1 )	// GLX_U: [Shop] and in open space in the Vacuum Suit
 		{
 			if (pm->xyspeed > 60)
 			{
@@ -6258,7 +6285,8 @@ static void PM_Footsteps( void ) {
 		// its drag, rounded away by the velocity snap, leaves 20-35 u/s for good -- so a player on the bottom
 		// stayed frozen in the move, drifting, until a wall stopped him. Off the bottom the swim anims above take
 		// over anyway; on land nothing changes.
-		if (  pm->xyspeed < 5 || ( pm->waterlevel > 1 && pm->ps->legsTimer <= 0 ) ) {
+		// GLX_U: [Shop] PM_SwimLevel: the same in open space in the Vacuum Suit, where the drag leaves a drift too
+		if (  pm->xyspeed < 5 || ( PM_SwimLevel() > 1 && pm->ps->legsTimer <= 0 ) ) {
 			pm->ps->bobCycle = 0;	// start at beginning of cycle again
 			if ( pm->ps->clientNum >= MAX_CLIENTS &&
 				pm_entSelf &&
@@ -12761,7 +12789,7 @@ void PmoveSingle (pmove_t *pmove) {
 
 			if (pm->ps->pm_flags & PMF_TIME_WATERJUMP) {
 				PM_WaterJumpMove();
-			} else if ( pm->waterlevel > 1 ) {
+			} else if ( PM_SwimLevel() > 1 ) {	// GLX_U: [Shop] and in open space in the Vacuum Suit
 				// swimming
 				PM_WaterMove();
 			} else if ( pml.walking ) {

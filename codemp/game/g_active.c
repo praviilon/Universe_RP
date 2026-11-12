@@ -3950,6 +3950,9 @@ void ClientThink_real( gentity_t *ent ) {
 		// is always 0 server-side, so this was unreachable.
 	}
 
+	// GLX_U: [Shop] the Vacuum Suit's swim in space, worked out again every command (set just below)
+	client->ps.stats[STAT_RP_SELF_FX] &= ~RP_SELF_FX_SPACE_SWIM;
+
 	if ( !ent->NPC || !(ent->NPC->aiFlags&NPCAI_CUSTOM_GRAVITY) )
 	{//use global gravity
 		if (ent->NPC && ent->s.NPC_class == CLASS_VEHICLE &&
@@ -3962,7 +3965,16 @@ void ClientThink_real( gentity_t *ent ) {
 			if (ent->client->inSpaceIndex && ent->client->inSpaceIndex != ENTITYNUM_NONE)
 			{ //in space, so no gravity...
 				client->ps.gravity = 1.0f;
-				if (ent->s.number < MAX_CLIENTS)
+				if (ent->s.number < MAX_CLIENTS && RP_SpaceSuitProtects(ent))
+				{ // GLX_U: [Shop] the Vacuum Suit: he swims (RP_SELF_FX_SPACE_SWIM, bg_pmove.c), slowed by the water
+				  // drag his own prediction knows, not by this damping, which it does not. Not while he rides a
+				  // vehicle (an open one: an enclosed one keeps him out of space): it moves him then
+					if (!client->ps.m_iVehicleNum)
+					{
+						client->ps.stats[STAT_RP_SELF_FX] |= RP_SELF_FX_SPACE_SWIM;
+					}
+				}
+				else if (ent->s.number < MAX_CLIENTS)
 				{
 					VectorScale(client->ps.velocity, 0.8f, client->ps.velocity);
 				}
