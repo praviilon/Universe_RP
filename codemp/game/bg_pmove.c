@@ -3537,6 +3537,15 @@ static void PM_WaterMove( void ) {
 	PM_Friction ();
 
 	scale = PM_CmdScale( &pm->cmd );
+	// GLX_U: [Swimming] jump or crouch alone: straight up or down at the swim speed. PM_CmdScale() leaves upmove out
+	// of the scale on purpose, so with no forward or side key it was 0 and that read as no input -- the player sank
+	// (or, in open space in the Vacuum Suit, only drifted) and could change height only while moving. This is the
+	// scale it would give with upmove counted (speed * |upmove| / (127 * |upmove|)); every other input keeps its own.
+	// Players and NPCs alike, in water and in the Vacuum Suit's space walk. Not crouch on the ground: there is no
+	// further down, and the clip to the ground plane below would turn the push into a faster slide of the drift.
+	if ( !scale && pm->cmd.upmove && !( pm->cmd.upmove < 0 && pml.groundPlane ) ) {
+		scale = (float)pm->ps->speed / 127.0f;
+	}
 	//
 	// user intentions
 	//
