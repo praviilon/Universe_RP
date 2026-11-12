@@ -19,8 +19,8 @@ Project based on OpenJK and Zyk Mod. Work copyrighted (C) 2020 - 2022
 #endif
 
 // Current version of the multi player game
-#define VERSION_MAJOR_RELEASE		3
-#define VERSION_MINOR_RELEASE		10
+#define VERSION_MAJOR_RELEASE		4
+#define VERSION_MINOR_RELEASE		0
 #define VERSION_BUGFIX_RELEASE		0
 #define VERSION_EXTERNAL_BUILD		0
 #define VERSION_INTERNAL_BUILD		0
