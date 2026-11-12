@@ -618,9 +618,149 @@
 
 		itemDef
 		{
-			name				extrasPropsButton_glow
+			name				extrasEmotesButton_glow
 			style				WINDOW_STYLE_SHADER
 			rect				160 50 150 24
+			background			"gfx/menus/menu_blendbox2"
+			forecolor			1 1 1 1
+			visible				0
+			decoration
+		}
+
+		// GLX_U: [Emotes Menu] Emotes: /emote, /anim, /wehug and /wekiss with a preview (ingame_rpx_emotes.menu);
+		// logged in only, as everything in this tab, and for every player: no admin power
+		itemDef
+		{
+			name				extrasEmotesButton
+			group				extrasControls
+			text				"Emotes"
+			type				ITEM_TYPE_BUTTON
+			style				WINDOW_STYLE_EMPTY
+			rect				160 50 150 24
+			font				3
+			textscale			0.6
+			textalignx			15
+			textaligny			5
+			textalign			ITEM_ALIGN_LEFT
+			textstyle			3
+			forecolor			1 .682 0 1
+			visible				0
+			descText			"Play emotes and animations on your character, with a preview"
+
+			mouseEnter
+			{
+				show			extrasEmotesButton_glow
+			}
+			mouseExit
+			{
+				hide			extrasEmotesButton_glow
+			}
+			action
+			{
+				play			"sound/interface/button1.wav" ;
+				hide			extrasEmotesButton_glow ;
+				close			ingame_galaxyrp ;
+				open			ingame_rpx_emotes
+			}
+		}
+
+		itemDef
+		{
+			name				extrasSoundsButton_glow
+			style				WINDOW_STYLE_SHADER
+			rect				160 75 150 24
+			background			"gfx/menus/menu_blendbox2"
+			forecolor			1 1 1 1
+			visible				0
+			decoration
+		}
+
+		itemDef
+		{
+			name				extrasSoundsButton
+			group				extrasControls
+			text				"Sounds"
+			type				ITEM_TYPE_BUTTON
+			style				WINDOW_STYLE_EMPTY
+			rect				160 75 150 24
+			font				3
+			textscale			0.6
+			textalignx			15
+			textaligny			5
+			textalign			ITEM_ALIGN_LEFT
+			textstyle			3
+			forecolor			1 .682 0 1
+			visible				0
+			descText			"Play a sound from the server's list for everyone around"
+
+			mouseEnter
+			{
+				show			extrasSoundsButton_glow
+			}
+			mouseExit
+			{
+				hide			extrasSoundsButton_glow
+			}
+			action
+			{
+				play			"sound/interface/button1.wav" ;
+				hide			extrasSoundsButton_glow ;
+				close			ingame_galaxyrp ;
+				open			ingame_rpx_sounds
+			}
+		}
+
+		itemDef
+		{
+			name				extrasMusicButton_glow
+			style				WINDOW_STYLE_SHADER
+			rect				160 100 150 24
+			background			"gfx/menus/menu_blendbox2"
+			forecolor			1 1 1 1
+			visible				0
+			decoration
+		}
+
+		itemDef
+		{
+			name				extrasMusicButton
+			group				extrasControls
+			text				"Music"
+			type				ITEM_TYPE_BUTTON
+			style				WINDOW_STYLE_EMPTY
+			rect				160 100 150 24
+			font				3
+			textscale			0.6
+			textalignx			15
+			textaligny			5
+			textalign			ITEM_ALIGN_LEFT
+			textstyle			3
+			forecolor			1 .682 0 1
+			visible				0
+			descText			"Play music from the server's list, for you or for everyone"
+
+			mouseEnter
+			{
+				show			extrasMusicButton_glow
+			}
+			mouseExit
+			{
+				hide			extrasMusicButton_glow
+			}
+			action
+			{
+				play			"sound/interface/button1.wav" ;
+				hide			extrasMusicButton_glow ;
+				close			ingame_galaxyrp ;
+				open			ingame_rpx_music
+			}
+		}
+
+		itemDef
+		{
+			name				extrasPropsButton_glow
+			style				WINDOW_STYLE_SHADER
+			rect				160 125 150 24
 			background			"gfx/menus/menu_blendbox2"
 			forecolor			1 1 1 1
 			visible				0
@@ -634,7 +774,7 @@
 			text				"MD3 Props"
 			type				ITEM_TYPE_BUTTON
 			style				WINDOW_STYLE_EMPTY
-			rect				160 50 150 24
+			rect				160 125 150 24
 			font				3
 			textscale			0.6
 			textalignx			15
@@ -672,7 +812,7 @@
 		{
 			name				extrasGlmPropsButton_glow
 			style				WINDOW_STYLE_SHADER
-			rect				160 75 150 24
+			rect				160 150 150 24
 			background			"gfx/menus/menu_blendbox2"
 			forecolor			1 1 1 1
 			visible				0
@@ -687,7 +827,7 @@
 			text				"GLM Props"
 			type				ITEM_TYPE_BUTTON
 			style				WINDOW_STYLE_EMPTY
-			rect				160 75 150 24
+			rect				160 150 150 24
 			font				3
 			textscale			0.6
 			textalignx			15
@@ -725,7 +865,7 @@
 		{
 			name				extrasEffectsButton_glow
 			style				WINDOW_STYLE_SHADER
-			rect				160 100 150 24
+			rect				160 175 150 24
 			background			"gfx/menus/menu_blendbox2"
 			forecolor			1 1 1 1
 			visible				0
@@ -739,7 +879,7 @@
 			text				"Effects"
 			type				ITEM_TYPE_BUTTON
 			style				WINDOW_STYLE_EMPTY
-			rect				160 100 150 24
+			rect				160 175 150 24
 			font				3
 			textscale			0.6
 			textalignx			15
@@ -777,7 +917,7 @@
 		{
 			name				extrasNpcsButton_glow
 			style				WINDOW_STYLE_SHADER
-			rect				160 125 150 24
+			rect				160 200 150 24
 			background			"gfx/menus/menu_blendbox2"
 			forecolor			1 1 1 1
 			visible				0
@@ -791,7 +931,7 @@
 			text				"NPCs & Vehicles"
 			type				ITEM_TYPE_BUTTON
 			style				WINDOW_STYLE_EMPTY
-			rect				160 125 150 24
+			rect				160 200 150 24
 			font				3
 			textscale			0.6
 			textalignx			15
@@ -827,101 +967,9 @@
 
 		itemDef
 		{
-			name				extrasMusicButton_glow
-			style				WINDOW_STYLE_SHADER
-			rect				160 150 150 24
-			background			"gfx/menus/menu_blendbox2"
-			forecolor			1 1 1 1
-			visible				0
-			decoration
-		}
-
-		itemDef
-		{
-			name				extrasMusicButton
-			group				extrasControls
-			text				"Music"
-			type				ITEM_TYPE_BUTTON
-			style				WINDOW_STYLE_EMPTY
-			rect				160 150 150 24
-			font				3
-			textscale			0.6
-			textalignx			15
-			textaligny			5
-			textalign			ITEM_ALIGN_LEFT
-			textstyle			3
-			forecolor			1 .682 0 1
-			visible				0
-			descText			"Play music from the server's list, for you or for everyone"
-
-			mouseEnter
-			{
-				show			extrasMusicButton_glow
-			}
-			mouseExit
-			{
-				hide			extrasMusicButton_glow
-			}
-			action
-			{
-				play			"sound/interface/button1.wav" ;
-				hide			extrasMusicButton_glow ;
-				close			ingame_galaxyrp ;
-				open			ingame_rpx_music
-			}
-		}
-
-		itemDef
-		{
-			name				extrasSoundsButton_glow
-			style				WINDOW_STYLE_SHADER
-			rect				160 175 150 24
-			background			"gfx/menus/menu_blendbox2"
-			forecolor			1 1 1 1
-			visible				0
-			decoration
-		}
-
-		itemDef
-		{
-			name				extrasSoundsButton
-			group				extrasControls
-			text				"Sounds"
-			type				ITEM_TYPE_BUTTON
-			style				WINDOW_STYLE_EMPTY
-			rect				160 175 150 24
-			font				3
-			textscale			0.6
-			textalignx			15
-			textaligny			5
-			textalign			ITEM_ALIGN_LEFT
-			textstyle			3
-			forecolor			1 .682 0 1
-			visible				0
-			descText			"Play a sound from the server's list for everyone around"
-
-			mouseEnter
-			{
-				show			extrasSoundsButton_glow
-			}
-			mouseExit
-			{
-				hide			extrasSoundsButton_glow
-			}
-			action
-			{
-				play			"sound/interface/button1.wav" ;
-				hide			extrasSoundsButton_glow ;
-				close			ingame_galaxyrp ;
-				open			ingame_rpx_sounds
-			}
-		}
-
-		itemDef
-		{
 			name				extrasLightsButton_glow
 			style				WINDOW_STYLE_SHADER
-			rect				160 200 150 24
+			rect				160 225 150 24
 			background			"gfx/menus/menu_blendbox2"
 			forecolor			1 1 1 1
 			visible				0
@@ -936,7 +984,7 @@
 			text				"Lights"
 			type				ITEM_TYPE_BUTTON
 			style				WINDOW_STYLE_EMPTY
-			rect				160 200 150 24
+			rect				160 225 150 24
 			font				3
 			textscale			0.6
 			textalignx			15
@@ -974,7 +1022,7 @@
 		{
 			name				extrasSpawnersButton_glow
 			style				WINDOW_STYLE_SHADER
-			rect				160 225 150 24
+			rect				160 250 150 24
 			background			"gfx/menus/menu_blendbox2"
 			forecolor			1 1 1 1
 			visible				0
@@ -989,7 +1037,7 @@
 			text				"Spawners"
 			type				ITEM_TYPE_BUTTON
 			style				WINDOW_STYLE_EMPTY
-			rect				160 225 150 24
+			rect				160 250 150 24
 			font				3
 			textscale			0.6
 			textalignx			15
@@ -1027,7 +1075,7 @@
 		{
 			name				extrasShadersButton_glow
 			style				WINDOW_STYLE_SHADER
-			rect				160 250 150 24
+			rect				160 275 150 24
 			background			"gfx/menus/menu_blendbox2"
 			forecolor			1 1 1 1
 			visible				0
@@ -1042,7 +1090,7 @@
 			text				"Shaders"
 			type				ITEM_TYPE_BUTTON
 			style				WINDOW_STYLE_EMPTY
-			rect				160 250 150 24
+			rect				160 275 150 24
 			font				3
 			textscale			0.6
 			textalignx			15
@@ -1080,7 +1128,7 @@
 		{
 			name				extrasPresetsButton_glow
 			style				WINDOW_STYLE_SHADER
-			rect				160 275 150 24
+			rect				160 300 150 24
 			background			"gfx/menus/menu_blendbox2"
 			forecolor			1 1 1 1
 			visible				0
@@ -1095,7 +1143,7 @@
 			text				"Presets"
 			type				ITEM_TYPE_BUTTON
 			style				WINDOW_STYLE_EMPTY
-			rect				160 275 150 24
+			rect				160 300 150 24
 			font				3
 			textscale			0.6
 			textalignx			15
@@ -1126,54 +1174,6 @@
 				hide			extrasPresetsButton_glow ;
 				close			ingame_galaxyrp ;
 				open			ingame_rpx_presets
-			}
-		}
-
-		itemDef
-		{
-			name				extrasEmotesButton_glow
-			style				WINDOW_STYLE_SHADER
-			rect				160 300 150 24
-			background			"gfx/menus/menu_blendbox2"
-			forecolor			1 1 1 1
-			visible				0
-			decoration
-		}
-
-		// GLX_U: [Emotes Menu] Emotes: /emote, /anim, /wehug and /wekiss with a preview (ingame_rpx_emotes.menu);
-		// logged in only, as everything in this tab, and for every player: no admin power
-		itemDef
-		{
-			name				extrasEmotesButton
-			group				extrasControls
-			text				"Emotes"
-			type				ITEM_TYPE_BUTTON
-			style				WINDOW_STYLE_EMPTY
-			rect				160 300 150 24
-			font				3
-			textscale			0.6
-			textalignx			15
-			textaligny			5
-			textalign			ITEM_ALIGN_LEFT
-			textstyle			3
-			forecolor			1 .682 0 1
-			visible				0
-			descText			"Play emotes and animations on your character, with a preview"
-
-			mouseEnter
-			{
-				show			extrasEmotesButton_glow
-			}
-			mouseExit
-			{
-				hide			extrasEmotesButton_glow
-			}
-			action
-			{
-				play			"sound/interface/button1.wav" ;
-				hide			extrasEmotesButton_glow ;
-				close			ingame_galaxyrp ;
-				open			ingame_rpx_emotes
 			}
 		}
 
