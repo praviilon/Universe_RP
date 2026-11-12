@@ -1896,6 +1896,73 @@ stringID_table_t animTable [MAX_ANIMATIONS+1] =
 	ENUM2STRING(BOTH_CIN_33),		//# GLX_U: [Anims] empty cinematic slot (BOTH_HELPUP moved to 1525)
 	ENUM2STRING(BOTH_FORCECASUAL),
 
+	// GLX_U: [RP Anims] StoryForce's roleplay animations (1622-1671; StoryForce has them from Mixamo), their frames
+	// appended from StoryForce's .gla (animation.cfg). Played only by /anim: past the stock list, so a vanilla client
+	// drawing one is dropped ("Bad animation number"), as with the GalaxyRP animations above
+	ENUM2STRING(BOTH_SHRUG),		//# shrug
+	ENUM2STRING(BOTH_LAUGH),		//# laughing (loop)
+	ENUM2STRING(BOTH_SORRY),		//# apologising
+	ENUM2STRING(BOTH_WHISPER),		//# whispering (pose)
+	ENUM2STRING(BOTH_COMEHERE),		//# beckoning
+	ENUM2STRING(BOTH_SNEAKHERE),		//# beckoning, crouched and quiet
+	ENUM2STRING(BOTH_LOOKAROUND),		//# looking around, a hand at the brow (loop)
+	ENUM2STRING(BOTH_SCARED),		//# flinching, scared
+	ENUM2STRING(BOTH_STARTLE),		//# startled
+	ENUM2STRING(BOTH_TALK4),		//# talking (loop)
+	ENUM2STRING(BOTH_TALK5),		//# talking (loop)
+	ENUM2STRING(BOTH_TALK6),		//# talking (loop)
+	ENUM2STRING(BOTH_TALKEXAGGERATED1),		//# talking with big gestures
+	ENUM2STRING(BOTH_TALKEXAGGERATED2),		//# talking with big gestures
+	ENUM2STRING(BOTH_BARTEND),		//# bartending (loop)
+	ENUM2STRING(BOTH_CONSOLETHINK),		//# thinking at a console
+	ENUM2STRING(BOTH_CROUCH_CONSOLE),		//# crouched at a low console
+	ENUM2STRING(BOTH_CODE),		//# typing (loop)
+	ENUM2STRING(BOTH_EXAMINESTART),		//# examining: leaning in
+	ENUM2STRING(BOTH_EXAMINE),		//# examining (loop)
+	ENUM2STRING(BOTH_EXAMINEEND),		//# examining: straightening up
+	ENUM2STRING(BOTH_RUMMAGE),		//# rummaging (loop)
+	ENUM2STRING(BOTH_OPENCRATE),		//# opening a crate
+	ENUM2STRING(BOTH_TORCH),		//# holding a torch or tool (pose)
+	ENUM2STRING(BOTH_TORCHINSPECTUP),		//# inspecting high up with a torch
+	ENUM2STRING(BOTH_TORCHINSPECTDOWN),		//# inspecting low down with a torch
+	ENUM2STRING(BOTH_COCKPIT),		//# pilot seat, at chair height (loop)
+	ENUM2STRING(BOTH_COCKPIT2),		//# pilot seat, at bar-stool height (loop)
+	ENUM2STRING(BOTH_DATAPADREAD),		//# reading a datapad
+	ENUM2STRING(BOTH_DATAPADUSE),		//# using a datapad (loop)
+	ENUM2STRING(BOTH_DANCE1),		//# dancing (loop)
+	ENUM2STRING(BOTH_DANCE2),		//# dancing (loop)
+	ENUM2STRING(BOTH_DANCE5),		//# dancing (loop)
+	ENUM2STRING(BOTH_DANCE6),		//# dancing (loop)
+	ENUM2STRING(BOTH_PIANO),		//# playing the piano, at bar-stool height (loop)
+	ENUM2STRING(BOTH_VIOLIN),		//# playing the violin (loop)
+	ENUM2STRING(BOTH_MUSICLISTEN),		//# listening to music (loop)
+	ENUM2STRING(BOTH_GAMING),		//# gaming, at bar-stool height (loop)
+	ENUM2STRING(BOTH_EXERCISE),		//# exercising (loop)
+	ENUM2STRING(BOTH_PUSHUPS),		//# push-ups (loop)
+	ENUM2STRING(BOTH_PUNCHBAG),		//# punching a bag (loop)
+	ENUM2STRING(BOTH_HURTARM),		//# holding a hurt arm (pose)
+	ENUM2STRING(BOTH_HURTLEG),		//# favouring a hurt leg (pose)
+	ENUM2STRING(BOTH_HURTFLAT),		//# lying hurt on the floor
+	ENUM2STRING(BOTH_INJURED),		//# standing injured (loop)
+	ENUM2STRING(BOTH_COWERFLOOR),		//# cowering on the floor (loop)
+	ENUM2STRING(BOTH_CUFFS),		//# cuffed, hands in front (pose)
+	ENUM2STRING(BOTH_KNEEL4),		//# kneeling (pose)
+	ENUM2STRING(BOTH_KNEELREACH),		//# kneeling, reaching forward (pose)
+	ENUM2STRING(BOTH_KNEEUP),		//# one knee up (pose)
+	// GLX_U: [RP Anims] Jedi Knight Galaxies' comlink, holo message, medpac, toss and bomb animations (1672-1682), frames
+	// from its .gla (animation.cfg); JKG spells the holo message set HOLOMESSEGE. Played only by /anim, as above
+	ENUM2STRING(BOTH_WRISTCHAT),		//# wrist comlink: raising it
+	ENUM2STRING(BOTH_WRISTCHATIDLE),		//# wrist comlink: talking (hold)
+	ENUM2STRING(BOTH_WRISTCHATEND),		//# wrist comlink: lowering it
+	ENUM2STRING(BOTH_HOLOMESSAGE),		//# holo message: raising it
+	ENUM2STRING(BOTH_HOLOMESSAGEIDLE),		//# holo message: watching (loop)
+	ENUM2STRING(BOTH_HOLOMESSAGEEND),		//# holo message: lowering it
+	ENUM2STRING(BOTH_USEMED),		//# using a medpac
+	ENUM2STRING(BOTH_TOSSITEM),		//# tossing an item
+	ENUM2STRING(BOTH_PLANTBOMBSTART),		//# planting a bomb: kneeling down
+	ENUM2STRING(BOTH_PLANTBOMBIDLE),		//# planting a bomb (loop)
+	ENUM2STRING(BOTH_PLANTBOMBFINISH),		//# planting a bomb: standing up
+
 	//must be terminated
 	{NULL,-1}
 };

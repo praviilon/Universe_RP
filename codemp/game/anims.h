@@ -1902,6 +1902,73 @@ typedef enum //# animNumber_e
 	BOTH_CIN_33,		//# GLX_U: [Anims] empty cinematic slot (BOTH_HELPUP moved to 1525)
 	BOTH_FORCECASUAL,
 
+	// GLX_U: [RP Anims] StoryForce's roleplay animations (1622-1671; StoryForce has them from Mixamo), their frames
+	// appended from StoryForce's .gla (animation.cfg). Played only by /anim: past the stock list, so a vanilla client
+	// drawing one is dropped ("Bad animation number"), as with the GalaxyRP animations above
+	BOTH_SHRUG,		//# shrug
+	BOTH_LAUGH,		//# laughing (loop)
+	BOTH_SORRY,		//# apologising
+	BOTH_WHISPER,		//# whispering (pose)
+	BOTH_COMEHERE,		//# beckoning
+	BOTH_SNEAKHERE,		//# beckoning, crouched and quiet
+	BOTH_LOOKAROUND,		//# looking around, a hand at the brow (loop)
+	BOTH_SCARED,		//# flinching, scared
+	BOTH_STARTLE,		//# startled
+	BOTH_TALK4,		//# talking (loop)
+	BOTH_TALK5,		//# talking (loop)
+	BOTH_TALK6,		//# talking (loop)
+	BOTH_TALKEXAGGERATED1,		//# talking with big gestures
+	BOTH_TALKEXAGGERATED2,		//# talking with big gestures
+	BOTH_BARTEND,		//# bartending (loop)
+	BOTH_CONSOLETHINK,		//# thinking at a console
+	BOTH_CROUCH_CONSOLE,		//# crouched at a low console
+	BOTH_CODE,		//# typing (loop)
+	BOTH_EXAMINESTART,		//# examining: leaning in
+	BOTH_EXAMINE,		//# examining (loop)
+	BOTH_EXAMINEEND,		//# examining: straightening up
+	BOTH_RUMMAGE,		//# rummaging (loop)
+	BOTH_OPENCRATE,		//# opening a crate
+	BOTH_TORCH,		//# holding a torch or tool (pose)
+	BOTH_TORCHINSPECTUP,		//# inspecting high up with a torch
+	BOTH_TORCHINSPECTDOWN,		//# inspecting low down with a torch
+	BOTH_COCKPIT,		//# pilot seat, at chair height (loop)
+	BOTH_COCKPIT2,		//# pilot seat, at bar-stool height (loop)
+	BOTH_DATAPADREAD,		//# reading a datapad
+	BOTH_DATAPADUSE,		//# using a datapad (loop)
+	BOTH_DANCE1,		//# dancing (loop)
+	BOTH_DANCE2,		//# dancing (loop)
+	BOTH_DANCE5,		//# dancing (loop)
+	BOTH_DANCE6,		//# dancing (loop)
+	BOTH_PIANO,		//# playing the piano, at bar-stool height (loop)
+	BOTH_VIOLIN,		//# playing the violin (loop)
+	BOTH_MUSICLISTEN,		//# listening to music (loop)
+	BOTH_GAMING,		//# gaming, at bar-stool height (loop)
+	BOTH_EXERCISE,		//# exercising (loop)
+	BOTH_PUSHUPS,		//# push-ups (loop)
+	BOTH_PUNCHBAG,		//# punching a bag (loop)
+	BOTH_HURTARM,		//# holding a hurt arm (pose)
+	BOTH_HURTLEG,		//# favouring a hurt leg (pose)
+	BOTH_HURTFLAT,		//# lying hurt on the floor
+	BOTH_INJURED,		//# standing injured (loop)
+	BOTH_COWERFLOOR,		//# cowering on the floor (loop)
+	BOTH_CUFFS,		//# cuffed, hands in front (pose)
+	BOTH_KNEEL4,		//# kneeling (pose)
+	BOTH_KNEELREACH,		//# kneeling, reaching forward (pose)
+	BOTH_KNEEUP,		//# one knee up (pose)
+	// GLX_U: [RP Anims] Jedi Knight Galaxies' comlink, holo message, medpac, toss and bomb animations (1672-1682), frames
+	// from its .gla (animation.cfg); JKG spells the holo message set HOLOMESSEGE. Played only by /anim, as above
+	BOTH_WRISTCHAT,		//# wrist comlink: raising it
+	BOTH_WRISTCHATIDLE,		//# wrist comlink: talking (hold)
+	BOTH_WRISTCHATEND,		//# wrist comlink: lowering it
+	BOTH_HOLOMESSAGE,		//# holo message: raising it
+	BOTH_HOLOMESSAGEIDLE,		//# holo message: watching (loop)
+	BOTH_HOLOMESSAGEEND,		//# holo message: lowering it
+	BOTH_USEMED,		//# using a medpac
+	BOTH_TOSSITEM,		//# tossing an item
+	BOTH_PLANTBOMBSTART,		//# planting a bomb: kneeling down
+	BOTH_PLANTBOMBIDLE,		//# planting a bomb (loop)
+	BOTH_PLANTBOMBFINISH,		//# planting a bomb: standing up
+
 	//# #eol
 	MAX_ANIMATIONS,
 	MAX_TOTALANIMATIONS,

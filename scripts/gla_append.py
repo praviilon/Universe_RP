@@ -39,6 +39,21 @@
 #                                                                                   -> frames 23662-23689
 #       gla_append.py --drop-extra-bones --ref 0 21374 _humanoid.gla <JKG _humanoid.gla> 22981 38 out.gla 23690
 #                                                                                   -> frames 23690-23727
+#   [RP Anims] StoryForce's roleplay animations (StoryForce has them from Mixamo), from StoryForce's _humanoid.gla
+#   (the same skeleton as ours), one run per range of its file, <n> being our frame count before the run:
+#       gla_append.py _humanoid.gla <StoryForce _humanoid.gla> <first> <count> out.gla <n>
+#   source first, count -> our frames:
+#       21407 101 -> 23728-23828, 21641 309 -> 23829-24137, 21953 45 -> 24138-24182, 22100 21 -> 24183-24203,
+#       22178 288 -> 24204-24491, 22581 133 -> 24492-24624, 22764 31 -> 24625-24655, 23083 20 -> 24656-24675,
+#       23418 1 -> 24676, 23421 125 -> 24677-24801, 23634 101 -> 24802-24902, 23762 102 -> 24903-25004,
+#       23938 66 -> 25005-25070, 24054 50 -> 25071-25120, 24105 23 -> 25121-25143, 24174 38 -> 25144-25181,
+#       24308 62 -> 25182-25243, 24496 72 -> 25244-25315, 24654 31 -> 25316-25346, 24755 125 -> 25347-25471,
+#       24919 51 -> 25472-25522, 25053 308 -> 25523-25830, 25566 1 -> 25831
+#   [RP Anims] Jedi Knight Galaxies' comlink, holo message, medpac, toss and bomb animations, the same way:
+#       gla_append.py --drop-extra-bones --ref 0 21374 _humanoid.gla <JKG _humanoid.gla> <first> <count> out.gla <n>
+#   source first, count -> our frames:
+#       22563 77 -> 25832-25908, 22641 24 -> 25909-25932, 22666 1 -> 25933, 22669 20 -> 25934-25953,
+#       22733 17 -> 25954-25970
 #
 # GLA (mdxa version 6) layout: a 100-byte header (ident, version, name[64], fScale, numFrames,
 # ofsFrames, numBones, ofsCompBonePool, ofsSkel, ofsEnd), the skeleton, then per frame and bone a
