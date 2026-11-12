@@ -6,6 +6,7 @@
 
 ### Added
 - Vacuum Suit, a fifth permanent shop upgrade (`/buy upgrade 5`, 45000 credits): the character doesn't suffocate in open space (`trigger_space`), e.g. after ejecting from a fighter. Instead he floats and swims there as in water, with the swim animations and controls and a slight drift, and takes no fall damage when he hits a hull. `/upgradereset` removes it with the others.
+- 61 new roleplay animations for the Universe RP client: sitting, dancing, talking, work, hurt and captive poses, wrist comlink, holo message, medpac and bomb planting (from Mixamo and Jedi Knight Galaxies). `/anim` has names for them in new categories (Social, Sit, Work, Leisure, Hurt; `/anim list` is now three pages). Several stock animations were also added in there.
 
 
 ## [3.10.0]
