@@ -10653,6 +10653,11 @@ static void CG_BobaJetFlames( centity_t *cent )
 // lowered no further than the floor under the feet allows, so a chair sit in the open stays as it was.
 #define RP_SIT_BUTT			4.0f	// pelvis above the seat (a floor sit's own, if lower)
 #define RP_SIT_RAISE_MAX	8.0f
+// GLX_U: [Sit Placement] the sits with both feet hanging (CG_RpSitFeetHang()) may come down until the soles reach the
+// ground: a sole is the ankle bone minus RP_SIT_ANKLE (standing, the ankles are 4.2 above the floor), and one less than
+// RP_SIT_FEET_UP above his floor counts as on it. Every other placed sit keeps its feet on his floor, as before.
+#define RP_SIT_ANKLE		4.0f
+#define RP_SIT_FEET_UP		1.0f
 
 static qboolean CG_RpSitPlacementAnim( int anim )
 {
@@ -10663,7 +10668,24 @@ static qboolean CG_RpSitPlacementAnim( int anim )
 	case BOTH_SITPALM: case BOTH_SITPALM2: case BOTH_SITUP:
 	case BOTH_MEDITATE: case BOTH_MEDITATION2: case BOTH_MEDITATEFORCE: case BOTH_STAND5TOSIT2:
 	case BOTH_MEDITATE_END:	// getting up from /meditate: raised only, see CG_RpSitPlacement()
+	// GLX_U: [Sit Placement] the new sits: a chair one (sitpilot2), three at bar-stool height with the legs hanging
+	// (sitpilot3, piano, gaming) and a floor one (cower)
+	case BOTH_COCKPIT: case BOTH_COCKPIT2: case BOTH_PIANO: case BOTH_GAMING: case BOTH_COWERFLOOR:
 		return qtrue;	// not BOTH_GUNSIT1: the emplaced gun places its gunner
+	default:
+		return qfalse;
+	}
+}
+
+// GLX_U: [Sit Placement] the sits drawn with both feet off his floor: the three at bar-stool height (sitpilot3, piano,
+// gaming; soles 12-13 up) and sitfeet (legs out at the seat's height, soles 30 up). The others keep at least one foot on
+// it in every frame (sitcross and sitcross2 lift only the crossed one)
+static qboolean CG_RpSitFeetHang( int anim )
+{
+	switch ( anim )
+	{
+	case BOTH_COCKPIT2: case BOTH_PIANO: case BOTH_GAMING: case BOTH_SITFEET:
+		return qtrue;
 	default:
 		return qfalse;
 	}
@@ -10687,7 +10709,7 @@ static void CG_RpSitPlacement( centity_t *cent, refEntity_t *legs )
 {
 	vec3_t	pelvis, foot[2], start, end;
 	trace_t	tr;
-	float	scale, floorZ, butt, offset, lowest;
+	float	scale, floorZ, butt, offset, lowest, raised;
 	int		i;
 
 	if ( !cent->ghoul2 || !CG_RpSitPlacementAnim( cent->currentState.legsAnim )
@@ -10754,9 +10776,20 @@ static void CG_RpSitPlacement( centity_t *cent, refEntity_t *legs )
 				lowest = 0;
 				break;
 			}
-			if ( tr.fraction < 1.0f && tr.endpos[2] - floorZ > lowest )
+			// GLX_U: [Sit Placement] with its feet hanging, how far the pose holds this foot's sole above his floor: it may
+			// come down that much more (a bar-stool sit onto a lower seat, or onto its feet in the open)
+			raised = 0;
+			if ( CG_RpSitFeetHang( cent->currentState.legsAnim ) )
+			{
+				raised = foot[i][2] - RP_SIT_ANKLE * scale - floorZ;
+				if ( raised < RP_SIT_FEET_UP * scale )
+				{
+					raised = 0;
+				}
+			}
+			if ( tr.fraction < 1.0f && tr.endpos[2] - floorZ - raised > lowest )
 			{ // (nothing under a foot, over an edge: no limit from it)
-				lowest = tr.endpos[2] - floorZ;
+				lowest = tr.endpos[2] - floorZ - raised;
 			}
 		}
 		if ( lowest > 0 )
