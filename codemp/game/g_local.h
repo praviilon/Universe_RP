@@ -3049,6 +3049,7 @@ void	G_EntitySound( gentity_t *ent, int channel, int soundIndex );
 // GalaxyRP: [Space] an NPC's per-frame trigger_space check -- see g_trigger.c
 void	RP_NpcSpaceFrame( gentity_t *ent );
 qboolean RP_SpaceSuitProtects( const gentity_t *ent );	// GLX_U: [Shop] the Vacuum Suit (g_trigger.c)
+qboolean RP_InSpaceTrigger( const gentity_t *ent, const gentity_t *trigger );	// GLX_U: [Space] by its brushes (g_trigger.c)
 void	TryUse( gentity_t *ent );
 // GalaxyRP: [Use hint] read-only companion to TryUse -- see its comment in g_utils.c
 qboolean G_CanUseInFrontOf( gentity_t *ent );

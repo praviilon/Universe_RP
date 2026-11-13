@@ -1791,8 +1791,7 @@ void RP_NpcSpaceFrame( gentity_t *ent )
 
 	spacetrigger = &g_entities[ent->client->inSpaceIndex];
 
-	if ( !spacetrigger->inuse ||
-		!G_PointInBounds( ent->client->ps.origin, spacetrigger->r.absmin, spacetrigger->r.absmax ) )
+	if ( !RP_InSpaceTrigger( ent, spacetrigger ) )	// GLX_U: [Space] by its brushes, not its bounding box
 	{ // no longer in space
 		ent->client->inSpaceIndex = 0;
 		return;
@@ -1847,6 +1846,33 @@ qboolean RP_SpaceSuitProtects( const gentity_t *ent )
 	return ( ent->client->sess.amrpgmode == 2 && ( ent->client->pers.skill_levels[38] & ( 1 << 4 ) ) ) ? qtrue : qfalse;
 }
 
+/*
+==================
+RP_InSpaceTrigger
+
+GLX_U: [Space] whether ent's origin is in the space trigger: the origin as a box one unit each way touching one of
+the trigger's own brushes, by the exact test the engine fires the trigger with (trap->EntityContact(), a box, not a
+capsule). Stock asked only whether the origin was inside the trigger's bounding box (r.absmin/r.absmax), so a
+trigger_space of many brushes round a hollow ship (Battle of Endor's) kept a player in space anywhere inside its
+box, the ship included: no gravity, the Vacuum Suit's swim, choking without it. The one unit each way is what the
+engine widens every linked box by (SV_LinkEntity()), and touching counts as inside (CM_TestBoxInBrush()), so for a
+trigger of one box-shaped brush this gives exactly the old answer.
+==================
+*/
+qboolean RP_InSpaceTrigger( const gentity_t *ent, const gentity_t *trigger )
+{
+	vec3_t mins, maxs;
+
+	if ( !ent || !ent->client || !trigger || !trigger->inuse )
+	{
+		return qfalse;
+	}
+
+	VectorSet( mins, ent->client->ps.origin[0] - 1, ent->client->ps.origin[1] - 1, ent->client->ps.origin[2] - 1 );
+	VectorSet( maxs, ent->client->ps.origin[0] + 1, ent->client->ps.origin[1] + 1, ent->client->ps.origin[2] + 1 );
+	return trap->EntityContact( mins, maxs, (const sharedEntity_t *)trigger, qfalse ) ? qtrue : qfalse;
+}
+
 void space_touch( gentity_t *self, gentity_t *other, trace_t *trace )
 {
 	if (!other || !other->inuse || !other->client )
@@ -1865,7 +1891,7 @@ void space_touch( gentity_t *self, gentity_t *other, trace_t *trace )
 		return;
 	}
 
-	if (!G_PointInBounds(other->client->ps.origin, self->r.absmin, self->r.absmax))
+	if (!RP_InSpaceTrigger(other, self))	// GLX_U: [Space] its brushes, not its bounding box
 	{ //his origin must be inside the trigger
 		return;
 	}

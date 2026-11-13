@@ -9006,8 +9006,7 @@ void G_RunFrame( int levelTime ) {
 			{ //we're in space, check for suffocating and for exiting
                 gentity_t *spacetrigger = &g_entities[ent->client->inSpaceIndex];
 
-				if (!spacetrigger->inuse ||
-					!G_PointInBounds(ent->client->ps.origin, spacetrigger->r.absmin, spacetrigger->r.absmax))
+				if (!RP_InSpaceTrigger(ent, spacetrigger))	// GLX_U: [Space] by its brushes, not its bounding box
 				{ //no longer in space then I suppose
                     ent->client->inSpaceIndex = 0;
 				}
