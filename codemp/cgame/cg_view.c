@@ -2719,6 +2719,7 @@ void CG_DrawActiveFrame( int serverTime, stereoFrame_t stereoView, qboolean demo
 	// update cg.predictedPlayerState
 	CG_PredictPlayerState();
 	CG_RpAutoWalkCheck();	// GLX_U: [AutoWalk] stops on death, knockdown, spectating
+	CG_RpCrouchToggleCheck();	// GLX_U: [Crouch Toggle] the crouch key's presses, and the hold letting go on its own
 
 	// decide on third person view
 	cg.renderingThirdPerson = cg_thirdPerson.integer || (cg.snap->ps.stats[STAT_HEALTH] <= 0);

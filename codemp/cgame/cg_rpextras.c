@@ -555,6 +555,11 @@ static void RPX_Queue( const char *cmd ) {
 	Q_strncpyz( rpx_queue[rpx_queued++], cmd, sizeof( rpx_queue[0] ) );
 }
 
+// GLX_U: [Crouch Toggle] the same queue for the commands a crouch hold would end (cg_consolecmds.c)
+void CG_RpxQueue( const char *cmd ) {
+	RPX_Queue( cmd );
+}
+
 // GalaxyRP: [Extras] the Props, Effects and Spawners menus' Offset: /entaddaim's aimoffset, 0 to 512, sent
 // only when it is not 0 -- the command is then the one these menus always sent
 static void RPX_AddOffset( char *cmd, int size, const char *cvar ) {
@@ -1402,19 +1407,25 @@ server checks everything else (whether emotes are on, the player's state) and sa
 */
 extern stringID_table_t animTable[MAX_ANIMATIONS+1];	// the animations' own names (cgame/animtable.h)
 
+// GLX_U: [Crouch Toggle] a crouch hold freed first: it would end the emote at once, and the queue waits for it to go
+static void RPX_EmoteQueue( const char *cmd ) {
+	CG_RpCrouchFree();
+	RPX_Queue( cmd );
+}
+
 static void RPX_Emote( const char *action ) {
 	char name[RPX_NAME_LEN * 2];
 	int i;
 
 	if ( !Q_stricmp( action, "wehug" ) || !Q_stricmp( action, "wekiss" ) ) {
-		RPX_Queue( !Q_stricmp( action, "wehug" ) ? "wehug" : "wekiss" );
+		RPX_EmoteQueue( !Q_stricmp( action, "wehug" ) ? "wehug" : "wekiss" );
 		return;
 	}
 	if ( !Q_stricmp( action, "emote" ) ) {
 		RPX_CvarString( "ui_rpx_em_sel0", name, sizeof( name ) );
 		for ( i = 0; i < RP_NUM_EMOTES; i++ ) {
 			if ( !Q_stricmp( name, rpEmotes[i].name ) ) {
-				RPX_Queue( va( "emote %s", rpEmotes[i].name ) );
+				RPX_EmoteQueue( va( "emote %s", rpEmotes[i].name ) );
 				return;
 			}
 		}
@@ -1422,7 +1433,7 @@ static void RPX_Emote( const char *action ) {
 		RPX_CvarString( "ui_rpx_em_sel1", name, sizeof( name ) );
 		for ( i = 0; i < MAX_WORDED_EMOTES; i++ ) {
 			if ( animations[i].animation_name && !Q_stricmp( name, animations[i].animation_name ) ) {
-				RPX_Queue( va( "anim %s", animations[i].animation_name ) );
+				RPX_EmoteQueue( va( "anim %s", animations[i].animation_name ) );
 				return;
 			}
 		}
@@ -1430,7 +1441,7 @@ static void RPX_Emote( const char *action ) {
 		RPX_CvarString( "ui_rpx_em_sel2", name, sizeof( name ) );
 		i = name[0] ? GetIDForString( animTable, name ) : -1;
 		if ( i >= 0 && i < MAX_ANIMATIONS ) {
-			RPX_Queue( va( "anim %d", i ) );
+			RPX_EmoteQueue( va( "anim %d", i ) );
 			return;
 		}
 	} else {
@@ -1563,7 +1574,9 @@ frame (it has to be known before the sky portal is drawn).
 void CG_RpxFrame( void ) {
 	int now = trap->Milliseconds();
 
-	if ( rpx_queued && RPX_CanSend( now ) ) {
+	// GLX_U: [Crouch Toggle] and not while a crouch hold just freed may still reach the server: /emote and the rest
+	// would meet it there and end at once
+	if ( rpx_queued && RPX_CanSend( now ) && !CG_RpCrouchSettling() ) {
 		RPX_Send( rpx_queue[0], now );
 		rpx_queued--;
 		memmove( rpx_queue[0], rpx_queue[1], sizeof( rpx_queue[0] ) * rpx_queued );

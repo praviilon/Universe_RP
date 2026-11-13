@@ -7536,6 +7536,29 @@
 			}
 		}
 
+		// GLX_U: [Crouch Toggle] cg_crouchToggle (cg_consolecmds.c), under HUD. The click area is 115 wide, not the
+		// 180 of the rows beside it, so it ends (485) before the Default button moved to its right (490)
+		itemDef 
+		{
+			name				cameraCrouchToggle
+			group				cameraControls
+			type				ITEM_TYPE_MULTI
+			text				"Crouch Toggle:"
+			cvar				"cg_crouchToggle"
+			cvarFloatList		{  @MENUS_OFF 0 @MENUS_ON 1 }
+			rect				370 335 115 25
+	   		textalign			ITEM_ALIGN_LEFT
+			font 				4
+			textscale 			1
+			forecolor			.615 .615 .956 1
+			visible				0
+			descText			"Press crouch once to stay crouched and again to stand"
+			action 
+			{ 
+				play			"sound/interface/button1"
+			}
+		}
+
 		itemDef 
 		{
 			name				cameraDefault
@@ -7546,7 +7569,7 @@
 			font				3
 			textscale			.7
 			style				WINDOW_STYLE_FILLED
-			rect				370 335 90 30
+			rect				490 335 75 30	// GLX_U: [Crouch Toggle] moved right, for the Crouch Toggle row (was 370 335 90 30)
 			textalign			ITEM_ALIGN_LEFT
 			forecolor			1 .682 0 1
 			visible				0

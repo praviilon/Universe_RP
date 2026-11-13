@@ -505,6 +505,135 @@ static void CG_AutoWalk_f( void ) {
 		fb, ( fb[0] && rl[0] ) ? " and " : "", rl );
 }
 
+/*
+=================
+GLX_U: [Crouch Toggle] cg_crouchToggle 1: the crouch key toggles. The first press holds crouch for him as
+/autowalk holds a movement key ("+movedown" as typed in the console: the engine's key -1, which no key lets go
+of), so he stays down after letting go; the next press frees that hold ("-movedown -1", which leaves a real key
+still down alone), and he stands as he lets go. The press is read from the first key bound to +movedown, so his
+bindings stay as they are (a second crouch key is a plain hold); a key pressed while the console, a menu or a
+chat box has the keyboard types and is no press.
+  The hold lets go on its own where crouch would do something else: dead, knocked down, spectating or following
+(as /autowalk), any movement but PM_NORMAL (jetpack, noclip, gripped, frozen), a vehicle, water to the waist or
+the Vacuum Suit's swim in open space (crouch swims down there), a jump (crouch held cancels its push out), the
+setting switched off, and a map change. cg_crouchHeld says the hold is ours, so a client reload never leaves it
+behind unknown.
+  On the server a held crouch ends a held /emote, an /anim, /wehug and /wekiss, and cancels /away, so those wait
+until the hold has been freed for RP_CROUCH_SETTLE_MS: see CG_RpCrouchDefers() and CG_RpxFrame().
+=================
+*/
+#define RP_CROUCH_SETTLE_MS	150	// the hold freed this long ago: the server has had input without crouch since
+
+static qboolean	rpCrouchKeyWasDown = qtrue;	// qtrue until a frame has read the keys: a key held then is no press
+static qboolean	rpCrouchJumpWasDown = qtrue;
+static int		rpCrouchFreedAt;			// trap->Milliseconds() the hold was last freed; 0 for not yet
+
+static qboolean CG_RpCrouchHeld( void ) {
+	char buf[16];
+
+	trap->Cvar_VariableStringBuffer( "cg_crouchHeld", buf, sizeof( buf ) );
+	return atoi( buf ) ? qtrue : qfalse;
+}
+
+void CG_RpCrouchFree( void ) {
+	if ( !CG_RpCrouchHeld() ) {
+		return;
+	}
+	trap->SendConsoleCommand( "-movedown -1\n" );
+	trap->Cvar_Set( "cg_crouchHeld", "0" );
+	rpCrouchFreedAt = trap->Milliseconds();
+	if ( !rpCrouchFreedAt ) {
+		rpCrouchFreedAt = 1;
+	}
+}
+
+// a map's start and end: the hold freed, a key already down is no press
+void CG_RpCrouchReset( void ) {
+	CG_RpCrouchFree();
+	rpCrouchKeyWasDown = rpCrouchJumpWasDown = qtrue;
+}
+
+// the hold freed so lately that the server may still get input with crouch in it
+qboolean CG_RpCrouchSettling( void ) {
+	return ( rpCrouchFreedAt && trap->Milliseconds() - rpCrouchFreedAt < RP_CROUCH_SETTLE_MS ) ? qtrue : qfalse;
+}
+
+// where crouch would not crouch him, or he is not up and playing
+static qboolean CG_RpCrouchBlocked( void ) {
+	const playerState_t *ps = &cg.predictedPlayerState;
+	vec3_t point;
+
+	if ( !cg.snap || cg.demoPlayback || CG_RpAutoWalkBlocked() || ps->pm_type != PM_NORMAL || ps->m_iVehicleNum
+		|| ( ps->stats[STAT_RP_SELF_FX] & RP_SELF_FX_SPACE_SWIM ) ) {
+		return qtrue;
+	}
+	// water to the waist, as the movement code reads it (PM_SetWaterLevel: level 2)
+	VectorCopy( ps->origin, point );
+	point[2] += MINS_Z + ( ps->viewheight - MINS_Z ) / 2;
+	return ( CG_PointContents( point, ps->clientNum ) & MASK_WATER ) ? qtrue : qfalse;
+}
+
+static qboolean CG_RpCrouchKeyDown( const char *binding ) {
+	const int key = trap->Key_GetKey( binding );
+
+	return ( key >= 0 && trap->Key_IsDown( key ) ) ? qtrue : qfalse;
+}
+
+// every frame, after prediction (cg_view.c)
+void CG_RpCrouchToggleCheck( void ) {
+	const qboolean crouchDown = CG_RpCrouchKeyDown( "+movedown" );
+	const qboolean jumpDown = CG_RpCrouchKeyDown( "+moveup" );
+	const qboolean typing = trap->Key_GetCatcher() ? qtrue : qfalse;
+	const qboolean crouchPressed = ( !typing && crouchDown && !rpCrouchKeyWasDown ) ? qtrue : qfalse;
+	const qboolean jumpPressed = ( !typing && jumpDown && !rpCrouchJumpWasDown ) ? qtrue : qfalse;
+
+	if ( CG_RpCrouchHeld() ) {
+		if ( !cg_crouchToggle.integer || crouchPressed || jumpPressed || CG_RpCrouchBlocked() ) {
+			CG_RpCrouchFree();
+		}
+	} else if ( cg_crouchToggle.integer && crouchPressed && !CG_RpCrouchBlocked() ) {
+		trap->SendConsoleCommand( "+movedown\n" );
+		trap->Cvar_Set( "cg_crouchHeld", "1" );
+	}
+	rpCrouchKeyWasDown = crouchDown;
+	rpCrouchJumpWasDown = jumpDown;
+}
+
+/*
+CG_RpCrouchDefers: one of the commands a held crouch would end, typed (or bound) while the hold is ours or only
+just freed. The hold is freed and the command goes through the Extras' queue, which keeps the flood gap and waits
+until CG_RpCrouchSettling() is over (CG_RpxFrame()); qtrue then, and the engine doesn't send it. Each argument is
+quoted, so the server reads the same arguments it would from the line as typed. Otherwise qfalse, and the engine
+sends the line as it always did.
+*/
+static qboolean CG_RpCrouchDefers( void ) {
+	static const char *cmds[] = { "anim", "away", "emote", "wehug", "wekiss" };
+	char line[MAX_STRING_CHARS];
+	const char *name = CG_Argv( 0 );
+	int i, argc;
+
+	if ( !CG_RpCrouchHeld() && !CG_RpCrouchSettling() ) {
+		return qfalse;
+	}
+	for ( i = 0; i < (int)ARRAY_LEN( cmds ); i++ ) {
+		if ( !Q_stricmp( name, cmds[i] ) ) {
+			break;
+		}
+	}
+	if ( i == (int)ARRAY_LEN( cmds ) ) {
+		return qfalse;
+	}
+
+	Q_strncpyz( line, cmds[i], sizeof( line ) );
+	argc = trap->Cmd_Argc();
+	for ( i = 1; i < argc; i++ ) {
+		Q_strcat( line, sizeof( line ), va( " \"%s\"", CG_Argv( i ) ) );
+	}
+	CG_RpCrouchFree();
+	CG_RpxQueue( line );
+	return qtrue;
+}
+
 typedef struct consoleCommand_s {
 	const char	*cmd;
 	void		(*func)(void);
@@ -565,6 +694,10 @@ Cmd_Argc() / Cmd_Argv()
 */
 qboolean CG_ConsoleCommand( void ) {
 	consoleCommand_t	*command = NULL;
+
+	if ( CG_RpCrouchDefers() ) {	// GLX_U: [Crouch Toggle] /emote, /anim, ... after the crouch hold is freed
+		return qtrue;
+	}
 
 	command = (consoleCommand_t *)Q_LinearSearch( CG_Argv( 0 ), commands, numCommands, sizeof( commands[0] ), cmdcmp );
 

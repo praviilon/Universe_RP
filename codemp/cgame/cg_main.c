@@ -2636,6 +2636,7 @@ Ghoul2 Insert End
 
 	CG_InitConsoleCommands();
 	CG_RpAutoWalkStop( qfalse );	// GLX_U: [AutoWalk] a new map (or a client that went without shutting down) starts standing
+	CG_RpCrouchReset();	// GLX_U: [Crouch Toggle] and not crouched by the toggle either
 
 	// GalaxyRP: [Extras] the Extras menus start this map afresh -- cg_rpextras.c
 	CG_RpxInit();
@@ -2795,6 +2796,7 @@ Called before every level change or subsystem restart
 void CG_Shutdown( void )
 {
 	CG_RpAutoWalkStop( qfalse );	// GLX_U: [AutoWalk] leaving the map: the engine would keep the buttons held
+	CG_RpCrouchReset();	// GLX_U: [Crouch Toggle] the same for the crouch hold
 	RP_ShaderAimFree();	// GLX_U: [Shader Aim] the map's surfaces, if /shaderaim read them
 
 	BG_ClearAnimsets(); //free all dynamic allocations made through the engine

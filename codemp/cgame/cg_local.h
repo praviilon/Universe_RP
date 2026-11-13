@@ -1877,6 +1877,7 @@ void CG_RpxFrame( void );
 void CG_RpxFxPass( void );
 qboolean CG_RpxFxPassActive( void );
 void CG_RpxReply( void );
+void CG_RpxQueue( const char *cmd );	// GLX_U: [Crouch Toggle] an action command, sent when the flood gap allows
 // GLX_U: [Dialogues] cg_rpdialog.c
 void CG_RpDialogInit( void );
 void CG_RpDialogFrame( void );
@@ -2219,6 +2220,10 @@ qboolean CG_ConsoleCommand( void );
 void CG_InitConsoleCommands( void );
 void CG_RpAutoWalkStop( qboolean announce );	// GLX_U: [AutoWalk]
 void CG_RpAutoWalkCheck( void );
+void CG_RpCrouchReset( void );	// GLX_U: [Crouch Toggle]
+void CG_RpCrouchFree( void );
+void CG_RpCrouchToggleCheck( void );
+qboolean CG_RpCrouchSettling( void );
 
 //
 // cg_servercmds.c
