@@ -13808,15 +13808,15 @@ void Cmd_Stuff_f( gentity_t *ent ) {
 				// upgrade-specific since the cloak-sync overhaul made ANY damage decloak a cloaked
 				// target, with or without this upgrade -- see G_Damage's centralized decloak hook).
 				// DAJ_RP: [Skills] the doors and elevators moved to Stun Baton skill level 5; the upgrade keeps the slow
-				trap->SendServerCommand( ent-g_entities, "print \"\n^3Stun Baton Upgrade: ^7each stun baton hit halves the enemy's movement speed for 1.5 seconds. Opening doors and moving elevators comes with Stun Baton skill level 5\n\n\"");
+				trap->SendServerCommand( ent-g_entities, "print \"\n^3Stun Baton Upgrade: ^7each stun baton hit halves the enemy's movement speed for 1.5 seconds.\n\n\"");
 			}
 			else if (value == 4)
 			{ // GLX_U: [Shop] Underwater Breather, skill_levels[38] bit 3 (P_WorldEffects, g_active.c)
-				trap->SendServerCommand( ent-g_entities, "print \"\n^3Underwater Breather: ^7you don't drown: no drowning damage under water. Lava, slime and harmful areas still hurt\n\n\"");
+				trap->SendServerCommand( ent-g_entities, "print \"\n^3Underwater Breather: ^7you don't drown: no drowning damage under water.\n\n\"");
 			}
 			else if (value == 5)
 			{ // GLX_U: [Shop] Vacuum Suit, skill_levels[38] bit 4 (RP_SpaceSuitProtects, g_trigger.c)
-				trap->SendServerCommand( ent-g_entities, "print \"\n^3Vacuum Suit: ^7you don't suffocate in open space: you float and swim there as in water. Other harm still hurts\n\n\"");
+				trap->SendServerCommand( ent-g_entities, "print \"\n^3Vacuum Suit: ^7you don't suffocate in open space: you can float freely.\n\n\"");
 			}
 			else
 			{
