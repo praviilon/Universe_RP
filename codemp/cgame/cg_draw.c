@@ -6270,6 +6270,35 @@ qboolean CG_RpCombatHudAllowed( void )
 }
 
 /*
+CG_RpCombatHudAimPoint
+
+GLX_U: [Shop] the point of a target the Combat HUD aims at: the middle of its box, not its origin, which on a player
+or NPC is at the hips (the box runs DEFAULT_MINS_2, 24, below it). The box is the one the engine packs into s.solid
+whenever it links the entity (SV_LinkEntity): its depth below the origin in bits 8-15, its height above plus 32 in
+bits 16-23, so it follows crouching, NPC scale and each NPC's own size (the height above is packed at most 223).
+Without one -- s.solid 0, as a walk-through player or NPC is sent (g_active.c), or a brush model -- the origin, as
+before. A scaled vehicle drawn lifted (CG_RpVehicleLiftApplied()) is measured from where it really is, as the
+prediction does (cg_predict.c), since its box is there.
+*/
+void CG_RpCombatHudAimPoint( const centity_t *cent, vec3_t out )
+{
+	const int solid = cent->currentState.solid;
+
+	VectorCopy( cent->lerpOrigin, out );
+	if ( cent->currentState.eType == ET_NPC && cent->currentState.NPC_class == CLASS_VEHICLE && CG_RpVehicleLiftApplied( cent ) )
+	{
+		out[2] -= cent->rpVehicleLift;
+	}
+	if ( solid && solid != SOLID_BMODEL )
+	{
+		const int below = ( solid >> 8 ) & 255;
+		const int above = ( ( solid >> 16 ) & 255 ) - 32;
+
+		out[2] += ( above - below ) * 0.5f;
+	}
+}
+
+/*
 CG_RpCombatHud
 
 Draws the leads. cg_leadIndicator, as TaystJK's: 0 off; 1 on, allowing for my ping; any other number on, allowing
@@ -6312,7 +6341,7 @@ static void CG_RpCombatHud( void )
 	for ( i = 0; i < cg.snap->numEntities; i++ )
 	{
 		centity_t *cent = &cg_entities[cg.snap->entities[i].number];
-		vec3_t leadPos;
+		vec3_t leadPos, aim;
 		float x, y, leadX, leadY;
 		trace_t tr;
 
@@ -6328,16 +6357,18 @@ static void CG_RpCombatHud( void )
 		{// standing still: aim at it
 			continue;
 		}
+		// GLX_U: [Shop] the middle of its box, not its origin (CG_RpCombatHudAimPoint()), for the view, the line and the lead
+		CG_RpCombatHudAimPoint( cent, aim );
 		// in clear view, against the map only: others standing in between don't hide it
-		CG_Trace( &tr, eye, NULL, NULL, cent->lerpOrigin, cg.snap->ps.clientNum, CONTENTS_SOLID );
+		CG_Trace( &tr, eye, NULL, NULL, aim, cg.snap->ps.clientNum, CONTENTS_SOLID );
 		if ( tr.fraction < 1.0f && tr.entityNum != cent->currentState.number )
 		{
 			continue;
 		}
 
-		CG_RpCombatHudLeadPoint( eye, cent->lerpOrigin, cent->currentState.pos.trDelta, (float)speed, lag, falls, leadPos );
+		CG_RpCombatHudLeadPoint( eye, aim, cent->currentState.pos.trDelta, (float)speed, lag, falls, leadPos );
 
-		if ( !CG_WorldCoordToScreenCoordFloat( cent->lerpOrigin, &x, &y )
+		if ( !CG_WorldCoordToScreenCoordFloat( aim, &x, &y )
 			|| !CG_WorldCoordToScreenCoordFloat( leadPos, &leadX, &leadY ) )
 		{// behind me
 			continue;

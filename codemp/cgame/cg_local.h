@@ -2028,6 +2028,7 @@ int CG_RpCombatHudShotSpeed( int weapon, qboolean altFire, qboolean *falls );
 qboolean CG_RpCombatHudTarget( const centity_t *cent );
 void CG_RpCombatHudLeadPoint( const vec3_t from, const vec3_t targetPos, const vec3_t targetVel, float speed, float lag, qboolean falls, vec3_t out );
 qboolean CG_RpCombatHudAllowed( void );
+void CG_RpCombatHudAimPoint( const centity_t *cent, vec3_t out );
 qboolean CG_RpInBracketVehicle( void );	// GLX_U: [Vehicles] in a fighter, speeder or walker: brackets (cg_draw.c)
 void CG_AddGhoul2Mark(int shader, float size, vec3_t start, vec3_t end, int entnum,
 					  vec3_t entposition, float entangle, void *ghoul2, vec3_t scale, int lifeTime);
