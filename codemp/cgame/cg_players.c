@@ -7038,6 +7038,14 @@ void CG_G2SaberEffects(vec3_t start, vec3_t end, centity_t *owner)
 
 #define CG_MAX_SABER_COMP_TIME 400 //last registered saber entity hit must match within this many ms for the client effect to take place.
 
+// GLX_U: [Vehicles] OJP's ResistsMarking: a vehicle whose .veh has it gets no hit marks on its model (projectile and
+// explosion hits, CG_G2MarkEvent(); the effects system's decals, cg_main.c; saber burns, above)
+qboolean CG_RpVehResistsMarking( const centity_t *cent )
+{
+	return ( cent && cent->currentState.NPC_class == CLASS_VEHICLE && cent->m_pVehicle && cent->m_pVehicle->m_pVehicleInfo
+		&& cent->m_pVehicle->m_pVehicleInfo->ResistsMarking ) ? qtrue : qfalse;
+}
+
 void CG_AddGhoul2Mark(int shader, float size, vec3_t start, vec3_t end, int entnum,
 					  vec3_t entposition, float entangle, void *ghoul2, vec3_t scale, int lifeTime)
 {
@@ -7195,6 +7203,8 @@ void CG_SaberCompWork(vec3_t start, vec3_t end, centity_t *owner, int saberNum, 
 										}
 									}
 								}
+								if ( !CG_RpVehResistsMarking( trEnt ) )	// GLX_U: [Vehicles] OJP's ResistsMarking: no burn, and no splash-back either
+								{
 								CG_AddGhoul2Mark(markShader, flrand(3.0f, 4.0f),
 									trace.endpos, ePos, trace.entityNum, trEnt->lerpOrigin, trEnt->lerpAngles[YAW],
 									trEnt->ghoul2, trEnt->modelScale, Q_irand(5000, 10000));
@@ -7205,6 +7215,7 @@ void CG_SaberCompWork(vec3_t start, vec3_t end, centity_t *owner, int saberNum, 
 									CG_AddGhoul2Mark(weaponMarkShader, flrand(0.5f, 2.0f),
 										trace.endpos, splashBackDir, owner->currentState.clientNum, owner->lerpOrigin, owner->lerpAngles[YAW],
 										owner->ghoul2, owner->modelScale, Q_irand(5000, 10000));
+								}
 								}
 							}
 						}

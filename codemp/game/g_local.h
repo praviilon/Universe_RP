@@ -446,6 +446,8 @@ struct gentity_s {
 	// GalaxyRP: [Entity System] rpAnimating was set by the AUTOANIMATE spawnflag of a
 	// misc_model_breakable (not by a script), so a respawn without the flag turns it off again
 	qboolean		rpAutoAnimate;
+	// GLX_U: [Vehicles] when a walker with SpeedMultiplierForRamDamage may crush this entity again (g_active.c)
+	int				rpVehCrushTime;
 
 	struct gclient_s	*client;			// NULL if not a client
 

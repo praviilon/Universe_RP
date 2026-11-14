@@ -160,6 +160,7 @@ static void C_G2Mark( void ) {
 
 	//	CG_TestLine( tr.endpos, end, 2000, 0x0000ff, 1 );
 
+		if ( !CG_RpVehResistsMarking( cent ) )	// GLX_U: [Vehicles] OJP's ResistsMarking: no decal on this vehicle
 		CG_AddGhoul2Mark( td->shader, td->size, tr.endpos, end, tr.entityNum, cent->lerpOrigin, cent->lerpAngles[YAW],
 			cent->ghoul2, cent->modelScale, Q_irand( 2000, 4000 ) );
 		// I'm making fx system decals have a very short lifetime.

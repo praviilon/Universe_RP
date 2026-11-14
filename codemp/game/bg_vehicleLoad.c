@@ -463,6 +463,10 @@ vehField_t vehicleFields[] =
 	{"MBFstopprimaryfiring", VFOFS(MBFstopprimaryfiring), VF_INT},// GLX_U: [Vehicles] OJP's keys: in these RP_VEHMODE_* modes
 	{"MBFstopaltfiring", VFOFS(MBFstopaltfiring), VF_INT},		// no primary fire, no alt fire,
 	{"MBFdisableshields", VFOFS(MBFdisableshields), VF_INT},		// no shields (bg_vehicles.h)
+	{"AllWeaponsDoDamageToArmor", VFOFS(AllWeaponsDoDamageToArmor), VF_BOOL},		// GLX_U: [Vehicles] OJP's keys
+	{"AllWeaponsDoDamageToShields", VFOFS(AllWeaponsDoDamageToShields), VF_BOOL},	// (bg_vehicles.h)
+	{"SpeedMultiplierForRamDamage", VFOFS(SpeedMultiplierForRamDamage), VF_FLOAT},
+	{"ResistsMarking", VFOFS(ResistsMarking), VF_BOOL},
 	{"toughness", VFOFS(toughness), VF_FLOAT},		//modifies incoming damage, 1.0 is normal, 0.5 is half, etc.  Simulates being made of tougher materials/construction
 	{"malfunctionArmorLevel", VFOFS(malfunctionArmorLevel), VF_INT},//when armor drops to or below this point, start malfunctioning
 	{"surfDestruction", VFOFS(surfDestruction), VF_INT},
@@ -720,6 +724,7 @@ void BG_SetSharedVehicleFunctions( vehicleInfo_t *pVehInfo )
 void BG_VehicleSetDefaults( vehicleInfo_t *vehicle )
 {
 	memset(vehicle, 0, sizeof(vehicleInfo_t));
+	vehicle->SpeedMultiplierForRamDamage = -1.0f;	// GLX_U: [Vehicles] not set: the base game's walker crush (g_active.c)
 /*
 	if (!vehicle->name)
 	{

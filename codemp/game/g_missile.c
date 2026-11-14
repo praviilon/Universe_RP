@@ -458,6 +458,19 @@ static qboolean G_HookImpact( gentity_t *ent, trace_t *trace )
 	return qtrue;
 }
 
+/*
+GLX_U: [Vehicles] OJP's AllWeaponsDoDamageToShields: a vehicle whose shields are up bounces light projectiles, unless
+its .veh sets the key to 1. OJP's default, every vehicle type. Fighters and walkers without AllWeaponsDoDamageToArmor
+are FL_SHIELDED and bounce them anyway; it shows on a walker or fighter with that key (the droideka: bolts bounce off
+while it stands with its shields up, and hit while it rolls with them off), and on a speeder or animal with shields.
+*/
+static qboolean RP_VehShieldsDeflect( const gentity_t *other )
+{
+	return ( other->client && other->s.NPC_class == CLASS_VEHICLE && other->m_pVehicle && other->m_pVehicle->m_pVehicleInfo
+		&& !other->m_pVehicle->m_pVehicleInfo->AllWeaponsDoDamageToShields
+		&& other->client->ps.stats[STAT_ARMOR] > 0 ) ? qtrue : qfalse;
+}
+
 void G_MissileImpact( gentity_t *ent, trace_t *trace ) {
 	gentity_t		*other;
 	qboolean		hitClient = qfalse;
@@ -609,7 +622,7 @@ void G_MissileImpact( gentity_t *ent, trace_t *trace ) {
 		ent->methodOfDeath != MOD_CONC &&
 		ent->methodOfDeath != MOD_CONC_ALT &&
 		!(ent->dflags&DAMAGE_HEAVY_WEAP_CLASS) &&
-		(other->flags & FL_SHIELDED || zyk_can_deflect_shots(other)) )
+		(other->flags & FL_SHIELDED || RP_VehShieldsDeflect(other) || zyk_can_deflect_shots(other)) )	// GLX_U: [Vehicles] before the chance roll
 	{
 		// GalaxyRP fix: [Magic] a "cannot_deflect" guard used to wrap this block, set by three tests that
 		// can no longer be true: the shot's owner being NPC_type "guardian_boss_7" or "guardian_boss_10"

@@ -995,6 +995,11 @@ void CG_G2MarkEvent(entityState_t *es)
 		return;
 	}
 
+	if ( CG_RpVehResistsMarking( pOwner ) )
+	{// GLX_U: [Vehicles] OJP's ResistsMarking: no marks on this vehicle
+		return;
+	}
+
 	//es->eventParm being non-0 means to do a special trace check
 	//first. This will give us an impact right at the surface to
 	//project the mark on. Typically this is used for radius

@@ -4698,7 +4698,20 @@ void ClientThink_real( gentity_t *ent ) {
 				if ( ent->client->ps.groundEntityNum != ENTITYNUM_NONE )
 				{//ATST crushes anything underneath it
 					gentity_t	*under = &g_entities[ent->client->ps.groundEntityNum];
-					if ( under && under->health && under->takedamage )
+					const float	ramMult = ent->m_pVehicle->m_pVehicleInfo->SpeedMultiplierForRamDamage;
+					if ( ramMult >= 0.0f )
+					{// GLX_U: [Vehicles] OJP's SpeedMultiplierForRamDamage: |speed| x it, at most every 500 ms per victim, so a
+					 // walker standing still crushes nothing (OJP's own speed x it gave nothing in reverse either)
+						const int crush = (int)( fabs( ent->client->ps.speed ) * ramMult );
+
+						if ( under && under->health && under->takedamage && crush > 0 && under->rpVehCrushTime <= level.time )
+						{
+							vec3_t	down = {0,0,-1};
+							G_Damage( under, ent, ent, down, under->r.currentOrigin, crush, 0, MOD_CRUSH );
+							under->rpVehCrushTime = level.time + 500;
+						}
+					}
+					else if ( under && under->health && under->takedamage )
 					{
 						vec3_t	down = {0,0,-1};
 						//FIXME: we'll be doing traces down from each foot, so we'll have a real impact origin

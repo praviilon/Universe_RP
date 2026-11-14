@@ -252,7 +252,12 @@ void NPC_SetMiscDefaultData( gentity_t *ent )
 		if (ent->m_pVehicle->m_pVehicleInfo->type == VH_WALKER)
 		{
 			ent->mass = 2000;//???
-			ent->flags |= (FL_SHIELDED|FL_NO_KNOCKBACK);
+			// GLX_U: [Vehicles] OJP's AllWeaponsDoDamageToArmor: no FL_SHIELDED, so light projectiles and the disruptor hurt it
+			ent->flags |= FL_NO_KNOCKBACK;
+			if ( !ent->m_pVehicle->m_pVehicleInfo->AllWeaponsDoDamageToArmor )
+			{
+				ent->flags |= FL_SHIELDED;
+			}
 			ent->pain = NPC_ATST_Pain;
 		}
 		//turn the damn hatch cover on and LEAVE it on
@@ -1679,6 +1684,11 @@ gentity_t *NPC_Spawn_Do( gentity_t *ent )
 		if ( g_vehicleInfo[iVehIndex].type == VH_FIGHTER )
 		{//FIXME: EXTERN!!!
 			newent->flags |= (FL_NO_KNOCKBACK|FL_SHIELDED|FL_DMG_BY_HEAVY_WEAP_ONLY);//don't get pushed around, blasters bounce off, only damage from heavy weaps
+			if ( g_vehicleInfo[iVehIndex].AllWeaponsDoDamageToArmor )
+			{// GLX_U: [Vehicles] OJP's AllWeaponsDoDamageToArmor, here for fighters too: no built-in immunity, so light
+			 // projectiles, the disruptor and melee hurt it (either flag alone still bounces light shots)
+				newent->flags &= ~(FL_SHIELDED|FL_DMG_BY_HEAVY_WEAP_ONLY);
+			}
 		}
 		//WTF?!!! Ships spawning in pointing straight down!
 		//set them up to start landed

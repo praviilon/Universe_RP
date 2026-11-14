@@ -194,6 +194,19 @@ typedef struct vehicleInfo_s {
 	int			MBFstopprimaryfiring;
 	int			MBFstopaltfiring;
 	int			MBFdisableshields;
+	// GLX_U: [Vehicles] OJP's damage and marking keys:
+	// - AllWeaponsDoDamageToArmor 1: no built-in weapon immunity. A walker spawns without FL_SHIELDED, a fighter
+	//   without FL_SHIELDED and FL_DMG_BY_HEAVY_WEAP_ONLY (NPC_spawn.c), so light projectiles, the disruptor and
+	//   melee can hurt it. 0 by default: as before.
+	// - AllWeaponsDoDamageToShields: 0 (OJP's default) bounces light projectiles off any vehicle while its shields
+	//   are up (RP_VehShieldsDeflect(), g_missile.c); 1 lets them hit the shields.
+	// - SpeedMultiplierForRamDamage: a walker crushes what it stands on for |speed| x this, at most every 500 ms per
+	//   victim (g_active.c). Below 0 ("not set", BG_VehicleSetDefaults()): the base game's 100 every frame.
+	// - ResistsMarking 1: no hit marks on its model (our client: CG_RpVehResistsMarking()).
+	qboolean	AllWeaponsDoDamageToArmor;
+	qboolean	AllWeaponsDoDamageToShields;
+	float		SpeedMultiplierForRamDamage;
+	qboolean	ResistsMarking;
 	float		toughness;		//modifies incoming damage, 1.0 is normal, 0.5 is half, etc.  Simulates being made of tougher materials/construction
 	int			malfunctionArmorLevel;//when armor drops to or below this point, start malfunctioning
 	int			surfDestruction; //can parts of this thing be torn off on impact? -rww
