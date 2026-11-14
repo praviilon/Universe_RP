@@ -161,7 +161,24 @@ Ghoul2 Insert End
 // compare against the same numbers (BG_ParseAmmoMax, BG_AmmoPickupMax)
 #define CS_RP_AMMOMAX			(CS_RP_NPCSABERS + RP_NPCSABER_GROUPS)
 
-#define CS_MAX					(CS_RP_AMMOMAX + 1)
+// GLX_U: [Shop] the Combat HUD (/buy upgrade 6): the speeds of the hand weapons' shots (the server's rp_*_velocity
+// cvars) in RP_WVEL_* order, "1600 2300 1300 1600 1100 3500 3500 900 3000", so the client's lead (CG_RpCombatHud(),
+// cg_draw.c) aims with the numbers the server fires with (RP_WeaponVelShare(), g_weapon.c)
+#define CS_RP_WEAPVEL			(CS_RP_AMMOMAX + 1)
+enum {
+	RP_WVEL_PISTOL,			// WP_BRYAR_PISTOL and WP_BRYAR_OLD, both fires
+	RP_WVEL_E11,			// WP_BLASTER, both fires
+	RP_WVEL_BOWCASTER,		// both fires
+	RP_WVEL_REPEATER,
+	RP_WVEL_REPEATER_ALT,	// the orb: it falls (TR_GRAVITY)
+	RP_WVEL_DEMP2,
+	RP_WVEL_FLECHETTE,
+	RP_WVEL_ROCKET,
+	RP_WVEL_CONCUSSION,
+	RP_WVEL_MAX
+};
+
+#define CS_MAX					(CS_RP_WEAPVEL + 1)
 
 #if (CS_MAX) > MAX_CONFIGSTRINGS
 #error overflow: (CS_MAX) > MAX_CONFIGSTRINGS
@@ -662,6 +679,11 @@ typedef enum {
 // movement code lets him swim there as in water (PM_SwimLevel(), bg_pmove.c). Set by ClientThink_real() before the
 // move, so his own prediction reads the same bit; private, as the others.
 #define RP_SELF_FX_SPACE_SWIM	(1<<5)
+// GLX_U: [Shop] the Combat HUD (/buy upgrade 6): a logged-in character who owns it. His own client draws a lead on
+// moving enemies for his hand weapon (CG_RpCombatHud(), cg_draw.c). Set by ClientThink_real() every command, so it
+// follows login, logout, a character switch, the purchase and /upgradereset at once; private, as the others, so
+// no client can grant it to itself.
+#define RP_SELF_FX_COMBAT_HUD	(1<<6)
 
 
 // playerState_t->persistant[] indexes

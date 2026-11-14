@@ -1022,6 +1022,10 @@ static void CG_ConfigStringModified( void ) {
 	{	// GLX_U: [Ammo Pickups] an rp_max_* ammo cap changed on the server: pickups are predicted against the new caps
 		BG_ParseAmmoMax( str );
 	}
+	else if ( num == CS_RP_WEAPVEL )
+	{	// GLX_U: [Shop] the Combat HUD: a shot speed changed on the server: its leads aim with the new one
+		CG_RpParseWeaponVel( str );
+	}
 
 }
 
@@ -2068,6 +2072,7 @@ char ui_cvars_in_order[100][100] = {
 	"ui_zyk_upgrade_3_owned",
 	"ui_zyk_upgrade_4_owned",	// GLX_U: [Shop] the Underwater Breather, sent right after the third
 	"ui_zyk_upgrade_5_owned",	// GLX_U: [Shop] the Vacuum Suit, right after the fourth
+	"ui_zyk_upgrade_6_owned",	// GLX_U: [Shop] the Combat HUD, right after the fifth
 	// GLX_U: [Extras Admin Grey] last, whether the player has the Entities and Remaps, NPC management and Music
 	// admin powers, in the order Cmd_GalaxyRpUi_f (g_cmds.c) appends them: the Extras buttons of
 	// ingame_galaxyrp.menu and ingame_rpx_music.menu's "Play for everyone" are greyed without them
@@ -2104,7 +2109,8 @@ void CG_RpExtrasAdminClear( void )
 // GLX_U: [Extras Admin Grey] + the three admin-power flags appended after the shop-upgrade ones = 75.
 // GLX_U: [Shop] + the Underwater Breather's owned flag, after the third shop-upgrade one = 76.
 // GLX_U: [Shop] + the Vacuum Suit's owned flag, after the fourth = 77.
-#define ZYKMOD_EXPECTED_FIELD_COUNT 77
+// GLX_U: [Shop] + the Combat HUD's owned flag, after the fifth = 78.
+#define ZYKMOD_EXPECTED_FIELD_COUNT 78
 
 static void CG_ZykMod( void )
 { // zyk: receives account info of logged players

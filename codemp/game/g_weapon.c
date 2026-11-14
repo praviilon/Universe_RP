@@ -5573,3 +5573,33 @@ void Weapon_HookThink( gentity_t *ent )
 	VectorCopy( ent->r.currentOrigin, ent->parent->client->ps.lastHitLoc );
 	ent->nextthink = level.time + FRAMETIME;
 }
+
+/*
+GLX_U: [Shop] the Combat HUD (/buy upgrade 6): the hand weapons' shot speeds to CS_RP_WEAPVEL, in RP_WVEL_* order
+(bg_public.h), for the leads the owner's client draws (CG_RpCombatHud(), cg_draw.c). At G_InitGame and whenever
+one of these rp_*_velocity cvars changes (RP_CVU_weaponVelocity, g_cvar.c). A client that doesn't know the string
+ignores it.
+*/
+void RP_WeaponVelShare( void )
+{
+	const int vel[RP_WVEL_MAX] = {
+		rp_blaster_pistol_velocity.integer,		// RP_WVEL_PISTOL
+		rp_e11_blaster_rifle_velocity.integer,	// RP_WVEL_E11
+		rp_bowcaster_velocity.integer,			// RP_WVEL_BOWCASTER
+		rp_repeater_velocity.integer,			// RP_WVEL_REPEATER
+		rp_repeater_alt_velocity.integer,		// RP_WVEL_REPEATER_ALT
+		rp_demp2_velocity.integer,				// RP_WVEL_DEMP2
+		rp_flechette_velocity.integer,			// RP_WVEL_FLECHETTE
+		rp_rocket_velocity.integer,				// RP_WVEL_ROCKET
+		rp_concussion_velocity.integer			// RP_WVEL_CONCUSSION
+	};
+	char buf[MAX_STRING_CHARS];
+	int i;
+
+	buf[0] = '\0';
+	for ( i = 0; i < RP_WVEL_MAX; i++ )
+	{
+		Q_strcat( buf, sizeof( buf ), va( i ? " %i" : "%i", vel[i] ) );
+	}
+	trap->SetConfigstring( CS_RP_WEAPVEL, buf );
+}

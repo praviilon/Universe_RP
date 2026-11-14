@@ -13790,7 +13790,8 @@ void Cmd_Stuff_f( gentity_t *ent ) {
 					"^32 - Impact Reducer: ^7Buy: 40000\n"
 					"^33 - Stun Baton Upgrade: ^7Buy: 15000\n"
 					"^34 - Underwater Breather: ^7Buy: 20000\n"	// GLX_U: [Shop] upgrade 4
-					"^35 - Vacuum Suit: ^7Buy: 45000\n\n\"");	// GLX_U: [Shop] upgrade 5
+					"^35 - Vacuum Suit: ^7Buy: 45000\n"	// GLX_U: [Shop] upgrade 5
+					"^36 - Combat HUD: ^7Buy: 70000\n\n\"");	// GLX_U: [Shop] upgrade 6
 				return;
 			}
 
@@ -13819,6 +13820,10 @@ void Cmd_Stuff_f( gentity_t *ent ) {
 			else if (value == 5)
 			{ // GLX_U: [Shop] Vacuum Suit, skill_levels[38] bit 4 (RP_SpaceSuitProtects, g_trigger.c)
 				trap->SendServerCommand( ent-g_entities, "print \"\n^3Vacuum Suit: ^7you don't suffocate in open space: you can float freely.\n\n\"");
+			}
+			else if (value == 6)
+			{ // GLX_U: [Shop] Combat HUD, skill_levels[38] bit 5 (RP_SELF_FX_COMBAT_HUD, g_active.c; CG_RpCombatHud(), cgame)
+				trap->SendServerCommand( ent-g_entities, "print \"\n^3Combat HUD: ^7shows where to aim your weapon to hit moving enemies: players, NPCs and vehicles.\n\n\"");
 			}
 			else
 			{
@@ -13870,7 +13875,8 @@ void Cmd_Buy_f( gentity_t *ent ) {
 		40000,	// upgrade 2: Impact Reducer
 		15000,	// upgrade 3: Stun Baton Upgrade
 		20000,	// upgrade 4: Underwater Breather (GLX_U: [Shop])
-		45000 };	// upgrade 5: Vacuum Suit (GLX_U: [Shop])
+		45000,	// upgrade 5: Vacuum Suit (GLX_U: [Shop])
+		70000 };	// upgrade 6: Combat HUD (GLX_U: [Shop])
 
 	if (trap->Argc() < 3)
 	{
@@ -13947,6 +13953,11 @@ void Cmd_Buy_f( gentity_t *ent ) {
 			trap->SendServerCommand( ent-g_entities, "print \"You already have the Vacuum Suit.\n\"" );
 			return;
 		}
+		else if (value == 6 && ent->client->pers.skill_levels[38] & (1 << 5))
+		{ // GLX_U: [Shop] Combat HUD, bit 5
+			trap->SendServerCommand( ent-g_entities, "print \"You already have the Combat HUD.\n\"" );
+			return;
+		}
 
 		cost = upgrade_costs[value-1];
 	}
@@ -13994,6 +14005,10 @@ void Cmd_Buy_f( gentity_t *ent ) {
 		else if (value == 5)
 		{ // GLX_U: [Shop] Vacuum Suit
 			ent->client->pers.skill_levels[38] |= (1 << 4);
+		}
+		else if (value == 6)
+		{ // GLX_U: [Shop] Combat HUD
+			ent->client->pers.skill_levels[38] |= (1 << 5);
 		}
 	}
 	else
@@ -20619,7 +20634,7 @@ void Cmd_AdminList_f( gentity_t *ent ) {
 		}
 		else if (command_number == ADM_SKILL)
 		{
-			trap->SendServerCommand(ent - g_entities, "print \"\nUse ^3/skillup ^7or ^3/skilldown <player name> <skill number> <number of levels (optional)> ^7to increase or decrease the skill levels of a player respectively.\nUse ^3/upgradereset <player name or ID> ^7to remove the permanent shop upgrades (Holdable Items Upgrade, Impact Reducer, Stun Baton Upgrade, Underwater Breather, Vacuum Suit) from a player's character.\n\n\"");
+			trap->SendServerCommand(ent - g_entities, "print \"\nUse ^3/skillup ^7or ^3/skilldown <player name> <skill number> <number of levels (optional)> ^7to increase or decrease the skill levels of a player respectively.\nUse ^3/upgradereset <player name or ID> ^7to remove the permanent shop upgrades (Holdable Items Upgrade, Impact Reducer, Stun Baton Upgrade, Underwater Breather, Vacuum Suit, Combat HUD) from a player's character.\n\n\"");
 		}
 		else if (command_number == ADM_CREATECREDITS)
 		{
@@ -21387,7 +21402,8 @@ Every effect reads the bit when it happens, so nothing else needs undoing. No re
 void Cmd_UpgradeReset_f( gentity_t *ent ) {
 	// GLX_U: [Shop] the Underwater Breather is bit 3, so the four bits 0-3 are cleared
 	// GLX_U: [Shop] and the Vacuum Suit bit 4: bits 0-4
-	static const char *upgrade_names[NUMBER_OF_SHOP_UPGRADES] = { "Holdable Items Upgrade", "Impact Reducer", "Stun Baton Upgrade", "Underwater Breather", "Vacuum Suit" };
+	// GLX_U: [Shop] and the Combat HUD bit 5: bits 0-5
+	static const char *upgrade_names[NUMBER_OF_SHOP_UPGRADES] = { "Holdable Items Upgrade", "Impact Reducer", "Stun Baton Upgrade", "Underwater Breather", "Vacuum Suit", "Combat HUD" };
 	char arg1[MAX_STRING_CHARS];
 	char removed[128] = "";
 	gentity_t *target;
@@ -26625,7 +26641,8 @@ void Cmd_GalaxyRpUi_f(gentity_t* ent) {
 			// GLX_U: [Shop] bit 3, the Underwater Breather, right after the third (ui_zyk_upgrade_4_owned); the admin
 			// flags below stay last
 			// GLX_U: [Shop] and bit 4, the Vacuum Suit, right after it (ui_zyk_upgrade_5_owned)
-			int upgrade_bits_to_sync[] = { 0, 1, 2, 3, 4 };
+			// GLX_U: [Shop] and bit 5, the Combat HUD, right after that (ui_zyk_upgrade_6_owned)
+			int upgrade_bits_to_sync[] = { 0, 1, 2, 3, 4, 5 };
 
 			for (int i = 0; i < ARRAY_LEN(upgrade_bits_to_sync); i++) {
 				owned_bit = upgrade_bits_to_sync[i];

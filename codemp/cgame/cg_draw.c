@@ -5693,6 +5693,10 @@ void CG_DottedLine( float x1, float y1, float x2, float y2, float dotSize, int n
 	}
 }
 
+// GLX_U: [Shop] the Combat HUD: the frame (cg.clientFrame + 1) the vehicle lead below was last drawn for each entity,
+// so CG_RpCombatHud() doesn't draw a second lead on the same target
+static int cg_rpVehLeadFrame[MAX_GENTITIES];
+
 void CG_BracketEntity( centity_t *cent, float radius )
 {
 	trace_t tr;
@@ -5863,6 +5867,7 @@ void CG_BracketEntity( centity_t *cent, float radius )
 								{//off-screen, don't draw it
 									return;
 								}
+								cg_rpVehLeadFrame[cent->currentState.number] = cg.clientFrame + 1;	// GLX_U: [Shop] the Combat HUD: this target has its lead
 								if ( !CG_WorldCoordToScreenCoordFloat(vehLeadPos, &leadX, &leadY) )
 								{//off-screen, don't draw it
 									//just draw the line
@@ -5933,6 +5938,408 @@ qboolean CG_RpInBracketVehicle( void )
 		}
 	}
 	return qfalse;
+}
+
+/*
+==========================================================================================================
+GLX_U: [Shop] the Combat HUD (/buy upgrade 6): leads for the hand weapon
+
+A logged-in character who owns it (RP_SELF_FX_COMBAT_HUD, set by the server in his own playerState) gets, for
+every moving enemy in view, a red dotted line from the target to a small red square: where to aim so the shot of
+the weapon in his hand meets it. After TaystJK's (JAPro's) cg_leadIndicator, with our rules for who is an enemy
+and the server's own shot speeds (CS_RP_WEAPVEL).
+==========================================================================================================
+*/
+
+// the shot speeds, RP_WVEL_* order: our server's defaults until its CS_RP_WEAPVEL arrives (an older server: never)
+static const int cg_rpWeapVelDefault[RP_WVEL_MAX] = { 1600, 2300, 1300, 1600, 1100, 3500, 3500, 900, 3000 };
+static int cg_rpWeapVel[RP_WVEL_MAX] = { 1600, 2300, 1300, 1600, 1100, 3500, 3500, 900, 3000 };
+
+/*
+CG_RpParseWeaponVel
+
+CS_RP_WEAPVEL, "1600 2300 1300 ...": RP_WVEL_MAX numbers (RP_WeaponVelShare(), g_weapon.c). Empty or missing (an
+older server): the defaults. A number that is missing or below 0 becomes 0, which gives that weapon no lead.
+*/
+void CG_RpParseWeaponVel( const char *s )
+{
+	int i;
+
+	if ( !s || !s[0] )
+	{
+		for ( i = 0; i < RP_WVEL_MAX; i++ )
+		{
+			cg_rpWeapVel[i] = cg_rpWeapVelDefault[i];
+		}
+		return;
+	}
+	for ( i = 0; i < RP_WVEL_MAX; i++ )
+	{
+		while ( *s == ' ' )
+		{
+			s++;
+		}
+		cg_rpWeapVel[i] = atoi( s );
+		if ( cg_rpWeapVel[i] < 0 )
+		{
+			cg_rpWeapVel[i] = 0;
+		}
+		while ( *s && *s != ' ' )
+		{
+			s++;
+		}
+	}
+}
+
+/*
+CG_RpCombatHudShotSpeed
+
+The speed of this weapon's shot with this fire button, 0 for one that gets no lead: the saber, melee, the stun
+baton, the disruptor (instant), thermals, mines and det packs, and the alt fires that don't fly straight at a
+target (DEMP2's area blast, the flechette's bouncing mines, the homing rocket, the concussion's beam). *falls is
+set for the one shot that drops on the way, the repeater's alt orb.
+*/
+int CG_RpCombatHudShotSpeed( int weapon, qboolean altFire, qboolean *falls )
+{
+	*falls = qfalse;
+	switch ( weapon )
+	{
+	case WP_BRYAR_PISTOL:
+	case WP_BRYAR_OLD:
+		return cg_rpWeapVel[RP_WVEL_PISTOL];
+	case WP_BLASTER:
+		return cg_rpWeapVel[RP_WVEL_E11];
+	case WP_BOWCASTER:
+		return cg_rpWeapVel[RP_WVEL_BOWCASTER];
+	case WP_REPEATER:
+		if ( altFire )
+		{
+			*falls = qtrue;
+			return cg_rpWeapVel[RP_WVEL_REPEATER_ALT];
+		}
+		return cg_rpWeapVel[RP_WVEL_REPEATER];
+	case WP_DEMP2:
+		return altFire ? 0 : cg_rpWeapVel[RP_WVEL_DEMP2];
+	case WP_FLECHETTE:
+		return altFire ? 0 : cg_rpWeapVel[RP_WVEL_FLECHETTE];
+	case WP_ROCKET_LAUNCHER:
+		return altFire ? 0 : cg_rpWeapVel[RP_WVEL_ROCKET];
+	case WP_CONCUSSION:
+		return altFire ? 0 : cg_rpWeapVel[RP_WVEL_CONCUSSION];
+	default:
+		return 0;
+	}
+}
+
+/*
+CG_RpCombatHudEnemyPlayer
+
+Whether this other player is an enemy for the Combat HUD, by the crosshair's rules: in the team gametypes the
+other team (an ally there stays an enemy); outside them anyone who is not my ally (/allyadd). In a power duel
+my own duel team is friendly.
+*/
+static qboolean CG_RpCombatHudEnemyPlayer( int clientNum )
+{
+	if ( clientNum < 0 || clientNum >= MAX_CLIENTS || clientNum == cg.snap->ps.clientNum )
+	{
+		return qfalse;
+	}
+	if ( cgs.gametype >= GT_TEAM )
+	{
+		return ( cgs.clientinfo[clientNum].team != cg.snap->ps.persistant[PERS_TEAM] ) ? qtrue : qfalse;
+	}
+	if ( cgs.gametype == GT_POWERDUEL
+		&& cgs.clientinfo[clientNum].duelTeam == cgs.clientinfo[cg.snap->ps.clientNum].duelTeam )
+	{
+		return qfalse;
+	}
+	return CG_IsAlly( clientNum ) ? qfalse : qtrue;
+}
+
+// an NPC's team (its teamowner) is the enemy's: NPCTEAM_ENEMY, or in Siege, where it is a player team, not mine.
+// Neutral NPCs and ones on no team get no lead.
+static qboolean CG_RpCombatHudEnemyNpcTeam( int teamowner )
+{
+	if ( cgs.gametype == GT_SIEGE )
+	{
+		return ( ( teamowner == TEAM_RED || teamowner == TEAM_BLUE )
+			&& teamowner != cg.snap->ps.persistant[PERS_TEAM] ) ? qtrue : qfalse;
+	}
+	return ( teamowner == NPCTEAM_ENEMY ) ? qtrue : qfalse;
+}
+
+/*
+CG_RpCombatHudTarget
+
+Whether this entity of the snapshot gets a lead (before the tests on its movement and the view to it):
+- a player, an NPC or a vehicle, alive and drawn; a player riding a vehicle is left to his vehicle's lead;
+- not one I can't see: cloaked, mind-tricking me (which is also how /admhidden hides), a Force ghost or a hologram;
+- not a player in a private duel I am not part of (he can't be hit), and in a duel of my own only my opponent;
+- an enemy: a player by CG_RpCombatHudEnemyPlayer(); an NPC by its team; a vehicle by its pilot (a player, or an
+  NPC's team), an empty one by its own team.
+*/
+qboolean CG_RpCombatHudTarget( const centity_t *cent )
+{
+	const entityState_t *es = &cent->currentState;
+
+	if ( es->number == cg.snap->ps.clientNum
+		|| ( cg.snap->ps.m_iVehicleNum && es->number == cg.snap->ps.m_iVehicleNum ) )
+	{// me, or what I ride
+		return qfalse;
+	}
+	if ( es->eType != ( es->number < MAX_CLIENTS ? ET_PLAYER : ET_NPC ) )
+	{
+		return qfalse;
+	}
+	if ( es->eFlags & ( EF_DEAD | EF_NODRAW ) )
+	{
+		return qfalse;
+	}
+	if ( es->powerups & ( 1 << PW_CLOAKED ) )
+	{
+		return qfalse;
+	}
+	if ( CG_IsMindTricked( es->trickedentindex, es->trickedentindex2, es->trickedentindex3, es->trickedentindex4,
+		cg.snap->ps.clientNum ) )
+	{
+		return qfalse;
+	}
+	{
+		const int phase = RP_PHASE_FROM_EFLAGS( es->eFlags );
+
+		if ( phase == RP_PHASE_GHOST || phase == RP_PHASE_HOLO )
+		{
+			return qfalse;
+		}
+	}
+
+	if ( es->eType == ET_PLAYER )
+	{
+		if ( es->m_iVehicleNum )
+		{// riding: his vehicle gets the lead
+			return qfalse;
+		}
+		if ( cg.snap->ps.duelInProgress )
+		{
+			if ( es->number != cg.snap->ps.duelIndex )
+			{
+				return qfalse;
+			}
+		}
+		else if ( es->bolt1 )
+		{// he is in a private duel and I am not
+			return qfalse;
+		}
+		return CG_RpCombatHudEnemyPlayer( es->number );
+	}
+
+	if ( es->NPC_class == CLASS_VEHICLE )
+	{
+		if ( es->m_iVehicleNum )
+		{// ridden: m_iVehicleNum is the pilot's entity number + 1
+			const int pilot = es->m_iVehicleNum - 1;
+
+			if ( pilot < MAX_CLIENTS )
+			{
+				return CG_RpCombatHudEnemyPlayer( pilot );
+			}
+			if ( pilot < MAX_GENTITIES && cg_entities[pilot].currentValid && cg_entities[pilot].currentState.eType == ET_NPC )
+			{
+				return CG_RpCombatHudEnemyNpcTeam( cg_entities[pilot].currentState.teamowner );
+			}
+		}
+		return CG_RpCombatHudEnemyNpcTeam( es->teamowner );
+	}
+
+	return CG_RpCombatHudEnemyNpcTeam( es->teamowner );
+}
+
+/*
+CG_RpCombatHudLeadPoint
+
+Where to aim from `from` so a shot of this speed meets a target now at targetPos moving at targetVel. First the
+target is moved on by `lag` seconds (my ping: what I see is that old by the time the server fires). Then the
+time t the shot needs is the one where both are as far from me: |d + targetVel * t| = speed * t, with d the way
+to the target, a quadratic in t. If it has no answer (the target outruns the shot), the plain distance / speed.
+A falling shot (the repeater's orb: gravity 800, thrown 40 upwards, g_weapon.c) is aimed higher by what it drops
+in that time.
+*/
+void CG_RpCombatHudLeadPoint( const vec3_t from, const vec3_t targetPos, const vec3_t targetVel, float speed, float lag,
+	qboolean falls, vec3_t out )
+{
+	vec3_t start, d;
+	float a, b, c, disc, eta;
+
+	VectorCopy( targetPos, out );
+	if ( speed <= 0.0f )
+	{
+		return;
+	}
+	VectorMA( targetPos, lag, targetVel, start );
+	VectorSubtract( start, from, d );
+
+	// ( v.v - s^2 ) t^2 + 2 ( d.v ) t + d.d = 0
+	a = DotProduct( targetVel, targetVel ) - speed * speed;
+	b = 2.0f * DotProduct( d, targetVel );
+	c = DotProduct( d, d );
+	eta = sqrt( c ) / speed;
+	disc = b * b - 4.0f * a * c;
+	if ( a < -0.001f && disc >= 0.0f )
+	{// the shot is faster than the target: one answer is ahead in time
+		const float t = ( -b - sqrt( disc ) ) / ( 2.0f * a );
+
+		if ( t > 0.0f )
+		{
+			eta = t;
+		}
+	}
+	if ( falls )
+	{// aiming higher makes the way longer: work the time out again with the raised point, a few times over
+		int i;
+
+		for ( i = 0; i < 8; i++ )
+		{
+			VectorMA( start, eta, targetVel, out );
+			out[2] += 0.5f * DEFAULT_GRAVITY * eta * eta - 40.0f * eta;
+			eta = Distance( from, out ) / speed;
+			if ( eta > 5.0f )
+			{// out of the orb's reach: no sense in going on
+				eta = 5.0f;
+				break;
+			}
+		}
+	}
+	VectorMA( start, eta, targetVel, out );
+	if ( falls )
+	{
+		out[2] += 0.5f * DEFAULT_GRAVITY * eta * eta - 40.0f * eta;
+	}
+}
+
+/*
+CG_RpCombatHudAllowed
+
+Whether I get leads at all right now: cg_leadIndicator on, the server's bit, alive, playing (not a spectator or
+following one, whose stats are the followed player's), and on foot or riding something that leaves my hand
+weapon working: a speeder or an animal. In a fighter or a walker the hand weapon is off (PM_Weapon()); the
+vehicle's own brackets and lead do the job there.
+*/
+qboolean CG_RpCombatHudAllowed( void )
+{
+	const playerState_t *ps;
+
+	if ( !cg_leadIndicator.integer || !cg.snap )
+	{
+		return qfalse;
+	}
+	ps = &cg.snap->ps;
+	if ( !( ps->stats[STAT_RP_SELF_FX] & RP_SELF_FX_COMBAT_HUD ) )
+	{
+		return qfalse;
+	}
+	if ( ( ps->pm_flags & PMF_FOLLOW ) || ps->persistant[PERS_TEAM] == TEAM_SPECTATOR
+		|| ps->pm_type == PM_SPECTATOR || ps->pm_type == PM_INTERMISSION )
+	{
+		return qfalse;
+	}
+	if ( ps->stats[STAT_HEALTH] <= 0 || ( ps->eFlags & EF_DEAD ) )
+	{
+		return qfalse;
+	}
+	if ( ps->m_iVehicleNum )
+	{
+		const centity_t *veh = ( ps->m_iVehicleNum < MAX_GENTITIES ) ? &cg_entities[ps->m_iVehicleNum] : NULL;
+
+		if ( !veh || !veh->m_pVehicle || !veh->m_pVehicle->m_pVehicleInfo )
+		{
+			return qfalse;
+		}
+		if ( veh->m_pVehicle->m_pVehicleInfo->type != VH_SPEEDER && veh->m_pVehicle->m_pVehicleInfo->type != VH_ANIMAL )
+		{
+			return qfalse;
+		}
+	}
+	return qtrue;
+}
+
+/*
+CG_RpCombatHud
+
+Draws the leads. cg_leadIndicator, as TaystJK's: 0 off; 1 on, allowing for my ping; any other number on, allowing
+for that many milliseconds instead.
+*/
+static void CG_RpCombatHud( void )
+{
+	usercmd_t cmd;
+	vec3_t eye;
+	qboolean falls;
+	float lag;
+	int speed, i;
+
+	if ( !CG_RpCombatHudAllowed() )
+	{
+		return;
+	}
+
+	trap->GetUserCmd( trap->GetCurrentCmdNumber(), &cmd );
+	speed = CG_RpCombatHudShotSpeed( cg.predictedPlayerState.weapon, ( cmd.buttons & BUTTON_ALT_ATTACK ) ? qtrue : qfalse, &falls );
+	if ( speed <= 0 )
+	{
+		return;
+	}
+
+	lag = ( cg_leadIndicator.integer == 1 ) ? (float)cg.snap->ping : cg_leadIndicator.value;
+	if ( !( lag > 0.0f ) )
+	{
+		lag = 0.0f;
+	}
+	else if ( lag > 999.0f )
+	{
+		lag = 999.0f;
+	}
+	lag *= 0.001f;
+
+	VectorCopy( cg.predictedPlayerState.origin, eye );
+	eye[2] += cg.predictedPlayerState.viewheight;
+
+	for ( i = 0; i < cg.snap->numEntities; i++ )
+	{
+		centity_t *cent = &cg_entities[cg.snap->entities[i].number];
+		vec3_t leadPos;
+		float x, y, leadX, leadY;
+		trace_t tr;
+
+		if ( !cent->currentValid || !CG_RpCombatHudTarget( cent ) )
+		{
+			continue;
+		}
+		if ( cg_rpVehLeadFrame[cent->currentState.number] == cg.clientFrame + 1 )
+		{// my vehicle's own lead is on it already
+			continue;
+		}
+		if ( !falls && VectorCompare( cent->currentState.pos.trDelta, vec3_origin ) )
+		{// standing still: aim at it
+			continue;
+		}
+		// in clear view, against the map only: others standing in between don't hide it
+		CG_Trace( &tr, eye, NULL, NULL, cent->lerpOrigin, cg.snap->ps.clientNum, CONTENTS_SOLID );
+		if ( tr.fraction < 1.0f && tr.entityNum != cent->currentState.number )
+		{
+			continue;
+		}
+
+		CG_RpCombatHudLeadPoint( eye, cent->lerpOrigin, cent->currentState.pos.trDelta, (float)speed, lag, falls, leadPos );
+
+		if ( !CG_WorldCoordToScreenCoordFloat( cent->lerpOrigin, &x, &y )
+			|| !CG_WorldCoordToScreenCoordFloat( leadPos, &leadX, &leadY ) )
+		{// behind me
+			continue;
+		}
+		CG_DottedLine( x, y, leadX, leadY, 1, 10, g_color_table[ColorIndex(COLOR_RED)], 0.5f );
+		trap->R_SetColor( g_color_table[ColorIndex(COLOR_RED)] );
+		CG_DrawPic( leadX - 2, leadY - 2, 4, 4, cgs.media.whiteShader );
+	}
+	trap->R_SetColor( NULL );
 }
 
 void CG_DrawBracketedEntities( void )
@@ -8702,6 +9109,7 @@ static void CG_Draw2D( void ) {
 
 	if (!cl_paused.integer) {
 		CG_DrawBracketedEntities();
+		CG_RpCombatHud();	// GLX_U: [Shop] the Combat HUD's leads, after the vehicle's own
 		CG_DrawUpperRight();
 	}
 

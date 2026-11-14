@@ -2022,6 +2022,12 @@ qhandle_t CG_StatusHandle(int task);
 qboolean CG_RagDoll(centity_t *cent, vec3_t forcedAngles);
 qboolean CG_G2TraceCollide(trace_t *tr, const vec3_t mins, const vec3_t maxs, const vec3_t lastValidStart, const vec3_t lastValidEnd);
 qboolean CG_RpVehResistsMarking( const centity_t *cent );	// GLX_U: [Vehicles] (cg_players.c)
+// GLX_U: [Shop] the Combat HUD (cg_draw.c)
+void CG_RpParseWeaponVel( const char *s );
+int CG_RpCombatHudShotSpeed( int weapon, qboolean altFire, qboolean *falls );
+qboolean CG_RpCombatHudTarget( const centity_t *cent );
+void CG_RpCombatHudLeadPoint( const vec3_t from, const vec3_t targetPos, const vec3_t targetVel, float speed, float lag, qboolean falls, vec3_t out );
+qboolean CG_RpCombatHudAllowed( void );
 qboolean CG_RpInBracketVehicle( void );	// GLX_U: [Vehicles] in a fighter, speeder or walker: brackets (cg_draw.c)
 void CG_AddGhoul2Mark(int shader, float size, vec3_t start, vec3_t end, int entnum,
 					  vec3_t entposition, float entangle, void *ghoul2, vec3_t scale, int lifeTime);

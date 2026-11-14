@@ -2676,6 +2676,7 @@ Ghoul2 Insert End
 
 	CG_ParseServerinfo();
 	BG_ParseAmmoMax( CG_ConfigString( CS_RP_AMMOMAX ) );	// GLX_U: [Ammo Pickups] the server's caps, for pickup prediction
+	CG_RpParseWeaponVel( CG_ConfigString( CS_RP_WEAPVEL ) );	// GLX_U: [Shop] the Combat HUD: the server's shot speeds
 
 	// load the new map
 //	CG_LoadingString( "collision map" );

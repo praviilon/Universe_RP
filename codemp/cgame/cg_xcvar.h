@@ -77,6 +77,9 @@ XCVAR_DEF( cg_drawStatus,						"1",					NULL,					CVAR_ARCHIVE )
 XCVAR_DEF( cg_drawTeamOverlay,					"0",					CG_TeamOverlayChange,	CVAR_ARCHIVE )
 XCVAR_DEF( cg_drawTimer,						"0",					NULL,					CVAR_ARCHIVE )
 XCVAR_DEF( cg_drawVehLeadIndicator,				"1",					NULL,					CVAR_ARCHIVE )
+// GLX_U: [Shop] the Combat HUD's leads (CG_RpCombatHud(), cg_draw.c), TaystJK's name and values: 0 off, 1 on allowing
+// for your ping, any other number on allowing for that many milliseconds. Only its owners see leads.
+XCVAR_DEF( cg_leadIndicator,					"1",					NULL,					CVAR_ARCHIVE )
 XCVAR_DEF( cg_dynamicCrosshair,					"1",					NULL,					CVAR_ARCHIVE )
 XCVAR_DEF( cg_dynamicCrosshairPrecision,		"1",					NULL,					CVAR_ARCHIVE )
 XCVAR_DEF( cg_debugAnim,						"0",					NULL,					CVAR_CHEAT )

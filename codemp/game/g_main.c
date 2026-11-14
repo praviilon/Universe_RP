@@ -1949,6 +1949,7 @@ void G_InitGame( int levelTime, int randomSeed, int restart ) {
 
 	G_RegisterCvars();
 	RP_AmmoMaxShare();	// GLX_U: [Ammo Pickups] every cap registered: CS_RP_AMMOMAX and the shared table
+	RP_WeaponVelShare();	// GLX_U: [Shop] the Combat HUD: every shot speed registered: CS_RP_WEAPVEL
 
 	G_ProcessIPBans();
 

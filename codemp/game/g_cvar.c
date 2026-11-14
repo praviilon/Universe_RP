@@ -410,6 +410,14 @@ void RP_CVU_maxAmmo(void)
 	RP_AmmoMaxShare();
 }
 
+// GLX_U: [Shop] the Combat HUD: one of the nine shot speeds its leads use changed, so they go out to the clients again
+// (RP_WeaponVelShare, g_weapon.c). Also run at registration, before the rest are registered; G_InitGame sends the
+// full set again once all are.
+void RP_CVU_weaponVelocity(void)
+{
+	RP_WeaponVelShare();
+}
+
 void RP_CVU_debugMelee(void)
 {
 	if (g_debugMelee.integer != 1)

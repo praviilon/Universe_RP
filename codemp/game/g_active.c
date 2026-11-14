@@ -3953,6 +3953,17 @@ void ClientThink_real( gentity_t *ent ) {
 	// GLX_U: [Shop] the Vacuum Suit's swim in space, worked out again every command (set just below)
 	client->ps.stats[STAT_RP_SELF_FX] &= ~RP_SELF_FX_SPACE_SWIM;
 
+	// GLX_U: [Shop] the Combat HUD (/buy upgrade 6, skill_levels[38] bit 5): a logged-in owner's own client draws the
+	// leads (RP_SELF_FX_COMBAT_HUD, bg_public.h). Players only; worked out again every command
+	if ( ent->s.number < MAX_CLIENTS && client->sess.amrpgmode == 2 && ( client->pers.skill_levels[38] & (1 << 5) ) )
+	{
+		client->ps.stats[STAT_RP_SELF_FX] |= RP_SELF_FX_COMBAT_HUD;
+	}
+	else
+	{
+		client->ps.stats[STAT_RP_SELF_FX] &= ~RP_SELF_FX_COMBAT_HUD;
+	}
+
 	if ( !ent->NPC || !(ent->NPC->aiFlags&NPCAI_CUSTOM_GRAVITY) )
 	{//use global gravity
 		if (ent->NPC && ent->s.NPC_class == CLASS_VEHICLE &&

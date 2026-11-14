@@ -53,9 +53,10 @@ int RP_DB_Open(sqlite3 **db);
 // jawa seller ever sold, most of it long dead) replaced by two smaller counts for the surviving
 // /buy item <n> and /buy upgrade <n> subcommands, each freshly numbered from 1.
 #define NUMBER_OF_SHOP_ITEMS			12 // zyk: quantity of items sold via /buy item <n> and /stuff item <n>
-#define NUMBER_OF_SHOP_UPGRADES			5 // zyk: quantity of upgrades sold via /buy upgrade <n> and /stuff upgrade <n>
+#define NUMBER_OF_SHOP_UPGRADES			6 // zyk: quantity of upgrades sold via /buy upgrade <n> and /stuff upgrade <n>
 // GLX_U: [Shop] 4 with the Underwater Breather (/buy upgrade 4, skill_levels[38] bit 3)
 // GLX_U: [Shop] 5 with the Vacuum Suit (/buy upgrade 5, skill_levels[38] bit 4)
+// GLX_U: [Shop] 6 with the Combat HUD (/buy upgrade 6, skill_levels[38] bit 5)
 #define DUEL_TOURNAMENT_ARENA_SIZE		64 // zyk: default size of the globe model used as the Duel Tournament arena
 #define DUEL_TOURNAMENT_PROTECT_TIME	2000 // zyk: duration of the duelists protection in Duel Tournament
 

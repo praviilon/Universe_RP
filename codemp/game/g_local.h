@@ -1233,6 +1233,8 @@ typedef struct clientPersistant_s {
 	// GLX_U: [Shop] bit 3 is the Underwater Breather (/buy upgrade 4): no drowning, see P_WorldEffects() (g_active.c).
 	// GLX_U: [Shop] bit 4 is the Vacuum Suit (/buy upgrade 5): no suffocation in open space, and he swims there --
 	// RP_SpaceSuitProtects() (g_trigger.c), EF_RP_SPACE_SWIM (bg_public.h).
+	// GLX_U: [Shop] bit 5 is the Combat HUD (/buy upgrade 6): his own client draws leads on moving enemies --
+	// RP_SELF_FX_COMBAT_HUD (bg_public.h), set in ClientThink_real() (g_active.c).
 	int skill_levels[NUM_OF_SKILLS];
 
 	int max_rpg_health; // zyk: max health the player can have in RPG Mode. This is set to STAT_MAX_HEALTH for RPG players
@@ -3333,6 +3335,9 @@ void RP_CVU_itemLifetime(void);
 void RP_CVU_addAmmoScale(void);
 // GLX_U: [Ammo Pickups] an rp_max_* ammo cap changed: send the caps again (RP_AmmoMaxShare)
 void RP_CVU_maxAmmo(void);
+// GLX_U: [Shop] the Combat HUD: a shot speed its leads use changed: send them again (RP_WeaponVelShare, g_weapon.c)
+void RP_CVU_weaponVelocity(void);
+void RP_WeaponVelShare( void );
 int RP_CorpseSecondsToMs(int seconds);
 
 // GalaxyRP fix: [validation] duel and minigame cvars whose feature becomes permanently unusable
