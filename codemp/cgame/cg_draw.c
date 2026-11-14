@@ -5727,6 +5727,8 @@ void CG_DottedLine( float x1, float y1, float x2, float y2, float dotSize, int n
 // so CG_RpCombatHud() doesn't draw a second lead on the same target
 static int cg_rpVehLeadFrame[MAX_GENTITIES];
 
+qboolean CG_InFighter( void );	// GLX_U: [Vehicles] defined below; CG_BracketEntity()'s near limit
+
 void CG_BracketEntity( centity_t *cent, float radius )
 {
 	trace_t tr;
@@ -5743,7 +5745,9 @@ void CG_BracketEntity( centity_t *cent, float radius )
 		&& (!cg.snap||cg.snap->ps.rocketLockIndex!= cent->currentState.clientNum) )
 	{//if they're the entity you're locking onto or under your crosshair, always draw bracket
 		//Hmm... for now, if they're closer than 2000, don't bracket?
-		if ( len < 2000.0f )
+		// GLX_U: [Vehicles] 2000 from a fighter, as stock; 1000 from a speeder or a walker (the only other riders with
+		// brackets, CG_RpInBracketVehicle()), whose fights are closer. For every bracketed target, the turrets too.
+		if ( len < ( CG_InFighter() ? 2000.0f : 1000.0f ) )
 		{
 			return;
 		}
