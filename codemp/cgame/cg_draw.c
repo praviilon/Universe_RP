@@ -5335,6 +5335,13 @@ static void CG_DrawCrosshair( vec3_t worldPoint, int chEntValid ) {
 							ecolor[2] = 0.0f;//B
 						}
 					}
+					else if ( crossEnt->currentState.teamowner == NPCTEAM_NEUTRAL )
+					{// GLX_U: [NPC] a neutral NPC (most droids, some civilians) stays yellow, as it was while NPCs reached the
+					 // clients team-less (RP_NpcShowTeam(), NPC_spawn.c); the stock rule below would make it red
+						ecolor[0] = 1.0f;//R
+						ecolor[1] = 1.0f;//G
+						ecolor[2] = 0.0f;//B
+					}
 					else if ( crossEnt->currentState.teamowner != plTeam )
 					{// on enemy team
 						ecolor[0] = 1.0f;//R

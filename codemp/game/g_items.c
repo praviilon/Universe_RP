@@ -1502,6 +1502,7 @@ void ItemUse_Seeker(gentity_t *ent)
 			{
 				remote->client->playerTeam = NPCTEAM_NEUTRAL;
 			}
+			RP_NpcShowTeam( remote );	// GLX_U: [NPC] and the team clients see
 		}
 	}
 	else

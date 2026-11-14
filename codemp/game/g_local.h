@@ -3337,6 +3337,7 @@ void RP_CVU_addAmmoScale(void);
 void RP_CVU_maxAmmo(void);
 // GLX_U: [Shop] the Combat HUD: a shot speed its leads use changed: send them again (RP_WeaponVelShare, g_weapon.c)
 void RP_CVU_weaponVelocity(void);
+void RP_NpcShowTeam( gentity_t *npc );	// GLX_U: [NPC] an NPC's own team into the one clients see (NPC_spawn.c)
 void RP_WeaponVelShare( void );
 int RP_CorpseSecondsToMs(int seconds);
 

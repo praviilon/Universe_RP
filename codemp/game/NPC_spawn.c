@@ -890,6 +890,25 @@ qboolean NPC_SpotWouldTelefrag( gentity_t *npc )
 
 /*
 ==================
+RP_NpcShowTeam
+
+GLX_U: [NPC] the NPC's own team (client->playerTeam, the one its AI uses) into s.teamowner, the team clients see:
+the crosshair's and health bar's colours, the brackets, the Combat HUD (cg_draw.c). The stock spawn copies the
+spawner's team over it (NPC_Spawn_Do()), which for /npc spawn and most map spawners is none, so almost every
+NPC reached the clients team-less. The NPC teams' numbers are the game teams' (NPCTEAM_ENEMY is TEAM_RED,
+NPCTEAM_PLAYER TEAM_BLUE), the mapping the stock code already relies on.
+==================
+*/
+void RP_NpcShowTeam( gentity_t *npc )
+{
+	if ( npc && npc->client )
+	{
+		npc->s.teamowner = npc->client->playerTeam;
+	}
+}
+
+/*
+==================
 RP_NpcSetTeam
 
 GalaxyRP: [NPC System] what /npc team does to the NPC or vehicle it is aimed at: the side it is on and the
@@ -919,6 +938,7 @@ static void RP_NpcSetTeam( gentity_t *npc, int team )
 		npc->client->enemyTeam = NPCTEAM_FREE;
 		break;
 	}
+	RP_NpcShowTeam( npc );	// GLX_U: [NPC] and the team clients see, vehicles too: an explicit choice
 }
 
 //--------------------------------------------------------------
@@ -1880,6 +1900,14 @@ gentity_t *NPC_Spawn_Do( gentity_t *ent )
 		newent->client->sess.sessionTeam = TEAM_FREE;
 	}
 	newent->client->ps.persistant[PERS_TEAM] = newent->client->sess.sessionTeam;
+	// GLX_U: [NPC] a spawner that gave no team left the NPC team-less for the clients (the copy above): they see its own
+	// team instead (RP_NpcShowTeam()). After the game team just above, which must keep coming from the spawner only
+	// (else every enemy NPC would join the red team). Not for vehicles: their .npc files mostly say TEAM_NEUTRAL as a
+	// placeholder, and a team-less vehicle is coloured by its pilot; "npcteam" or /npc team still sets theirs
+	if ( !newent->s.teamowner && newent->client->NPC_class != CLASS_VEHICLE )
+	{
+		RP_NpcShowTeam( newent );
+	}
 
 	// GalaxyRP: [Entity System] an npc_spawner's "npceffect": the NPC starts with that /npc effect mode,
 	// set here rather than in NPC_Begin() because the spawner may be gone by then (its last use frees it).
