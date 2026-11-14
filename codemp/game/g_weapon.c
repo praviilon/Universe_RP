@@ -4455,6 +4455,12 @@ void FireVehicleWeapon( gentity_t *ent, qboolean alt_fire )
 		return;
 	}
 
+	// GLX_U: [Vehicles] OJP's MBF keys: no primary / alt fire in the movement modes they mask (bg_vehicles.h)
+	if ( pVeh->rpMoveMode & ( alt_fire ? pVeh->m_pVehicleInfo->MBFstopaltfiring : pVeh->m_pVehicleInfo->MBFstopprimaryfiring ) )
+	{
+		return;
+	}
+
 	// TODO?: If possible (probably not enough time), it would be nice if secondary fire was actually a mode switch/toggle
 	// so that, for instance, an x-wing can have 4-gun fire, or individual muzzle fire. If you wanted a different weapon, you
 	// would actually have to press the 2 key or something like that (I doubt I'd get a graphic for it anyways though). -AReis

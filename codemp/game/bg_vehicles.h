@@ -187,6 +187,13 @@ typedef struct vehicleInfo_s {
 	// shields keep recharging (at shieldRechargeMS) after they are knocked down to 0 instead of staying down.
 	// Off by default (BG_VehicleSetDefaults memsets the struct). Used by Update() in g_vehicles.c.
 	qboolean	CantKnockoutShields;
+	// GLX_U: [Vehicles] OJP's "moving but firing" keys, so vehicles made for OJP work here too. Each is a mask of
+	// RP_VEHMODE_* bits (below, OJP's values): in those movement modes the primary weapon, the alt weapon or the
+	// shields are off. Walkers only (the mode is set in WalkerNPC.c's AnimateVehicle()); 0 by default.
+	// Used by FireVehicleWeapon() (g_weapon.c) and RP_VehShieldsByMode() (g_vehicles.c).
+	int			MBFstopprimaryfiring;
+	int			MBFstopaltfiring;
+	int			MBFdisableshields;
 	float		toughness;		//modifies incoming damage, 1.0 is normal, 0.5 is half, etc.  Simulates being made of tougher materials/construction
 	int			malfunctionArmorLevel;//when armor drops to or below this point, start malfunctioning
 	int			surfDestruction; //can parts of this thing be torn off on impact? -rww
@@ -638,11 +645,27 @@ typedef struct Vehicle_s
 
 	//the guy who was previously the pilot
 	bgEntity_t *	m_pOldPilot;
+
+	// GLX_U: [Vehicles] the walker's movement mode for the MBF keys (one RP_VEHMODE_* bit; 0 for none yet), and the
+	// shields kept aside while MBFdisableshields has them off (rpShieldsOff): see RP_VehShieldsByMode() (g_vehicles.c)
+	int			rpMoveMode;
+	qboolean	rpShieldsOff;
+	int			rpShieldsStored;
 #if defined(__GNUC__) || defined(__GCC__) || defined(MINGW32) || defined(MACOS_X)
 	};
 #else
 	} Vehicle_t;
 #endif
+
+// GLX_U: [Vehicles] the movement modes the MBF keys mask (OJP's vehicleMode_t values, so OJP .veh files work as written).
+// A walker is RUNNING at 27.5% of speedMax or more (walk button not held), WALKING below that or with the walk button,
+// BACKWARDS under -1.8%, STILL otherwise. OJP's TURNING (turning on the spot) and CROUCHING are never set here.
+#define RP_VEHMODE_RUNNING		1
+#define RP_VEHMODE_WALKING		2
+#define RP_VEHMODE_BACKWARDS	4
+#define RP_VEHMODE_STILL		8
+#define RP_VEHMODE_TURNING		16
+#define RP_VEHMODE_CROUCHING	32
 
 extern int BG_VehicleGetIndex( const char *vehicleName );
 // DAJ_RP: [NPC Scale] how far a vehicle of this kind, at this scale, is drawn above its origin -- see bg_vehicleLoad.c

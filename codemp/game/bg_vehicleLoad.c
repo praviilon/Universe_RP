@@ -460,6 +460,9 @@ vehField_t vehicleFields[] =
 	{"shields", VFOFS(shields), VF_INT},			//energy shield damage points
 	{"shieldRechargeMS", VFOFS(shieldRechargeMS), VF_INT},//energy shield milliseconds per point recharged
 	{"CantKnockoutShields", VFOFS(CantKnockoutShields), VF_BOOL},// DAJ_RP: [Vehicles] OJP's key: shields recharge from 0 too
+	{"MBFstopprimaryfiring", VFOFS(MBFstopprimaryfiring), VF_INT},// GLX_U: [Vehicles] OJP's keys: in these RP_VEHMODE_* modes
+	{"MBFstopaltfiring", VFOFS(MBFstopaltfiring), VF_INT},		// no primary fire, no alt fire,
+	{"MBFdisableshields", VFOFS(MBFdisableshields), VF_INT},		// no shields (bg_vehicles.h)
 	{"toughness", VFOFS(toughness), VF_FLOAT},		//modifies incoming damage, 1.0 is normal, 0.5 is half, etc.  Simulates being made of tougher materials/construction
 	{"malfunctionArmorLevel", VFOFS(malfunctionArmorLevel), VF_INT},//when armor drops to or below this point, start malfunctioning
 	{"surfDestruction", VFOFS(surfDestruction), VF_INT},

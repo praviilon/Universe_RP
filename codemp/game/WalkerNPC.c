@@ -390,6 +390,7 @@ static void AnimateVehicle( Vehicle_t *pVeh )
 			else*/
 			{
 				Anim = BOTH_WALK1;
+				pVeh->rpMoveMode = RP_VEHMODE_WALKING;	// GLX_U: [Vehicles] the MBF keys' mode (bg_vehicles.h)
 			}
 		}
 		// otherwise we're running.
@@ -407,6 +408,7 @@ static void AnimateVehicle( Vehicle_t *pVeh )
 			else*/
 			{
 				Anim = BOTH_RUN1;
+				pVeh->rpMoveMode = RP_VEHMODE_RUNNING;	// GLX_U: [Vehicles]
 			}
 		}
 	}
@@ -418,6 +420,7 @@ static void AnimateVehicle( Vehicle_t *pVeh )
 			iFlags = SETANIM_FLAG_NORMAL;
 			Anim = BOTH_WALKBACK1;
 			iBlend = 500;
+			pVeh->rpMoveMode = RP_VEHMODE_BACKWARDS;	// GLX_U: [Vehicles]
 		}
 		else
 		{
@@ -426,6 +429,7 @@ static void AnimateVehicle( Vehicle_t *pVeh )
 			// Every once in a while buck or do a different idle...
 			iFlags = SETANIM_FLAG_NORMAL | SETANIM_FLAG_RESTART | SETANIM_FLAG_HOLD;
 			iBlend = 600;
+			pVeh->rpMoveMode = RP_VEHMODE_STILL;	// GLX_U: [Vehicles] with a rider or empty: an empty walker gets its shields back
 			if (parent->client->ps.m_iVehicleNum)
 			{//occupado
 				Anim = BOTH_STAND1;

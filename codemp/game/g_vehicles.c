@@ -1213,6 +1213,10 @@ qboolean Initialize( Vehicle_t *pVeh )
 	pVeh->m_iShields = pVeh->m_pVehicleInfo->shields;
 	G_VehUpdateShields( parent );
 	parent->client->ps.stats[STAT_ARMOR] = pVeh->m_iShields;
+	// GLX_U: [Vehicles] no movement mode yet, and no shields kept aside (MBF keys: RP_VehShieldsByMode())
+	pVeh->rpMoveMode = 0;
+	pVeh->rpShieldsOff = qfalse;
+	pVeh->rpShieldsStored = 0;
 	}
 	parent->mass = pVeh->m_pVehicleInfo->mass;
 	//initialize the ammo to max
@@ -1305,6 +1309,52 @@ qboolean Initialize( Vehicle_t *pVeh )
 	return qtrue;
 }
 
+/*
+GLX_U: [Vehicles] OJP's MBFdisableshields: in the movement modes it masks (pVeh->rpMoveMode, set by the walker's
+AnimateVehicle()) the shields are off. Going in, they are kept aside in rpShieldsStored and STAT_ARMOR goes to 0, so the
+pilot's HUD and everyone's shield display show them down and hits go to the hull; coming out, they are put back. While
+off, anything that put shields back meanwhile (a shield station) is folded into the store too, up to the most this
+vehicle has, and Update()'s recharge adds to the store instead of STAT_ARMOR. OJP did the same only with its
+VehicleMovementModesActive key set (and erratically without it); here the mask alone does it.
+*/
+static void RP_VehShieldsByMode( Vehicle_t *pVeh, gentity_t *parent, playerState_t *parentPS )
+{
+	const int maxShields = pVeh->m_pVehicleInfo->shields;
+
+	if ( maxShields <= 0 )
+	{//no shields to switch off
+		return;
+	}
+
+	if ( pVeh->rpMoveMode & pVeh->m_pVehicleInfo->MBFdisableshields )
+	{
+		if ( !pVeh->rpShieldsOff )
+		{
+			pVeh->rpShieldsOff = qtrue;
+			pVeh->rpShieldsStored = 0;
+		}
+		if ( parentPS->stats[STAT_ARMOR] > 0 )
+		{//going in, or put back since: into the store
+			pVeh->rpShieldsStored += parentPS->stats[STAT_ARMOR];
+			if ( pVeh->rpShieldsStored > maxShields )
+			{
+				pVeh->rpShieldsStored = maxShields;
+			}
+			parentPS->stats[STAT_ARMOR] = 0;
+			pVeh->m_iShields = 0;
+			G_VehUpdateShields( parent );
+		}
+	}
+	else if ( pVeh->rpShieldsOff )
+	{//back on, as high as they had recharged
+		pVeh->rpShieldsOff = qfalse;
+		parentPS->stats[STAT_ARMOR] = pVeh->rpShieldsStored;
+		pVeh->rpShieldsStored = 0;
+		pVeh->m_iShields = parentPS->stats[STAT_ARMOR];
+		G_VehUpdateShields( parent );
+	}
+}
+
 // Like a think or move command, this updates various vehicle properties.
 void G_VehicleDamageBoxSizing(Vehicle_t *pVeh); //declared below
 static qboolean Update( Vehicle_t *pVeh, const usercmd_t *pUmcd )
@@ -1373,25 +1423,33 @@ static qboolean Update( Vehicle_t *pVeh, const usercmd_t *pUmcd )
 		pVeh->lastShieldInc = pUmcd->serverTime;
 	}
 
+	// GLX_U: [Vehicles] OJP's MBFdisableshields: shields off (kept aside) in the movement modes it masks
+	RP_VehShieldsByMode( pVeh, parent, parentPS );
+
 	//increment shields for rechargable shields
 	// DAJ_RP: [Vehicles] CantKnockoutShields (OJP's .veh key) lets them recharge from 0 too; without it they stay
 	// down once knocked out, as in the base game.
+	// GLX_U: [Vehicles] while MBFdisableshields has them off, the recharge goes to the shields kept aside
+	{
+	int *shieldsNow = pVeh->rpShieldsOff ? &pVeh->rpShieldsStored : &parentPS->stats[STAT_ARMOR];
+
 	if ( pVeh->m_pVehicleInfo->shieldRechargeMS
-		&& ( parentPS->stats[STAT_ARMOR] > 0 || pVeh->m_pVehicleInfo->CantKnockoutShields ) //still have some shields left
-		&& parentPS->stats[STAT_ARMOR] < pVeh->m_pVehicleInfo->shields//its below max
+		&& ( *shieldsNow > 0 || pVeh->m_pVehicleInfo->CantKnockoutShields ) //still have some shields left
+		&& *shieldsNow < pVeh->m_pVehicleInfo->shields//its below max
 		&& pUmcd->serverTime-pVeh->lastShieldInc >= pVeh->m_pVehicleInfo->shieldRechargeMS )//enough time has passed
 	{
 		// DAJ_RP: [Vehicles] stamp the point, as the weapon and turret ammo above do. The base game never did,
 		// so the time test always passed and the shields went up a point every vehicle update -- every server
 		// frame, or every pilot command -- whatever shieldRechargeMS said. OJP fixes it the same way.
 		pVeh->lastShieldInc = pUmcd->serverTime;
-		parentPS->stats[STAT_ARMOR]++;
-		if ( parentPS->stats[STAT_ARMOR] > pVeh->m_pVehicleInfo->shields )
+		(*shieldsNow)++;
+		if ( *shieldsNow > pVeh->m_pVehicleInfo->shields )
 		{
-			parentPS->stats[STAT_ARMOR] = pVeh->m_pVehicleInfo->shields;
+			*shieldsNow = pVeh->m_pVehicleInfo->shields;
 		}
 		pVeh->m_iShields = parentPS->stats[STAT_ARMOR];
 		G_VehUpdateShields( parent );
+	}
 	}
 
 	if (parent && parent->r.ownerNum != parent->s.owner)
