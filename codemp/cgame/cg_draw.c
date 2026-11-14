@@ -4924,7 +4924,15 @@ void CG_DrawHealthBar(centity_t *cent, float chX, float chY, float chW, float ch
 	}
 
 	//color of the bar
-	if (!cent->currentState.teamowner || cgs.gametype < GT_TEAM)
+	if ( cent->currentState.eType == ET_NPC && cgs.gametype != GT_SIEGE )
+	{ // GLX_U: [NPC] an NPC (vehicles too) by the crosshair's NPC rule, in every gametype: its NPC team (NPC_spawn.c's
+	  // RP_NpcShowTeam()) is not a game team, so the stock test below took an enemy for a red-team player's friend
+		aColor[0] = ( cent->currentState.teamowner == NPCTEAM_PLAYER ) ? 0.0f : 1.0f;
+		aColor[1] = ( cent->currentState.teamowner == NPCTEAM_ENEMY ) ? 0.0f : 1.0f;
+		aColor[2] = 0.0f;
+		aColor[3] = 0.4f;
+	}
+	else if (!cent->currentState.teamowner || cgs.gametype < GT_TEAM)
 	{ //not owned by a team or teamplay
 		aColor[0] = 1.0f;
 		aColor[1] = 1.0f;
@@ -5762,6 +5770,23 @@ void CG_BracketEntity( centity_t *cent, float radius )
 			trap->R_SetColor ( g_color_table[ColorIndex(COLOR_RED)] );
 		}
 	}
+	else if ( cent->currentState.teamowner && cent->currentState.eType == ET_NPC && cgs.gametype != GT_SIEGE )
+	{// GLX_U: [NPC] a vehicle's NPC team (/npc team, npcteam; NPC_spawn.c), by the crosshair's NPC rule: only the
+	 // enemy team is an enemy, red with the vehicle lead; the player team green; anything else (neutral, free) white
+		if ( cent->currentState.teamowner == NPCTEAM_ENEMY )
+		{
+			isEnemy = qtrue;
+			trap->R_SetColor ( g_color_table[ColorIndex(COLOR_RED)] );
+		}
+		else if ( cent->currentState.teamowner == NPCTEAM_PLAYER )
+		{
+			trap->R_SetColor ( g_color_table[ColorIndex(COLOR_GREEN)] );
+		}
+		else
+		{
+			trap->R_SetColor ( NULL );
+		}
+	}
 	else if ( cent->currentState.teamowner )
 	{
 		if ( cgs.gametype < GT_TEAM )
@@ -6360,7 +6385,9 @@ static void CG_RpCombatHud( void )
 		// GLX_U: [Shop] the middle of its box, not its origin (CG_RpCombatHudAimPoint()), for the view, the line and the lead
 		CG_RpCombatHudAimPoint( cent, aim );
 		// in clear view, against the map only: others standing in between don't hide it
-		CG_Trace( &tr, eye, NULL, NULL, aim, cg.snap->ps.clientNum, CONTENTS_SOLID );
+		// GLX_U: [Shop] against what can't be seen through (CONTENTS_OPAQUE), as the brackets test: glass doesn't hide a
+		// lead, foliage or a curtain does; bodies aren't opaque, so they still don't
+		CG_Trace( &tr, eye, NULL, NULL, aim, cg.snap->ps.clientNum, CONTENTS_OPAQUE );
 		if ( tr.fraction < 1.0f && tr.entityNum != cent->currentState.number )
 		{
 			continue;
