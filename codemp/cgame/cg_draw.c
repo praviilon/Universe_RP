@@ -4911,6 +4911,8 @@ void CG_DrawSiegeInfo(centity_t *cent, float chX, float chY, float chW, float ch
 }
 
 //draw the health bar based on current "health" and maxhealth
+static qboolean CG_RpCombatHudEnemyPlayer( int clientNum );	// GLX_U: [Vehicles] below, the Combat HUD's player rule
+
 void CG_DrawHealthBar(centity_t *cent, float chX, float chY, float chW, float chH)
 {
 	vec4_t aColor;
@@ -4924,7 +4926,20 @@ void CG_DrawHealthBar(centity_t *cent, float chX, float chY, float chW, float ch
 	}
 
 	//color of the bar
-	if ( cent->currentState.eType == ET_NPC && cgs.gametype != GT_SIEGE )
+	if ( cent->currentState.eType == ET_NPC && cent->currentState.NPC_class == CLASS_VEHICLE
+		&& cent->currentState.m_iVehicleNum && cent->currentState.m_iVehicleNum - 1 < MAX_CLIENTS
+		&& cgs.clientinfo[cent->currentState.m_iVehicleNum - 1].infoValid )
+	{ // GLX_U: [Vehicles] a vehicle with a player pilot (m_iVehicleNum is his slot + 1), by its pilot, in every gametype, as
+	  // its crosshair (which takes the pilot), brackets and leads: green for a friend (my team in the team gametypes, my
+	  // ally or power-duel team outside them; CG_RpCombatHudEnemyPlayer()), red otherwise. No grey, as no bar has one
+		const qboolean enemy = CG_RpCombatHudEnemyPlayer( cent->currentState.m_iVehicleNum - 1 );
+
+		aColor[0] = enemy ? 1.0f : 0.0f;
+		aColor[1] = enemy ? 0.0f : 1.0f;
+		aColor[2] = 0.0f;
+		aColor[3] = 0.4f;
+	}
+	else if ( cent->currentState.eType == ET_NPC && cgs.gametype != GT_SIEGE )
 	{ // GLX_U: [NPC] an NPC (vehicles too) by the crosshair's NPC rule, in every gametype: its NPC team (NPC_spawn.c's
 	  // RP_NpcShowTeam()) is not a game team, so the stock test below took an enemy for a red-team player's friend
 		aColor[0] = ( cent->currentState.teamowner == NPCTEAM_PLAYER ) ? 0.0f : 1.0f;
