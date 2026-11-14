@@ -85,6 +85,7 @@ void auto_turret_die ( gentity_t *self, gentity_t *inflictor, gentity_t *attacke
 	self->s.loopSound = 0;
 	self->s.shouldtarget = qfalse;
 	//self->s.owner = MAX_CLIENTS; //not owned by any client
+	self->s.eFlags2 &= ~EF2_BRACKET_ENTITY;	// GLX_U: [Vehicles] the wreck gets no brackets (turret_base_spawn_top())
 
 	VectorCopy( self->r.currentOrigin, pos );
 	pos[2] += self->r.maxs[2]*0.5f;
@@ -1040,6 +1041,11 @@ qboolean turret_base_spawn_top( gentity_t *base )
 
 	top->material = MAT_METAL;
 	//base->r.svFlags |= SVF_NO_TELEPORT|SVF_NONNPC_ENEMY|SVF_SELF_ANIMATING;
+
+	// GLX_U: [Vehicles] brackets on the gun (the part that is shot at, turns and dies), in every gametype, as the Death
+	// Star turret (misc_turretG2 TURBO, g_turret_G2.c): our client draws them from a fighter, speeder or walker, a
+	// vanilla one from a fighter. Taken off when it dies (auto_turret_die()), so the wreck has none
+	top->s.eFlags2 |= EF2_BRACKET_ENTITY;
 
 	// Register this so that we can use it for the missile effect
 	RegisterItem( BG_FindItemForWeapon( WP_EMPLACED_GUN ));
