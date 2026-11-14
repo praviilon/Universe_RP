@@ -1003,7 +1003,7 @@ static void CG_General( centity_t *cent ) {
 	}
 	if (cent->currentState.eFlags2 & EF2_BRACKET_ENTITY)
 	{
-		if ( CG_InFighter() )
+		if ( CG_RpInBracketVehicle() )	// GLX_U: [Vehicles] in a fighter, speeder or walker (was CG_InFighter())
 		{//only bracken when in a fighter
 			CG_AddBracketedEnt(cent);
 		}

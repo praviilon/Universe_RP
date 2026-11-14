@@ -5915,6 +5915,26 @@ qboolean CG_InATST( void )
 	return qfalse;
 }
 
+// GLX_U: [Vehicles] brackets (and the lead indicator, CG_BracketEntity()) from a fighter, a speeder or a walker, not only
+// from a fighter as in the base game. Riding an animal or a flier, or on foot: none. Asked where vehicles
+// (CG_Player(), cg_players.c) and the server's EF2_BRACKET_ENTITY ones, the turbolaser turrets (CG_General(),
+// cg_ents.c), are put on the bracket list.
+qboolean CG_RpInBracketVehicle( void )
+{
+	if ( cg.predictedPlayerState.m_iVehicleNum )
+	{
+		const centity_t *vehCent = &cg_entities[cg.predictedPlayerState.m_iVehicleNum];
+
+		if ( vehCent->m_pVehicle && vehCent->m_pVehicle->m_pVehicleInfo )
+		{
+			const int type = vehCent->m_pVehicle->m_pVehicleInfo->type;
+
+			return ( type == VH_FIGHTER || type == VH_SPEEDER || type == VH_WALKER ) ? qtrue : qfalse;
+		}
+	}
+	return qfalse;
+}
+
 void CG_DrawBracketedEntities( void )
 {
 	int i;

@@ -1249,7 +1249,8 @@ void finish_spawning_turretG2( gentity_t *base )
 		}
 		//start in "off" anim
 		TurboLaser_SetBoneAnim( base, 4, 5 );
-		if ( level.gametype == GT_SIEGE )
+		// GLX_U: [Vehicles] in every gametype, not only Siege: our client brackets it from a fighter, speeder or
+		// walker (CG_RpInBracketVehicle(), cgame), a vanilla one from a fighter
 		{//FIXME: designer-specified?
 			//FIXME: put on other entities, too, particularly siege objectives and bbrushes...
 			base->s.eFlags2 |= EF2_BRACKET_ENTITY;

@@ -11122,7 +11122,7 @@ void CG_Player( centity_t *cent ) {
 	if (cent->currentState.eType == ET_NPC)
 	{// zyk: npcs will also be shown in radar
 		CG_AddRadarEnt(cent);
-		if ( cent->currentState.NPC_class == CLASS_VEHICLE && CG_InFighter() )
+		if ( cent->currentState.NPC_class == CLASS_VEHICLE && CG_RpInBracketVehicle() )	// GLX_U: [Vehicles] was CG_InFighter()
 		{//this is a vehicle, bracket it
 			if ( cg.predictedPlayerState.m_iVehicleNum != cent->currentState.clientNum )
 			{//don't add the vehicle I'm in... :)
