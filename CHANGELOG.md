@@ -9,6 +9,10 @@
 - 61 new roleplay animations for the Universe RP client: sitting, dancing, talking, work, hurt and captive poses, wrist comlink, holo message, medpac and bomb planting (from Mixamo and Jedi Knight Galaxies). `/anim` has names for them in new categories (Social, Sit, Work, Leisure, Hurt; `/anim list` is now three pages). Several stock animations were also added in there.
 - Crouch Toggle, a new switch in the Universe RP menu's Camera panel (`cg_crouchToggle`, off by default): press crouch once to stay crouched and again to stand. It lets go on its own when you jump, swim, die or board a vehicle, and `/emote` or `/anim` stand you up first. Universe RP client only.
 - New vehicle `.veh` keys from OJP: `MBFstopprimaryfiring`, `MBFstopaltfiring` and `MBFdisableshields` stop a vehicle's weapons or shields while it moves, and `AllWeaponsDoDamageToArmor`, `AllWeaponsDoDamageToShields`, `SpeedMultiplierForRamDamage` and `ResistsMarking` set which weapons can hurt it, how hard a walker crushes and whether hits leave marks on it. Vehicle files without them work as before.
+- Combat HUD, a sixth permanent shop upgrade (`/buy upgrade 6`, 70000 credits): your client shows where to aim the weapon in your hand to hit a moving enemy player, NPC or vehicle, with a red dotted line to a small marker. Allies, friendly NPCs and cloaked targets get none; `cg_leadIndicator 0` turns it off. Universe RP client only.
+
+### Changed
+- Vehicle brackets and the lead indicator now also show when riding a speeder or a walker, not only a fighter (Universe RP client only). The big turbolaser turrets get brackets in every gametype, not only Siege.
 
 ### Fixed
 - The head and spine no longer turn backwards for a moment after the left air kick, the left Force jump and 55 other mirrored stock animations: their Motion bone, which the spine correction reads, now faces forward.
