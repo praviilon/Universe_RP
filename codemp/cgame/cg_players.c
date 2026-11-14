@@ -11124,7 +11124,11 @@ void CG_Player( centity_t *cent ) {
 		CG_AddRadarEnt(cent);
 		if ( cent->currentState.NPC_class == CLASS_VEHICLE && CG_RpInBracketVehicle() )	// GLX_U: [Vehicles] was CG_InFighter()
 		{//this is a vehicle, bracket it
-			if ( cg.predictedPlayerState.m_iVehicleNum != cent->currentState.clientNum )
+			// GLX_U: [Vehicles] ...once it has spawned: its clientNum is then its own number (NPC_Begin() sets ps.clientNum,
+			// copied into s.clientNum every frame). One still waiting for a blocked spot (NPC_Begin() retries; a script
+			// spawning onto a parked vehicle) is already sent, half set up, with clientNum 0: no ghost brackets for it.
+			if ( cg.predictedPlayerState.m_iVehicleNum != cent->currentState.clientNum
+				&& cent->currentState.clientNum == cent->currentState.number )
 			{//don't add the vehicle I'm in... :)
 				CG_AddBracketedEnt(cent);
 			}

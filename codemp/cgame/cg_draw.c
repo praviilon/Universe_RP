@@ -5741,8 +5741,11 @@ void CG_BracketEntity( centity_t *cent, float radius )
 	VectorSubtract( cent->lerpOrigin, cg.refdef.vieworg, dif );
 	len = VectorNormalize( dif );
 
-	if ( cg.crosshairClientNum != cent->currentState.clientNum
-		&& (!cg.snap||cg.snap->ps.rocketLockIndex!= cent->currentState.clientNum) )
+	// GLX_U: [Vehicles] both hold an entity number, so compared with the entity's number (was its clientNum): the same for a
+	// vehicle, but a turret's clientNum is 0, so the one aimed at was never exempted and every turret was (through walls,
+	// at any distance) whenever the crosshair value was 0
+	if ( cg.crosshairClientNum != cent->currentState.number
+		&& (!cg.snap||cg.snap->ps.rocketLockIndex!= cent->currentState.number) )
 	{//if they're the entity you're locking onto or under your crosshair, always draw bracket
 		//Hmm... for now, if they're closer than 2000, don't bracket?
 		// GLX_U: [Vehicles] 2000 from a fighter, as stock; 1000 from a speeder or a walker (the only other riders with
