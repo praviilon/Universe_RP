@@ -4700,9 +4700,12 @@ void ClientThink_real( gentity_t *ent ) {
 					gentity_t	*under = &g_entities[ent->client->ps.groundEntityNum];
 					const float	ramMult = ent->m_pVehicle->m_pVehicleInfo->SpeedMultiplierForRamDamage;
 					if ( ramMult >= 0.0f )
-					{// GLX_U: [Vehicles] OJP's SpeedMultiplierForRamDamage: |speed| x it, at most every 500 ms per victim, so a
-					 // walker standing still crushes nothing (OJP's own speed x it gave nothing in reverse either)
-						const int crush = (int)( fabs( ent->client->ps.speed ) * ramMult );
+					{// GLX_U: [Vehicles] OJP's SpeedMultiplierForRamDamage: |speed| x it, at most every 500 ms per victim. Reversing
+					 // crushes as hard as going forward at the same speed, and a walker standing still crushes nothing (OJP did 1
+					 // every 500 ms in both cases: its G_Damage() makes anything below 1 a 1). The damage is made an int only
+					 // within range: at most 100000, and 0 for nothing, below 0 or not a number (an absurd .veh value).
+						const double crushD = fabs( ent->client->ps.speed ) * ramMult;
+						const int crush = ( crushD > 0.0 ) ? ( ( crushD < 100000.0 ) ? (int)crushD : 100000 ) : 0;
 
 						if ( under && under->health && under->takedamage && crush > 0 && under->rpVehCrushTime <= level.time )
 						{

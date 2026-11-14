@@ -7205,17 +7205,17 @@ void CG_SaberCompWork(vec3_t start, vec3_t end, centity_t *owner, int saberNum, 
 								}
 								if ( !CG_RpVehResistsMarking( trEnt ) )	// GLX_U: [Vehicles] OJP's ResistsMarking: no burn, and no splash-back either
 								{
-								CG_AddGhoul2Mark(markShader, flrand(3.0f, 4.0f),
-									trace.endpos, ePos, trace.entityNum, trEnt->lerpOrigin, trEnt->lerpAngles[YAW],
-									trEnt->ghoul2, trEnt->modelScale, Q_irand(5000, 10000));
-								if ( weaponMarkShader )
-								{
-									vec3_t splashBackDir;
-									VectorScale( ePos, -1 , splashBackDir );
-									CG_AddGhoul2Mark(weaponMarkShader, flrand(0.5f, 2.0f),
-										trace.endpos, splashBackDir, owner->currentState.clientNum, owner->lerpOrigin, owner->lerpAngles[YAW],
-										owner->ghoul2, owner->modelScale, Q_irand(5000, 10000));
-								}
+									CG_AddGhoul2Mark(markShader, flrand(3.0f, 4.0f),
+										trace.endpos, ePos, trace.entityNum, trEnt->lerpOrigin, trEnt->lerpAngles[YAW],
+										trEnt->ghoul2, trEnt->modelScale, Q_irand(5000, 10000));
+									if ( weaponMarkShader )
+									{
+										vec3_t splashBackDir;
+										VectorScale( ePos, -1 , splashBackDir );
+										CG_AddGhoul2Mark(weaponMarkShader, flrand(0.5f, 2.0f),
+											trace.endpos, splashBackDir, owner->currentState.clientNum, owner->lerpOrigin, owner->lerpAngles[YAW],
+											owner->ghoul2, owner->modelScale, Q_irand(5000, 10000));
+									}
 								}
 							}
 						}

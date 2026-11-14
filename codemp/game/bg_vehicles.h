@@ -196,8 +196,8 @@ typedef struct vehicleInfo_s {
 	int			MBFdisableshields;
 	// GLX_U: [Vehicles] OJP's damage and marking keys:
 	// - AllWeaponsDoDamageToArmor 1: no built-in weapon immunity. A walker spawns without FL_SHIELDED, a fighter
-	//   without FL_SHIELDED and FL_DMG_BY_HEAVY_WEAP_ONLY (NPC_spawn.c), so light projectiles, the disruptor and
-	//   melee can hurt it. 0 by default: as before.
+	//   without FL_SHIELDED and FL_DMG_BY_HEAVY_WEAP_ONLY (NPC_spawn.c), so light projectiles and the disruptor can
+	//   hurt it, and on a fighter melee too (a walker could already be hurt by melee). 0 by default: as before.
 	// - AllWeaponsDoDamageToShields: 0 (OJP's default) bounces light projectiles off any vehicle while its shields
 	//   are up (RP_VehShieldsDeflect(), g_missile.c); 1 lets them hit the shields.
 	// - SpeedMultiplierForRamDamage: a walker crushes what it stands on for |speed| x this, at most every 500 ms per

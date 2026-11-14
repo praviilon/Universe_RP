@@ -1370,6 +1370,7 @@ static qboolean Update( Vehicle_t *pVeh, const usercmd_t *pUmcd )
 	int halfMaxSpeed;
 	playerState_t *parentPS;
 	qboolean linkHeld = qfalse;
+	int *shieldsNow;	// GLX_U: [Vehicles] the shields the recharge below adds to (MBFdisableshields)
 
 
 	parentPS =  pVeh->m_pParentEntity->playerState;
@@ -1430,9 +1431,7 @@ static qboolean Update( Vehicle_t *pVeh, const usercmd_t *pUmcd )
 	// DAJ_RP: [Vehicles] CantKnockoutShields (OJP's .veh key) lets them recharge from 0 too; without it they stay
 	// down once knocked out, as in the base game.
 	// GLX_U: [Vehicles] while MBFdisableshields has them off, the recharge goes to the shields kept aside
-	{
-	int *shieldsNow = pVeh->rpShieldsOff ? &pVeh->rpShieldsStored : &parentPS->stats[STAT_ARMOR];
-
+	shieldsNow = pVeh->rpShieldsOff ? &pVeh->rpShieldsStored : &parentPS->stats[STAT_ARMOR];
 	if ( pVeh->m_pVehicleInfo->shieldRechargeMS
 		&& ( *shieldsNow > 0 || pVeh->m_pVehicleInfo->CantKnockoutShields ) //still have some shields left
 		&& *shieldsNow < pVeh->m_pVehicleInfo->shields//its below max
@@ -1449,7 +1448,6 @@ static qboolean Update( Vehicle_t *pVeh, const usercmd_t *pUmcd )
 		}
 		pVeh->m_iShields = parentPS->stats[STAT_ARMOR];
 		G_VehUpdateShields( parent );
-	}
 	}
 
 	if (parent && parent->r.ownerNum != parent->s.owner)
