@@ -332,6 +332,13 @@ qboolean Board( Vehicle_t *pVeh, bgEntity_t *pEnt )
 		 ( ent->client->ps.m_iVehicleNum ) )	// GLX_U fix: [Vehicles] no client (used by a map entity): nothing to board
 		return qfalse;
 
+	// GLX_U: [Vehicles] only players board. NPCs and bots have no piloting AI (an NPC in a vehicle does nothing, and
+	// the bots' vehicle code is debug-only), so one that dropped onto a speeder or a docked fighter, pressed use or set
+	// off a trigger just sat in it. Refused here, every boarding path (landing, standing on a suspended vehicle, use,
+	// NPC_Use) leaves them on foot. A vehicle's droid unit is set in place at spawn and never comes here.
+	if ( ent->s.number >= MAX_CLIENTS || ( ent->r.svFlags & SVF_BOT ) )
+		return qfalse;
+
 	// Bucking so we can't do anything (NOTE: Should probably be a better name since fighters don't buck...).
 	if ( pVeh->m_ulFlags & VEH_BUCKING )
 		return qfalse;
