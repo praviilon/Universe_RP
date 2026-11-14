@@ -13511,6 +13511,7 @@ void Cmd_ListAccount_f( gentity_t *ent ) {
 				// GLX_U: [Couple Emotes] /wehug and /wekiss under /anim; this half of Misc was at 964, so it is
 				// split after them (about 560 and 570 then). GLX_U: [Emote] /emote under /anim: this one is at 669.
 				// GLX_U: [AutoWalk] /autowalk (a client command, the cgame's) after them: 843.
+				// GLX_U: [Crouch Toggle] the cg_crouchToggle hint (the cgame's cvar) after /autowalk: 922.
 				trap->SendServerCommand(ent - g_entities, "print \"\
 ^3/engage_duel: ^7Challenges the player you are looking at to a private saber duel. Most Force powers are disabled for both of you.\n\
 ^3/engage_fullforceduel: ^7Challenges the player you are looking at to a private saber duel with Force powers allowed.\n\
@@ -13518,7 +13519,8 @@ void Cmd_ListAccount_f( gentity_t *ent ) {
 ^3/emote <name/list>: ^7Plays a full emote with its own ending. Jump, crouch, Use or Attack to stop. ^3/emote list ^7lists them.\n\
 ^3/wehug: ^7Hugs the player you are looking at.\n\
 ^3/wekiss: ^7Kisses the player you are looking at. The kissed player can slap out of it with Force Push.\n\
-^3/autowalk: ^7Keeps you walking (or running) the way you are holding, forward if no key, so you can type on the move. Again to stop. Stops when you die or are knocked down.\n\"");
+^3/autowalk: ^7Keeps you walking (or running) the way you are holding, forward if no key, so you can type on the move. Again to stop. Stops when you die or are knocked down.\n\
+^3/cg_crouchToggle 1: ^7Press crouch once to stay crouched and again to stand.\n\"");
 				trap->SendServerCommand(ent - g_entities, "print \"\
 ^3/playsound <channel (optional)> <file path>: ^7Plays a sound, once every 15 seconds. With no arguments, lists the channels; ^3/list sounds ^7lists the files.\n\
 ^3/datetime: ^7Shows current server date and time.\n\
